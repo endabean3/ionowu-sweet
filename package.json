@@ -1,0 +1,17 @@
+{
+  "name": "ionowu-sweet-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "test": "pnpm --filter web test",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck"
+  },
+  "packageManager": "pnpm@11.22.0",
+  "onlyBuiltDependencies": [
+    "@biomejs/biome",
+    "esbuild",
+    "sharp"
+  ]
+}

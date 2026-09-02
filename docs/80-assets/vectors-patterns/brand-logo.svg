@@ -1,0 +1,24 @@
+<svg width="240" height="64" viewBox="0 0 240 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Strawberry Silk Gradient -->
+    <linearGradient id="strawberryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E11D48"/>
+      <stop offset="100%" stop-color="#FF5A82"/>
+    </linearGradient>
+    <filter id="shadowOffset" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="3" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+  </defs>
+
+  <!-- Mochi Cloud Squircle Icon -->
+  <g filter="url(#shadowOffset)">
+    <rect x="4" y="8" width="48" height="48" rx="16" fill="#FFA4B6" stroke="#2D231E" stroke-width="2.5"/>
+    <text x="28" y="39" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="24" fill="#2D231E" text-anchor="middle">🍓</text>
+  </g>
+
+  <!-- Brand Typography -->
+  <g transform="translate(64, 40)">
+    <text font-family="'Fraunces', Georgia, serif" font-weight="800" font-size="28" fill="#2D231E" letter-spacing="-0.5">ionowu</text>
+    <text x="96" y="-2" font-family="'Fraunces', Georgia, serif" font-style="italic" font-weight="800" font-size="22" fill="url(#strawberryGrad)">sweet</text>
+  </g>
+</svg>

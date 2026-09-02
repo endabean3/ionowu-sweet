@@ -1,0 +1,907 @@
+openapi: 3.1.0
+
+info:
+  title: ionowu Core API — POS Inti
+  version: "0.1.0"
+  description: >
+    Kontrak API untuk Core Service (Golang) — Fase 0 + Fase 1.
+    Sumber kebenaran untuk generate shared-types TypeScript (apps/web) dan
+    handler Go (apps/core). Setiap perubahan di sini mendahului kode,
+    bukan menyusul. Referensi: FDR.md §8, PRD-01-POS-INTI.md §8.
+  contact:
+    name: ionowu.com
+
+servers:
+  - url: https://api.ionowu.com/v1
+    description: Produksi
+  - url: http://localhost:8080/v1
+    description: Lokal (Docker Compose)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: products
+  - name: variants
+  - name: sales
+  - name: stock
+  - name: shifts
+  - name: outlets
+  - name: sync
+
+paths:
+  # ═══════════════════════════════════════════════════════════════
+  # AUTH — FR-01..05
+  # ═══════════════════════════════════════════════════════════════
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Daftarkan tenant baru + akun owner pertama
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_name, outlet_name, owner_email, owner_password, owner_name]
+              properties:
+                organization_name: { type: string, minLength: 1, maxLength: 200 }
+                outlet_name: { type: string, minLength: 1, maxLength: 200 }
+                owner_email: { type: string, format: email }
+                owner_password: { type: string, minLength: 10 }
+                owner_name: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "201":
+          description: Tenant terdaftar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "409":
+          description: Email sudah terdaftar
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login dengan email + password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Berhasil login
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "401":
+          description: Kredensial salah
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Tukar refresh token dengan access token baru
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: Token baru
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "401":
+          description: Refresh token tidak valid/dicabut
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Cabut refresh token aktif
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "204": { description: Berhasil logout }
+
+  # ═══════════════════════════════════════════════════════════════
+  # PRODUCTS — FR-10..15
+  # ═══════════════════════════════════════════════════════════════
+  /products:
+    get:
+      tags: [products]
+      summary: Daftar produk (untuk manajemen katalog, bukan pencarian kasir)
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: is_active, in: query, schema: { type: boolean } }
+        - { name: q, in: query, description: "cari by nama/SKU", schema: { type: string } }
+      responses:
+        "200":
+          description: Daftar produk
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total: { type: integer }
+    post:
+      tags: [products]
+      summary: Buat produk baru (owner/manager saja)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductInput" }
+      responses:
+        "201":
+          description: Produk dibuat
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Product" } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /products/{productId}:
+    parameters:
+      - { name: productId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    patch:
+      tags: [products]
+      summary: Ubah produk, termasuk soft-delete (is_active=false, FR-15)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductPatch" }
+      responses:
+        "200":
+          description: Produk diperbarui
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Product" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/import:
+    post:
+      tags: [products]
+      summary: Import produk massal via CSV (FR-14)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "202":
+          description: Import diterima, diproses async
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id: { $ref: "#/components/schemas/ULID" }
+                  rows_received: { type: integer }
+
+  # ═══════════════════════════════════════════════════════════════
+  # VARIANTS — FR-11..12
+  # ═══════════════════════════════════════════════════════════════
+  /products/{productId}/variants:
+    parameters:
+      - { name: productId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    get:
+      tags: [variants]
+      summary: Daftar varian sebuah produk
+      responses:
+        "200":
+          description: Daftar varian
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Variant" } }
+    post:
+      tags: [variants]
+      summary: Tambah varian baru ke produk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VariantInput" }
+      responses:
+        "201":
+          description: Varian dibuat
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Variant" } }
+        "409":
+          description: Barcode sudah dipakai varian lain di tenant ini
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /variants/{variantId}:
+    parameters:
+      - { name: variantId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    patch:
+      tags: [variants]
+      summary: Ubah harga/cost/barcode varian
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VariantPatch" }
+      responses:
+        "200":
+          description: Varian diperbarui
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Variant" } }
+
+  /variants/lookup:
+    get:
+      tags: [variants]
+      summary: Cari 1 varian by barcode — endpoint kasir, dipanggil tiap scan (FR-12)
+      parameters:
+        - { name: barcode, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Varian ditemukan
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Variant" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # SALES — FR-20..28
+  # ═══════════════════════════════════════════════════════════════
+  /sales:
+    get:
+      tags: [sales]
+      summary: Riwayat transaksi (histori kasir, bukan laporan BI)
+      parameters:
+        - { name: outlet_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: shift_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        "200":
+          description: Daftar transaksi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Sale" } }
+                  page: { type: integer }
+                  total: { type: integer }
+    post:
+      tags: [sales]
+      summary: >
+        Catat transaksi penjualan. IDEMPOTENT by client-generated ULID (FR-48) —
+        request dengan id yang sama, berkali-kali, mengembalikan transaksi
+        yang sama tanpa efek ganda. Ini endpoint yang dipanggil antrean sync
+        klien setelah offline (FR-43).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaleInput" }
+      responses:
+        "201":
+          description: Transaksi baru tercatat
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Sale" } }
+        "200":
+          description: >
+            Transaksi dengan id ini sudah pernah tercatat (idempotency hit) —
+            mengembalikan record yang sudah ada, bukan error.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Sale" } }
+        "422":
+          description: Payload tidak valid (mis. discount > discount_max_pct_cashier tanpa discount_approved_by)
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /sales/{saleId}/refund:
+    parameters:
+      - { name: saleId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    post:
+      tags: [sales]
+      summary: Refund sebagian/penuh (FR-26). Ditolak kalau di luar refund_window_hours tenant tanpa approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, amount]
+              properties:
+                reason: { type: string, minLength: 1 }
+                amount: { type: number, format: decimal, exclusiveMinimum: 0 }
+      responses:
+        "201":
+          description: Refund tercatat
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Refund" } }
+        "403":
+          description: Di luar window refund, butuh approval manager
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  # ═══════════════════════════════════════════════════════════════
+  # STOCK — FR-30..35
+  # ═══════════════════════════════════════════════════════════════
+  /stock/events:
+    post:
+      tags: [stock]
+      summary: >
+        Kirim batch event stok (restock manual, dsb). Menerima banyak event
+        sekaligus — inti dari sinkronisasi setelah offline berjam-jam (FR-31).
+        Idempotent per event id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { $ref: "#/components/schemas/StockEventInput" }
+      responses:
+        "201":
+          description: Event diterima
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: integer }
+                  duplicates: { type: integer, description: "sudah pernah diterima sebelumnya, diabaikan aman" }
+
+  /stock/levels:
+    get:
+      tags: [stock]
+      summary: Level stok saat ini per outlet (dari materialized view, bisa negatif — lihat D-11)
+      parameters:
+        - { name: outlet_id, in: query, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: variant_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: only_negative, in: query, description: "FR-34: filter untuk daftar peringatan manager", schema: { type: boolean } }
+      responses:
+        "200":
+          description: Level stok
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/StockLevel" } }
+
+  /stock/opname:
+    post:
+      tags: [stock]
+      summary: Catat hasil stok opname — menghasilkan event `adjustment`, tidak menimpa angka (FR-32)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outlet_id, counts]
+              properties:
+                outlet_id: { $ref: "#/components/schemas/ULID" }
+                counts:
+                  type: array
+                  items:
+                    type: object
+                    required: [variant_id, counted_qty]
+                    properties:
+                      variant_id: { $ref: "#/components/schemas/ULID" }
+                      counted_qty: { type: number, format: decimal }
+      responses:
+        "201":
+          description: Event adjustment dibuat untuk tiap selisih
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StockEvent" }
+
+  /stock/history/{variantId}:
+    parameters:
+      - { name: variantId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    get:
+      tags: [stock]
+      summary: Riwayat pergerakan stok satu varian, tertelusur siapa/kapan/kenapa (FR-35)
+      parameters:
+        - { name: outlet_id, in: query, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      responses:
+        "200":
+          description: Riwayat event
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/StockEvent" } }
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHIFTS — FR-50..54
+  # ═══════════════════════════════════════════════════════════════
+  /shifts/open:
+    post:
+      tags: [shifts]
+      summary: >
+        Buka shift kasir (input kas awal). `id` digenerate KLIEN (D-02) —
+        shift wajib bisa dibuka saat perangkat offline, karena kasir yang
+        tiba pagi hari tanpa koneksi harus tetap bisa mulai bekerja (FR-45).
+        Saat offline, klien mencatat shift lokal lalu mengirimnya lewat
+        /sync/push (field `shifts_open`), bukan lewat endpoint ini.
+        Idempotent by id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShiftOpenInput" }
+      responses:
+        "201":
+          description: Shift terbuka
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Shift" } }
+        "200":
+          description: Shift dengan id ini sudah tercatat (idempotency hit)
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Shift" } }
+        "409":
+          description: Kasir masih punya shift terbuka lain
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /shifts/{shiftId}/close:
+    parameters:
+      - { name: shiftId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    post:
+      tags: [shifts]
+      summary: Tutup shift — kirim kas fisik aktual, server hitung selisih (FR-51..52)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [closing_cash, occurred_at]
+              properties:
+                closing_cash: { type: number, format: decimal, minimum: 0 }
+                occurred_at: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Shift tertutup dengan ringkasan
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ShiftSummary" } }
+
+  /shifts:
+    get:
+      tags: [shifts]
+      summary: Riwayat shift (manager/owner, FR-53)
+      parameters:
+        - { name: outlet_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: cashier_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
+      responses:
+        "200":
+          description: Daftar shift
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Shift" } }
+
+  # ═══════════════════════════════════════════════════════════════
+  # OUTLETS — FR-60..62
+  # ═══════════════════════════════════════════════════════════════
+  /outlets:
+    get:
+      tags: [outlets]
+      summary: Daftar outlet tenant
+      responses:
+        "200":
+          description: Daftar outlet
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Outlet" } }
+    post:
+      tags: [outlets]
+      summary: Buat outlet baru (owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OutletInput" }
+      responses:
+        "201":
+          description: Outlet dibuat
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Outlet" } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # SYNC — FR-40..48 (endpoint paling kritis di seluruh API)
+  # ═══════════════════════════════════════════════════════════════
+  /sync/pull:
+    post:
+      tags: [sync]
+      summary: >
+        Klien tarik perubahan sejak checkpoint terakhir (mis. produk/harga
+        diubah dari perangkat lain). Dipanggil saat kembali online.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id: { $ref: "#/components/schemas/ULID" }
+                since_event_id: { $ref: "#/components/schemas/ULID" }
+      responses:
+        "200":
+          description: Batch perubahan sejak checkpoint
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                  variants: { type: array, items: { $ref: "#/components/schemas/Variant" } }
+                  checkpoint_event_id: { $ref: "#/components/schemas/ULID" }
+                  has_more: { type: boolean }
+
+  /sync/push:
+    post:
+      tags: [sync]
+      summary: >
+        Klien kirim BATCH event lokal sekaligus (shift, transaksi, event
+        stok) — bukan satu per satu. Ini yang membuat sync setelah offline
+        3 hari tidak butuh ratusan round-trip (lihat catatan desain di
+        PRD-01 §8). Setiap item idempotent by ULID; retry aman (FR-48).
+
+
+        ⚠️ URUTAN PENERAPAN DI SERVER (bukan urutan array): server WAJIB
+        menerapkan dalam urutan (1) shifts_open, (2) sales + stock_events,
+        (3) shifts_close — diurutkan berdasarkan occurred_at di dalam tiap
+        kelompok. Alasannya: pos_sales.shift_id punya FK ke pos_shifts,
+        jadi shift yang dibuka offline harus tercipta lebih dulu; dan index
+        parsial "satu shift terbuka per kasir" akan menolak shift baru kalau
+        penutupan shift sebelumnya belum diterapkan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id: { $ref: "#/components/schemas/ULID" }
+                shifts_open:
+                  type: array
+                  description: Shift yang dibuka saat perangkat offline (FR-45)
+                  items: { $ref: "#/components/schemas/ShiftOpenInput" }
+                sales:
+                  type: array
+                  items: { $ref: "#/components/schemas/SaleInput" }
+                stock_events:
+                  type: array
+                  items: { $ref: "#/components/schemas/StockEventInput" }
+                shifts_close:
+                  type: array
+                  description: Shift yang ditutup saat perangkat offline (FR-54)
+                  items: { $ref: "#/components/schemas/ShiftCloseInput" }
+      responses:
+        "200":
+          description: Hasil per-item — status diterima/duplikat/konflik untuk tiap entitas yang dikirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        client_id: { $ref: "#/components/schemas/ULID" }
+                        status: { type: string, enum: [accepted, duplicate, conflict, rejected] }
+                        detail: { type: string, nullable: true }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Forbidden:
+      description: Role tidak punya izin (mis. kasir mencoba hapus produk — D-10)
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    NotFound:
+      description: Resource tidak ditemukan
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  schemas:
+    ULID:
+      type: string
+      pattern: "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+      description: "26-karakter Crockford Base32, digenerate KLIEN (D-02 FDR)"
+      example: "01J8ZK9X3QR7VYVEHW8N4T9F5B"
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: "VALIDATION_ERROR" }
+        message: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+
+    AuthSession:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer, example: 900, description: "detik, default 15 menit" }
+        user:
+          type: object
+          properties:
+            id: { $ref: "#/components/schemas/ULID" }
+            tenant_id: { $ref: "#/components/schemas/ULID" }
+            email: { type: string, format: email }
+            role: { type: string, enum: [owner, manager, cashier] }
+
+    Product:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        sku: { type: string, nullable: true }
+        name: { type: string }
+        category: { type: string, nullable: true }
+        unit: { type: string, example: "pcs" }
+        image_url: { type: string, format: uri, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProductInput:
+      type: object
+      required: [name, unit]
+      properties:
+        sku: { type: string, nullable: true }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        category: { type: string, nullable: true }
+        unit: { type: string, default: "pcs" }
+        image_url: { type: string, format: uri, nullable: true }
+
+    ProductPatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        category: { type: string, nullable: true }
+        image_url: { type: string, format: uri, nullable: true }
+        is_active: { type: boolean, description: "false = soft-delete, FR-15" }
+
+    Variant:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        product_id: { $ref: "#/components/schemas/ULID" }
+        name: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        price: { type: number, format: decimal }
+        cost: { type: number, format: decimal }
+        is_active: { type: boolean }
+
+    VariantInput:
+      type: object
+      required: [price]
+      properties:
+        name: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        price: { type: number, format: decimal, minimum: 0 }
+        cost: { type: number, format: decimal, minimum: 0, default: 0 }
+
+    VariantPatch:
+      type: object
+      properties:
+        name: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        price: { type: number, format: decimal, minimum: 0 }
+        cost: { type: number, format: decimal, minimum: 0 }
+        is_active: { type: boolean }
+
+    SaleInput:
+      type: object
+      required: [id, outlet_id, shift_id, items, payments, subtotal, total, occurred_at]
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        outlet_id: { $ref: "#/components/schemas/ULID" }
+        shift_id: { $ref: "#/components/schemas/ULID" }
+        customer_id: { $ref: "#/components/schemas/ULID" }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [variant_id, qty, unit_price, unit_cost]
+            properties:
+              variant_id: { $ref: "#/components/schemas/ULID" }
+              qty: { type: number, format: decimal, exclusiveMinimum: 0 }
+              unit_price: { type: number, format: decimal, minimum: 0 }
+              unit_cost:
+                type: number
+                format: decimal
+                minimum: 0
+                description: >
+                  Snapshot harga modal SAAT TRANSAKSI TERJADI di klien.
+                  Server DILARANG melakukan lookup ke catalog_variants.cost
+                  saat menerima sync — transaksi offline bisa tiba 72 jam
+                  kemudian (FR-45), dan kalau cost sudah berubah dalam
+                  rentang itu, lookup menghasilkan margin historis yang salah
+                  dan merusak seluruh laporan BI Fase 2 tanpa jejak.
+              discount: { type: number, format: decimal, minimum: 0, default: 0 }
+        payments:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [method, amount]
+            properties:
+              method: { type: string, enum: [cash, qris, card, other] }
+              amount: { type: number, format: decimal, minimum: 0 }
+              reference: { type: string, nullable: true }
+        subtotal: { type: number, format: decimal, minimum: 0 }
+        discount: { type: number, format: decimal, minimum: 0, default: 0 }
+        discount_approved_by:
+          allOf: [{ $ref: "#/components/schemas/ULID" }]
+          nullable: true
+          description: "Wajib diisi kalau discount > discount_max_pct_cashier tenant (FR-22)"
+        tax: { type: number, format: decimal, minimum: 0, default: 0 }
+        total: { type: number, format: decimal, minimum: 0 }
+        occurred_at: { type: string, format: date-time, description: "waktu transaksi di klien, bukan waktu server terima" }
+        client_version: { type: integer, default: 1 }
+
+    Sale:
+      allOf:
+        - $ref: "#/components/schemas/SaleInput"
+        - type: object
+          properties:
+            tenant_id: { $ref: "#/components/schemas/ULID" }
+            cashier_id: { $ref: "#/components/schemas/ULID" }
+            status: { type: string, enum: [completed, refunded, partially_refunded] }
+            recorded_at: { type: string, format: date-time, description: "waktu server menerima — dipakai debugging sync" }
+
+    Refund:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        sale_id: { $ref: "#/components/schemas/ULID" }
+        reason: { type: string }
+        amount: { type: number, format: decimal }
+        requested_by: { $ref: "#/components/schemas/ULID" }
+        approved_by:
+          allOf: [{ $ref: "#/components/schemas/ULID" }]
+          nullable: true
+        occurred_at: { type: string, format: date-time }
+
+    StockEventInput:
+      type: object
+      required: [id, outlet_id, variant_id, delta, reason, occurred_at]
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        outlet_id: { $ref: "#/components/schemas/ULID" }
+        variant_id: { $ref: "#/components/schemas/ULID" }
+        delta: { type: number, format: decimal, description: "negatif = keluar" }
+        reason: { type: string, enum: [sale, purchase, adjustment, transfer, waste] }
+        ref_type: { type: string, nullable: true }
+        ref_id:
+          allOf: [{ $ref: "#/components/schemas/ULID" }]
+          nullable: true
+        occurred_at: { type: string, format: date-time }
+
+    StockEvent:
+      allOf:
+        - $ref: "#/components/schemas/StockEventInput"
+        - type: object
+          properties:
+            tenant_id: { $ref: "#/components/schemas/ULID" }
+            created_by: { $ref: "#/components/schemas/ULID" }
+            recorded_at: { type: string, format: date-time }
+
+    StockLevel:
+      type: object
+      properties:
+        outlet_id: { $ref: "#/components/schemas/ULID" }
+        variant_id: { $ref: "#/components/schemas/ULID" }
+        qty: { type: number, format: decimal, description: "bisa negatif — lihat D-11 di FDR" }
+        last_movement_at: { type: string, format: date-time }
+
+    ShiftOpenInput:
+      type: object
+      required: [id, outlet_id, opening_cash, occurred_at]
+      properties:
+        id:
+          allOf: [{ $ref: "#/components/schemas/ULID" }]
+          description: Digenerate KLIEN (D-02) agar shift bisa dibuka offline
+        outlet_id: { $ref: "#/components/schemas/ULID" }
+        opening_cash: { type: number, format: decimal, minimum: 0 }
+        occurred_at:
+          type: string
+          format: date-time
+          description: Waktu shift dibuka di klien, bukan waktu server menerima
+
+    ShiftCloseInput:
+      type: object
+      required: [id, closing_cash, occurred_at]
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        closing_cash: { type: number, format: decimal, minimum: 0 }
+        occurred_at: { type: string, format: date-time }
+
+    Shift:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        outlet_id: { $ref: "#/components/schemas/ULID" }
+        cashier_id: { $ref: "#/components/schemas/ULID" }
+        opened_at: { type: string, format: date-time }
+        closed_at: { type: string, format: date-time, nullable: true }
+        opening_cash: { type: number, format: decimal }
+        closing_cash: { type: number, format: decimal, nullable: true }
+        expected_cash: { type: number, format: decimal, nullable: true }
+
+    ShiftSummary:
+      allOf:
+        - $ref: "#/components/schemas/Shift"
+        - type: object
+          properties:
+            total_by_method:
+              type: object
+              additionalProperties: { type: number, format: decimal }
+            txn_count: { type: integer }
+            cash_variance: { type: number, format: decimal, description: "closing_cash - expected_cash" }
+
+    Outlet:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ULID" }
+        name: { type: string }
+        timezone: { type: string, example: "Asia/Jakarta" }
+        address: { type: string, nullable: true }
+        is_active: { type: boolean }
+
+    OutletInput:
+      type: object
+      required: [name, timezone]
+      properties:
+        name: { type: string, minLength: 1 }
+        timezone: { type: string, default: "Asia/Jakarta" }
+        address: { type: string, nullable: true }

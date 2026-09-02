@@ -1,0 +1,26 @@
+# Dipakai saat build image `web` — context-nya ROOT repo (bukan apps/web/)
+# karena ini pnpm workspace; server pos-engine punya .dockerignore sendiri
+# di services/pos-engine/ karena context-nya folder itu sendiri.
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.git/
+docs/
+*.md
+!README.md
+
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+apps/web/tsconfig.tsbuildinfo
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+.pnpm-store/
+
+services/pos-engine/
+30-data/migrations/

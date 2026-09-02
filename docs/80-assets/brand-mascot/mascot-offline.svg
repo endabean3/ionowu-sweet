@@ -1,0 +1,65 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Cocoa Drop Shadow -->
+    <filter id="sleepDrop" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+    <linearGradient id="taroPillow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E8E0FA"/>
+      <stop offset="100%" stop-color="#DDD0FA"/>
+    </linearGradient>
+    <linearGradient id="mintBlanket" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C5F2DF"/>
+      <stop offset="100%" stop-color="#A2E8CE"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#sleepDrop)">
+    <!-- Puffy Taro Cloud Pillow (Base) -->
+    <path d="M30 115 C15 115 10 100 15 88 C10 75 22 65 35 68 C42 54 60 50 75 58 C90 50 110 54 118 68 C130 65 142 75 138 88 C144 100 138 115 124 115 Z" fill="url(#taroPillow)" stroke="#2D231E" stroke-width="2.5" stroke-linejoin="round"/>
+    
+    <!-- Pillow Tag -->
+    <rect x="22" y="102" width="20" height="10" rx="3" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.2"/>
+    <text x="32" y="109" font-family="'Space Grotesk', sans-serif" font-weight="700" font-size="5" fill="#7A6F68" text-anchor="middle">Taro</text>
+
+    <!-- Sleeping Mochi Head -->
+    <path d="M52 82 C52 64 66 52 84 52 C102 52 116 64 116 82 C116 94 104 102 84 102 C64 102 52 94 52 82 Z" fill="#FFFFFF" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Bear Ears -->
+    <circle cx="58" cy="56" r="8" fill="#FFFFFF" stroke="#2D231E" stroke-width="2"/>
+    <circle cx="58" cy="56" r="4" fill="#FFA4B6"/>
+    <circle cx="110" cy="56" r="8" fill="#FFFFFF" stroke="#2D231E" stroke-width="2"/>
+    <circle cx="110" cy="56" r="4" fill="#FFA4B6"/>
+
+    <!-- Sleeping Peaceful Closed Eyes (-_-) -->
+    <path d="M68 76 Q74 80 80 76" stroke="#2D231E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <path d="M92 76 Q98 80 104 76" stroke="#2D231E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+
+    <!-- Rosy Cheek Blush -->
+    <ellipse cx="64" cy="82" rx="4.5" ry="3" fill="#FFA4B6" opacity="0.85"/>
+    <ellipse cx="108" cy="82" rx="4.5" ry="3" fill="#FFA4B6" opacity="0.85"/>
+
+    <!-- Gentle Sleeping Smile -->
+    <path d="M82 82 Q86 86 90 82" stroke="#2D231E" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+    <!-- Mint Knit Blanket Over Body -->
+    <path d="M54 90 C64 88 106 88 116 90 L122 120 C108 126 62 126 48 120 Z" fill="url(#mintBlanket)" stroke="#2D231E" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="60" y1="98" x2="110" y2="98" stroke="#2D231E" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.6"/>
+    <line x1="56" y1="108" x2="114" y2="108" stroke="#2D231E" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.6"/>
+
+    <!-- Cute Pastel 'Zzz' Bubbles -->
+    <g transform="translate(112, 26)">
+      <!-- Z 1 (Smallest) -->
+      <circle cx="6" cy="30" r="7" fill="#FFA4B6" stroke="#2D231E" stroke-width="1.2"/>
+      <text x="6" y="33" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="8" fill="#2D231E" text-anchor="middle">z</text>
+
+      <!-- Z 2 (Medium) -->
+      <circle cx="16" cy="18" r="8" fill="#A7D8F8" stroke="#2D231E" stroke-width="1.2"/>
+      <text x="16" y="22" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="10" fill="#2D231E" text-anchor="middle">z</text>
+
+      <!-- Z 3 (Large) -->
+      <circle cx="28" cy="4" r="10" fill="#DDD0FA" stroke="#2D231E" stroke-width="1.5"/>
+      <text x="28" y="9" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="13" fill="#2D231E" text-anchor="middle">Z</text>
+    </g>
+  </g>
+</svg>

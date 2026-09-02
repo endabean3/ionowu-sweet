@@ -1,0 +1,27 @@
+[
+  {
+    "name": "pembulatan_005",
+    "items": [
+      { "quantity": "1", "unit_price": "10", "discount": "0" },
+      { "quantity": "0.5", "unit_price": "0.01", "discount": "0" }
+    ],
+    "discount": "0",
+    "tax_rate": "0",
+    "expect_subtotal": "10.01",
+    "expect_discount_total": "0.00",
+    "expect_tax_total": "0.00",
+    "expect_grand_total": "10.01"
+  },
+  {
+    "name": "diskon_100_persen",
+    "items": [
+      { "quantity": "2", "unit_price": "15000", "discount": "0" }
+    ],
+    "discount": "30000",
+    "tax_rate": "0.11",
+    "expect_subtotal": "30000.00",
+    "expect_discount_total": "30000.00",
+    "expect_tax_total": "0.00",
+    "expect_grand_total": "0.00"
+  }
+]

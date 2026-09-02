@@ -1,0 +1,51 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Cocoa Drop Shadow -->
+    <filter id="latteShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+    <linearGradient id="matchaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C5F2DF"/>
+      <stop offset="50%" stop-color="#A2E8CE"/>
+      <stop offset="100%" stop-color="#72D4AF"/>
+    </linearGradient>
+    <linearGradient id="strawberryBase" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFA4B6"/>
+      <stop offset="100%" stop-color="#FF5A82"/>
+    </linearGradient>
+    <linearGradient id="foamGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E8F9F2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Cup Saucer Base -->
+  <ellipse cx="60" cy="104" rx="46" ry="8" fill="#FFEAA7" stroke="#2D231E" stroke-width="2.5"/>
+
+  <!-- Glass Mug Body -->
+  <g filter="url(#latteShadow)">
+    <!-- Mug Handle -->
+    <path d="M84 48 C98 48 102 78 84 82" fill="none" stroke="#2D231E" stroke-width="5" stroke-linecap="round"/>
+    <path d="M84 48 C98 48 102 78 84 82" fill="none" stroke="#FAF6F0" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- Main Glass Cup Shape -->
+    <path d="M28 32 C28 28 34 26 60 26 C86 26 92 28 92 32 L86 92 C86 98 76 102 60 102 C44 102 34 98 34 92 Z" fill="#FFFFFF" fill-opacity="0.9" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Strawberry Milk Swirl (Bottom Layer) -->
+    <path d="M34 80 C40 86 50 78 60 84 C70 90 80 84 86 86 L86 92 C86 98 76 102 60 102 C44 102 34 98 34 92 Z" fill="url(#strawberryBase)"/>
+
+    <!-- Matcha Green Foam Body (Middle Layer) -->
+    <path d="M30 42 C30 42 35 48 60 48 C85 48 90 42 90 42 L86 86 C80 84 70 90 60 84 C50 78 40 86 34 80 Z" fill="url(#matchaGrad)"/>
+
+    <!-- Cream Foam Top -->
+    <ellipse cx="60" cy="34" rx="30" ry="10" fill="url(#foamGrad)" stroke="#2D231E" stroke-width="2"/>
+
+    <!-- Matcha Latte Art Leaf -->
+    <path d="M60 41 C54 36 50 32 60 27 C70 32 66 36 60 41 Z" fill="#58B38E" stroke="#2D231E" stroke-width="1.2"/>
+    <path d="M60 27 L60 41" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="60" cy="26" r="2" fill="#58B38E"/>
+
+    <!-- Specular Highlight Curve on Glass -->
+    <path d="M34 40 L38 88" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+  </g>
+</svg>

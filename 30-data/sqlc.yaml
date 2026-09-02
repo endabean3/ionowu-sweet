@@ -1,0 +1,96 @@
+# sqlc — generate kode Go dari SQL yang kita tulis sendiri.
+#
+# Kenapa sqlc dan bukan ORM (TECH-STACK §3):
+#   1. Aturan emas `WHERE tenant_id = $1` hanya bisa ditegakkan saat code review
+#      bila SQL-nya terlihat. ORM menyembunyikan kueri yang dihasilkannya.
+#   2. Tanpa refleksi runtime — membantu memenuhi anggaran latensi <5ms.
+#
+# Jalankan:  sqlc generate     (dari folder ini)
+#            sqlc vet          (menegakkan aturan di bagian `rules`)
+
+version: "2"
+
+sql:
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "queries"
+
+    # ⚠️ WAJIB: aturan di bagian `rules:` bawah hanya DIDEFINISIKAN.
+    # Tanpa didaftarkan di sini, `sqlc vet` tetap exit 0 — gerbangnya mati
+    # tanpa tanda apa pun. Ditemukan saat pengujian nyata, bukan saat menulis.
+    rules:
+      - wajib-tenant-scope
+      - larang-delete-transaksional
+
+    gen:
+      go:
+        package: "store"
+        out: "../services/pos-engine/internal/store"
+        sql_package: "pgx/v5"
+
+        emit_json_tags: true
+        emit_interface: true              # memudahkan mock saat uji
+        emit_empty_slices: true           # [] bukan nil — lebih aman di JSON
+        emit_pointers_for_null_types: true
+        emit_db_tags: true
+
+        overrides:
+          # ── UANG & KUANTITAS ────────────────────────────────────────
+          # pgtype.Numeric bawaan pgx menyulitkan aritmetika dan mudah
+          # disalahgunakan. decimal.Decimal membuat perhitungan uang eksplisit
+          # dan mencegah seseorang diam-diam mengubahnya menjadi float64.
+          - db_type: "pg_catalog.numeric"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - db_type: "pg_catalog.numeric"
+            nullable: true
+            go_type:
+              import: "github.com/shopspring/decimal"
+              type: "NullDecimal"
+
+          # ── WAKTU ───────────────────────────────────────────────────
+          - db_type: "pg_catalog.timestamptz"
+            go_type: "time.Time"
+          - db_type: "pg_catalog.timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+
+          # ── JSONB ───────────────────────────────────────────────────
+          - db_type: "jsonb"
+            go_type: "encoding/json.RawMessage"
+
+# ═══════════════════════════════════════════════════════════════════════
+#  sqlc vet — menegakkan aturan yang selama ini hanya konvensi tertulis.
+#
+#  SECURITY.md §2B menyebut `WHERE tenant_id = $1` sebagai "aturan emas",
+#  tetapi aturan yang hanya bergantung pada kedisiplinan manusia akan
+#  dilanggar cepat atau lambat. Bagian ini menjadikannya gerbang CI.
+# ═══════════════════════════════════════════════════════════════════════
+rules:
+  - name: wajib-tenant-scope
+    message: >-
+      Kueri ini tidak menyebut tenant_id. Setiap kueri pada tabel bertenant WAJIB
+      memfilter tenant_id (SECURITY.md §2B). Bila kueri ini memang lintas-tenant
+      (platform_admins, identities, distributors, webhook_events), tambahkan
+      komentar '-- sqlc-vet-disable: wajib-tenant-scope' INLINE di baris SQL
+      yang sama (bukan di baris komentar tersendiri di atas kueri — field
+      query.sql yang dievaluasi CEL tidak menyertakan komentar baris tersendiri).
+    rule: |
+      !query.sql.contains("tenant_id")
+        && !query.sql.contains("sqlc-vet-disable: wajib-tenant-scope")
+
+  # CATATAN: aturan `larang-select-bintang` DIHAPUS setelah pengujian nyata.
+  # sqlc MEMPERLUAS `SELECT *` menjadi kolom eksplisit sebelum vet melihatnya,
+  # sehingga regex tidak akan pernah cocok — aturan mati yang menyamar
+  # sebagai gerbang. Risikonya justru ditangani secara struktural: kolom baru
+  # mengubah struct hasil generate, dan perubahan itu terlihat di diff
+  # SELAMA kode hasil generate ikut di-commit (lihat .gitignore).
+
+  - name: larang-delete-transaksional
+    message: >-
+      DELETE pada tabel keuangan dilarang. Katalog di-arsip lewat is_active;
+      transaksi tidak pernah dihapus (RETENTION.md §2).
+    rule: |
+      query.sql.matches("(?i)delete\\s+from\\s+(sales_transactions|sales_items|payments|audit_logs|stock_events)")

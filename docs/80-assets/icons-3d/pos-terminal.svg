@@ -1,0 +1,50 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Cocoa Drop Shadow -->
+    <filter id="posShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+    <linearGradient id="posBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFA4B6"/>
+      <stop offset="100%" stop-color="#FF7E99"/>
+    </linearGradient>
+    <linearGradient id="posScreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E8F9F2"/>
+      <stop offset="100%" stop-color="#C5F2DF"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#posShadow)">
+    <!-- Thermal Paper Receipt Curling Out -->
+    <path d="M42 22 L42 8 L48 12 L54 8 L60 12 L66 8 L72 12 L78 8 L78 22 Z" fill="#FFFFFF" stroke="#2D231E" stroke-width="2" stroke-linejoin="round"/>
+    <line x1="48" y1="14" x2="72" y2="14" stroke="#2D231E" stroke-width="1.5" stroke-dasharray="2 2"/>
+    <text x="60" y="20" font-family="'Space Mono', monospace" font-weight="700" font-size="5" fill="#E11D48" text-anchor="middle">PAID ✓</text>
+
+    <!-- Side Mint Accent Chassis -->
+    <rect x="26" y="28" width="68" height="74" rx="20" fill="#A2E8CE" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Main Strawberry Front Panel -->
+    <rect x="30" y="22" width="60" height="80" rx="18" fill="url(#posBody)" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Screen Glass -->
+    <rect x="38" y="32" width="44" height="30" rx="10" fill="url(#posScreen)" stroke="#2D231E" stroke-width="2"/>
+    <!-- Screen Face / Text -->
+    <circle cx="53" cy="44" r="2" fill="#2D231E"/>
+    <circle cx="67" cy="44" r="2" fill="#2D231E"/>
+    <path d="M57 48 Q60 52 63 48" stroke="#2D231E" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <text x="60" y="58" font-family="'Space Mono', monospace" font-weight="700" font-size="6" fill="#2D231E" text-anchor="middle">Rp 28.000</text>
+
+    <!-- Contactless Wave Icon -->
+    <path d="M56 68 C58 66 62 66 64 68" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <path d="M53 71 C57 68 63 68 67 71" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+
+    <!-- Keypad Grid (Squircle Buttons) -->
+    <rect x="38" y="76" width="12" height="9" rx="3" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.5"/>
+    <rect x="54" y="76" width="12" height="9" rx="3" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.5"/>
+    <rect x="70" y="76" width="12" height="9" rx="3" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.5"/>
+
+    <rect x="38" y="88" width="12" height="9" rx="3" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.5"/>
+    <rect x="54" y="88" width="12" height="9" rx="3" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.5"/>
+    <rect x="70" y="88" width="12" height="9" rx="3" fill="#A2E8CE" stroke="#2D231E" stroke-width="1.5"/>
+  </g>
+</svg>

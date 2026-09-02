@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="pastel">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>L'IONOWU · Haute Couture Fashion Magazine Edition</title>
+  
+  <!-- Luxury High-Fashion Fonts: Bodoni / Cormorant Garamond, Instrument Serif, Plus Jakarta Sans, Space Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+  <style>
+    /* =========================================================
+       HAUTE COUTURE LUXURY TOKENS (VOGUE SWEET RUNWAY)
+    ========================================================= */
+    :root[data-theme="pastel"] {
+      --bg-base: #FAF6F0;             /* Silk Ivory & Warm Linen */
+      --text-main: #1A1718;           /* Espresso Noir */
+      --text-muted: #726A66;          /* Muted Cashmere */
+      --card-bg: rgba(255, 255, 255, 0.78);
+      --card-border: #1A1718;         /* 3px Haute Contour Line */
+      --border-highlight: rgba(255, 255, 255, 0.98);
+      
+      /* Sweet Haute Pastels */
+      --couture-rose: #FF94A8;        /* Haute Strawberry */
+      --couture-rose-glow: rgba(255, 148, 168, 0.45);
+      --couture-matcha: #A3E8D0;      /* Pistachio Velvet */
+      --couture-matcha-glow: rgba(163, 232, 208, 0.45);
+      --couture-sky: #A5D6F8;         /* Silk Organza Blue */
+      --couture-sky-glow: rgba(165, 214, 248, 0.45);
+      --couture-champagne: #FFEAA5;   /* Champagne Cream */
+      --couture-lavender: #DDD0FA;    /* Sweet Lilac */
+      --couture-peach: #FFD2BA;       /* Peach Satin */
+
+      --shadow-hard: 5px 5px 0px #1A1718;
+      --shadow-hover: 8px 8px 0px #1A1718;
+      --border-width: 3px;
+      --card-radius: 26px;
+      --blur-val: 22px;
+    }
+
+    :root[data-theme="dark"] {
+      --bg-base: #0A0C11;
+      --text-main: #F6F6F8;
+      --text-muted: #9CA3AF;
+      --card-bg: rgba(18, 22, 32, 0.75);
+      --card-border: #FFFFFF;
+      --border-highlight: rgba(255, 255, 255, 0.45);
+      
+      --couture-rose: #FF2D8F;
+      --couture-rose-glow: rgba(255, 45, 143, 0.45);
+      --couture-matcha: #00F090;
+      --couture-matcha-glow: rgba(0, 240, 144, 0.35);
+      --couture-sky: #00E5FF;
+      --couture-sky-glow: rgba(0, 229, 255, 0.4);
+      --couture-champagne: #FFE600;
+      --couture-lavender: #C084FC;
+      --couture-peach: #FB923C;
+
+      --shadow-hard: 5px 5px 0px #000;
+      --shadow-hover: 8px 8px 0px #000;
+      --border-width: 3px;
+      --card-radius: 26px;
+      --blur-val: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: 120px;
+      position: relative;
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    /* Ambient Spatial Runway Orbs */
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(105px);
+      opacity: 0.6;
+      animation: floatOrb 24s ease-in-out infinite alternate;
+    }
+    .orb-1 {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--couture-rose), #FFC5D3);
+      top: -120px;
+      left: -100px;
+    }
+    .orb-2 {
+      width: 640px;
+      height: 640px;
+      background: radial-gradient(circle, var(--couture-sky), var(--couture-lavender));
+      bottom: -140px;
+      right: -100px;
+      animation-delay: -6s;
+    }
+    .orb-3 {
+      width: 480px;
+      height: 480px;
+      background: radial-gradient(circle, var(--couture-champagne), var(--couture-matcha));
+      top: 30%;
+      left: 50%;
+      animation-delay: -12s;
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(55px, 45px) scale(1.08); }
+      100% { transform: translate(-45px, 65px) scale(0.94); }
+    }
+
+    /* Silk Texture Pattern */
+    .fashion-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.025) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    /* Haute Couture Typography */
+    .font-bodoni {
+      font-family: 'Bodoni Moda', 'Playfair Display', Georgia, serif;
+      letter-spacing: -0.04em;
+    }
+    .font-garamond-italic {
+      font-family: 'Cormorant Garamond', 'Instrument Serif', Georgia, serif;
+      font-style: italic;
+    }
+    .font-display {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .font-mono {
+      font-family: 'Space Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .tracking-couture {
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    /* Top Floating Controls Bar */
+    .top-action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill-btn {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 2px solid var(--card-border);
+      border-radius: 999px;
+      padding: 7px 16px;
+      font-family: 'Space Grotesk';
+      font-weight: 800;
+      font-size: 11.5px;
+      box-shadow: 3px 3px 0px var(--card-border);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      color: var(--text-main);
+    }
+    .pill-btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 5px 5px 0px var(--card-border);
+    }
+    .pill-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px var(--card-border);
+    }
+
+    /* =========================================================
+       VOGUE-STYLE FASHION COVER MASTHEAD
+    ========================================================= */
+    .magazine-cover-box {
+      background: var(--card-bg);
+      backdrop-filter: blur(var(--blur-val));
+      -webkit-backdrop-filter: blur(var(--blur-val));
+      border: var(--border-width) solid var(--card-border);
+      border-radius: var(--card-radius);
+      padding: 32px 36px 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-hard), 0 25px 50px var(--couture-rose-glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Giant Watermark Behind Header */
+    .cover-watermark {
+      position: absolute;
+      top: -20px;
+      right: 20px;
+      font-family: 'Bodoni Moda', serif;
+      font-size: 140px;
+      font-weight: 900;
+      color: rgba(255, 148, 168, 0.12);
+      line-height: 1;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .cover-top-meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1.5px solid rgba(0, 0, 0, 0.12);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .cover-masthead {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 20px 0 16px;
+    }
+    .vogue-title {
+      font-size: clamp(3rem, 7.5vw, 6.2rem);
+      line-height: 0.88;
+      color: var(--text-main);
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+    }
+    .vogue-title span {
+      color: var(--couture-rose);
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .cover-tagline {
+      font-size: 12px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 10px;
+      font-weight: 700;
+    }
+
+    .cover-bottom-bar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1.5px solid var(--text-main);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* Luxury Hangtag Barcode Ribbon */
+    .barcode-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Space Mono';
+      font-size: 11px;
+      background: var(--couture-champagne);
+      border: 2px solid var(--card-border);
+      padding: 4px 10px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 0px var(--card-border);
+      color: #1A1718;
+    }
+
+    /* Live Ticker Runway */
+    .runway-ticker {
+      background: var(--couture-champagne);
+      border: var(--border-width) solid var(--card-border);
+      border-radius: 16px;
+      padding: 8px 16px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 4px 4px 0px var(--card-border);
+      overflow: hidden;
+    }
+    .runway-label {
+      background: var(--couture-rose);
+      color: #1A1718;
+      font-family: 'Space Grotesk';
+      font-weight: 800;
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 8px;
+      border: 2px solid var(--card-border);
+      white-space: nowrap;
+      box-shadow: 2px 2px 0px var(--card-border);
+      letter-spacing: 0.05em;
+    }
+    .runway-content {
+      white-space: nowrap;
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      gap: 36px;
+      animation: tickerScroll 25s linear infinite;
+    }
+    @keyframes tickerScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* =========================================================
+       FASHION BENTO GRID
+    ========================================================= */
+    .editorial-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 22px;
+      margin-bottom: 36px;
+    }
+    .card-glassbrut {
+      background: var(--card-bg);
+      backdrop-filter: blur(var(--blur-val));
+      -webkit-backdrop-filter: blur(var(--blur-val));
+      border: var(--border-width) solid var(--card-border);
+      border-radius: var(--card-radius);
+      padding: 26px;
+      box-shadow: var(--shadow-hard), 0 15px 30px rgba(0, 0, 0, 0.05);
+      position: relative;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+    .card-glassbrut::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--border-highlight), transparent);
+    }
+    .card-glassbrut:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover), 0 20px 40px var(--couture-rose-glow);
+    }
+
+    .col-4 { grid-column: span 4; }
+    .col-5 { grid-column: span 5; }
+    .col-7 { grid-column: span 7; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+
+    @media (max-width: 960px) {
+      .col-4, .col-5, .col-7, .col-8 { grid-column: span 12; }
+    }
+
+    /* Lookbook Badge / Hangtag */
+    .lookbook-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      color: var(--text-main);
+      font-weight: 700;
+      display: inline-block;
+      background: var(--couture-champagne);
+      border: 1.5px solid var(--card-border);
+      padding: 3px 8px;
+      border-radius: 6px;
+      box-shadow: 2px 2px 0px var(--card-border);
+      margin-bottom: 8px;
+    }
+
+    /* Spring Physics Buttons */
+    .spring-btn {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 12px 20px;
+      border-radius: 14px;
+      border: var(--border-width) solid var(--card-border);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 4px 4px 0px var(--card-border);
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      color: var(--text-main);
+    }
+    .spring-btn:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: 7px 7px 0px var(--card-border);
+    }
+    .spring-btn:active {
+      transform: translate(3px, 3px) scale(0.96);
+      box-shadow: 1px 1px 0px var(--card-border);
+    }
+
+    .btn-rose { background: var(--couture-rose); }
+    .btn-rose:hover { box-shadow: 7px 7px 0px var(--card-border), 0 10px 20px var(--couture-rose-glow); }
+    .btn-sky { background: var(--couture-sky); }
+    .btn-sky:hover { box-shadow: 7px 7px 0px var(--card-border), 0 10px 20px var(--couture-sky-glow); }
+    .btn-matcha { background: var(--couture-matcha); }
+    .btn-matcha:hover { box-shadow: 7px 7px 0px var(--card-border), 0 10px 20px var(--couture-matcha-glow); }
+    .btn-champagne { background: var(--couture-champagne); }
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* 3D Tilt Wrapper */
+    .tilt-wrapper { perspective: 1000px; }
+    .tilt-card {
+      transition: transform 0.15s ease-out, box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-style: preserve-3d;
+    }
+
+    /* Lookbook Menu Grid (Fashion Catalog Style) */
+    .lookbook-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .lookbook-card-item {
+      background: rgba(255, 255, 255, 0.65);
+      border: 2.5px solid var(--card-border);
+      border-radius: 18px;
+      padding: 14px 10px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 3px 3px 0px var(--card-border);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
+      position: relative;
+    }
+    .lookbook-card-item:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0px var(--card-border);
+      background: var(--couture-rose);
+    }
+    .lookbook-card-item:active {
+      transform: translate(2px, 2px) scale(0.95);
+      box-shadow: 1px 1px 0px var(--card-border);
+    }
+
+    /* Mini Runway Chart */
+    .mini-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      height: 110px;
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 16px;
+      border: 2px solid rgba(0, 0, 0, 0.08);
+    }
+    .bar {
+      flex: 1;
+      border-radius: 8px 8px 3px 3px;
+      border: 2px solid var(--card-border);
+      box-shadow: 2px 2px 0px var(--card-border);
+      transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s;
+      cursor: pointer;
+    }
+    .bar:hover {
+      transform: scaleY(1.08);
+      filter: brightness(1.08);
+    }
+
+    /* Cart / Bag Summary Box */
+    .bag-summary {
+      background: var(--couture-champagne);
+      border: 2.5px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px 18px;
+      box-shadow: 4px 4px 0px var(--card-border);
+      margin-top: 16px;
+    }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: var(--card-bg);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 3px solid var(--card-border);
+      border-radius: 999px;
+      padding: 10px 26px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 6px 6px 0px var(--card-border), 0 15px 35px var(--couture-rose-glow);
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-width: 90vw;
+    }
+
+    /* iOS Bottom Sheet (Drawer) */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 12, 18, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .drawer-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .bottom-drawer {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%) translateY(105%);
+      width: 100%;
+      max-width: 580px;
+      background: var(--bg-base);
+      border: var(--border-width) solid var(--card-border);
+      border-bottom: none;
+      border-radius: 28px 28px 0 0;
+      padding: 24px 28px 40px;
+      box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.3), var(--shadow-hard);
+      z-index: 201;
+      transition: transform 0.45s cubic-bezier(0.32, 1, 0.23, 1);
+    }
+    .bottom-drawer.active {
+      transform: translateX(-50%) translateY(0%);
+    }
+    .drawer-pill-handle {
+      width: 50px;
+      height: 5px;
+      background: var(--card-border);
+      border-radius: 999px;
+      margin: 0 auto 18px;
+      opacity: 0.4;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Light Orbs -->
+  <div class="ambient-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <div class="fashion-grid"></div>
+
+  <div class="container">
+    
+    <!-- Top Action Bar -->
+    <div class="top-action-bar">
+      <div class="barcode-tag">
+        <span>||||| |||| || 89402-IDN</span>
+        <span>• SPEC 04</span>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button class="pill-btn" onclick="toggleSound()" id="soundBtn">
+          🔊 Sound: ON
+        </button>
+        <button class="pill-btn" onclick="toggleTheme()" id="themeBtn">
+          🍨 Palette: Haute Pastel
+        </button>
+        <button class="pill-btn" onclick="openDrawer('editorial')">
+          🏷️ Lookbook: SS-2026
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= VOGUE-STYLE FASHION MASTHEAD ================= -->
+    <div class="magazine-cover-box">
+      <div class="cover-watermark">27</div>
+      
+      <div class="cover-top-meta">
+        <span class="tracking-couture">THE INTELLIGENCE ISSUE</span>
+        <span class="tracking-couture">VOL. XXVII · AUTUMN / HARVEST 2026</span>
+        <span class="tracking-couture">PARIS — TOKYO — JAKARTA</span>
+      </div>
+
+      <div class="cover-masthead">
+        <h1 class="vogue-title font-bodoni">
+          L'IONOWU <span>Runway</span>
+        </h1>
+        <div class="cover-tagline">
+          HAUTE COUTURE POS & ARTISANAL RETAIL INTELLIGENCE
+        </div>
+      </div>
+
+      <div class="cover-bottom-bar">
+        <div><strong>DIRECTOR:</strong> KASIR & OWNER ATELIER</div>
+        <div><strong>MATERIAL:</strong> 100% ORGANIC DATA & SWEET VELVET</div>
+        <div style="color: #059669;"><strong>CURRENCY:</strong> TABULAR RUPIAH (WIB)</div>
+      </div>
+    </div>
+
+    <!-- ================= RUNWAY TICKER ================= -->
+    <div class="runway-ticker">
+      <div class="runway-label">⚡ RUNWAY INSIGHT</div>
+      <div class="runway-content font-mono">
+        <span>• [LOOK 01] MATCHA PISTACHIO LATTE MENJADI TREN TERLARIS DI KORIDOR SELATAN (+155%)</span>
+        <span>• [LOOK 02] KOLEKSI STRAWBERRY CHEESECAKE TERSISA 3 POTONG — REKOMENDASI BUNDLING DIAKTIFKAN</span>
+        <span>• [LOOK 03] TRANSAKSI QRIS MENCATAT SETTLEMENT MEWAH 84% TANPA GANGGUAN</span>
+        <span>• [LOOK 04] FRESH OAT MILK BARISTA RUNWAY SUDAH TIBA DI ATELIER UTAMA</span>
+      </div>
+    </div>
+
+    <!-- ================= EDITORIAL BENTO GRID ================= -->
+    <div class="editorial-grid">
+
+      <!-- Col 1: Lead Cover Story & 1-Tap Action (7 Cols) -->
+      <div class="col-7">
+        <div class="card-glassbrut">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <span class="lookbook-tag">LOOKBOOK § 01 · TREN UTAMA</span>
+                <h2 class="font-bodoni" style="font-size: 2rem; line-height: 1.1; margin-bottom: 6px; font-weight: 800;">
+                  "Harmoni Rasa: Sentuhan Velvet Matcha & Strawberry di Jam Sibuk"
+                </h2>
+              </div>
+              <div style="width: 58px; height: 58px; border-radius: 50%; background: var(--couture-rose); border: 2.5px solid var(--card-border); display: grid; place-items: center; font-size: 24px; box-shadow: 3px 3px 0px var(--card-border); cursor: pointer;" onclick="playSynthSound('pop'); triggerAlert('✨ Editorial AI Curve Aktif!')">
+                🌹
+              </div>
+            </div>
+
+            <div class="font-garamond-italic" style="font-size: 1.55rem; line-height: 1.25; color: var(--text-main); border-left: 4px solid var(--couture-rose); padding-left: 16px; margin: 14px 0 16px;">
+              "Kemewahan bukan hanya pada rasa, melainkan bagaimana kecepatan kasir menyajikan keindahan dalam satu sentuhan fluid."
+            </div>
+
+            <p style="font-size: 14px; line-height: 1.6; color: var(--text-muted); margin-bottom: 20px;">
+              Tingkatkan nilai keranjang pelanggan dengan paket kurasi <strong>Matcha Latte & Berry Cake</strong>. Cukup tekan tombol aksi otomatis di bawah ini.
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="spring-btn btn-rose" onclick="openDrawer('promo')">
+              🎁 Pasang Kurasi Promo 15%
+            </button>
+            <button class="spring-btn btn-sky" onclick="openDrawer('supplier')">
+              📲 Order Restock via WA
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 2: Key Financial Metric / 3D Tilt Card (5 Cols) -->
+      <div class="tilt-wrapper col-5">
+        <div class="card-glassbrut tilt-card" id="tiltCard" style="background: rgba(255, 148, 168, 0.2); border-color: var(--card-border);">
+          <div>
+            <span class="lookbook-tag" style="background: var(--couture-rose);">LOOKBOOK § 02 · NERACA ATELIER</span>
+            <div style="font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; font-weight: 700;">
+              Total Omzet Koleksi Hari Ini
+            </div>
+            
+            <div class="font-mono" style="font-size: clamp(2.3rem, 3.8vw, 3.2rem); font-weight: 700; color: var(--text-main); letter-spacing: -0.05em; margin-bottom: 8px;">
+              <span style="font-size: 1.4rem; color: #D946EF;">Rp</span>
+              <span id="omzetVal">6.120.000</span>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.65); border: 2px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 12px 14px; margin: 12px 0;">
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <span style="color: var(--text-muted); font-weight: 600;">Total Transaksi:</span>
+                <strong class="font-mono" id="txCount">188 Struk</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                <span style="color: var(--text-muted); font-weight: 600;">Average Order Value:</span>
+                <strong class="font-mono" style="color: #059669;" id="aovVal">Rp 32.553</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="spring-btn btn-matcha" style="flex: 1;" onclick="triggerAlert('🖨️ Struk Neraca Kasir Dicetak dengan Tipografi Rapi!')">
+              🖨️ Cetak Struk
+            </button>
+            <button class="spring-btn btn-champagne" style="flex: 1;" onclick="triggerAlert('📲 Rekap Penjualan Terkirim ke WhatsApp Owner!')">
+              📲 Kirim WA
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 3: Interactive Lookbook Catalog (8 Cols) -->
+      <div class="col-8">
+        <div class="card-glassbrut">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <span class="lookbook-tag" style="background: var(--couture-sky);">LOOKBOOK § 03 · KATALOG KASIR</span>
+                <h3 class="font-bodoni" style="font-size: 1.4rem; font-weight: 800;">Sentuh Item untuk Memasukkan ke Shopping Bag</h3>
+              </div>
+              <span class="font-mono" style="font-size: 11px; background: var(--couture-matcha); color: var(--text-main); border: 2px solid var(--card-border); padding: 3px 8px; border-radius: 6px; font-weight: 700; box-shadow: 2px 2px 0px var(--card-border);">
+                HAUTE POS
+              </span>
+            </div>
+
+            <!-- Lookbook Cards -->
+            <div class="lookbook-grid">
+              <div class="lookbook-card-item" onclick="addToCart('Velvet Matcha', 28000)">
+                <span style="font-size: 26px;">🍵</span>
+                <strong style="font-size: 13px;">Velvet Matcha</strong>
+                <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Rp 28.000</span>
+              </div>
+              <div class="lookbook-card-item" onclick="addToCart('Berry Shortcake', 35000)">
+                <span style="font-size: 26px;">🍰</span>
+                <strong style="font-size: 13px;">Berry Cake</strong>
+                <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Rp 35.000</span>
+              </div>
+              <div class="lookbook-card-item" onclick="addToCart('Silk Oat Latte', 30000)">
+                <span style="font-size: 26px;">☕</span>
+                <strong style="font-size: 13px;">Silk Oat Latte</strong>
+                <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Rp 30.000</span>
+              </div>
+              <div class="lookbook-card-item" onclick="addToCart('Butter Croissant', 22000)">
+                <span style="font-size: 26px;">🥐</span>
+                <strong style="font-size: 13px;">Croissant</strong>
+                <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Rp 22.000</span>
+              </div>
+            </div>
+
+            <!-- Bag Summary -->
+            <div class="bag-summary">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong style="font-size: 14px;">Shopping Bag: <span id="cartCount" class="font-mono">0 Item</span></strong>
+                  <div id="cartItemsText" style="font-size: 12px; color: var(--text-muted);">Pilih menu di atas untuk menambah pesanan</div>
+                </div>
+                <div style="text-align: right;">
+                  <div class="font-mono" style="font-size: 18px; font-weight: 800; color: #1A1718;" id="cartTotal">Rp 0</div>
+                  <button class="spring-btn btn-rose" style="padding: 6px 14px; font-size: 11px; margin-top: 4px;" onclick="checkoutCart()">
+                    💳 Bayar QRIS Instan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 4: Runway Hourly Distribution (4 Cols) -->
+      <div class="col-4">
+        <div class="card-glassbrut">
+          <div>
+            <span class="lookbook-tag" style="background: var(--couture-champagne);">LOOKBOOK § 04 · ARUS RUNWAY</span>
+            <h3 class="font-bodoni" style="font-size: 1.35rem; margin-bottom: 4px; font-weight: 800;">Puncak Jam Belanja</h3>
+            <p style="font-size: 12px; color: var(--text-muted);">Volume pengunjung per jam:</p>
+
+            <div class="mini-chart" id="chartBars">
+              <div class="bar" style="height: 45%; background: var(--couture-sky);" onclick="barClick(this, '08:00 WIB', 'Rp 450k')" title="08:00 WIB"></div>
+              <div class="bar" style="height: 70%; background: var(--couture-matcha);" onclick="barClick(this, '10:00 WIB', 'Rp 700k')" title="10:00 WIB"></div>
+              <div class="bar" style="height: 95%; background: var(--couture-rose);" onclick="barClick(this, '12:00 WIB', 'Rp 950k')" title="12:00 WIB (Lunch)"></div>
+              <div class="bar" style="height: 60%; background: var(--couture-champagne);" onclick="barClick(this, '14:00 WIB', 'Rp 600k')" title="14:00 WIB"></div>
+              <div class="bar" style="height: 100%; background: var(--couture-rose);" onclick="barClick(this, '16:00 WIB', 'Rp 1.100k')" title="16:00 WIB (Tea Rush)"></div>
+              <div class="bar" style="height: 80%; background: var(--couture-lavender);" onclick="barClick(this, '18:00 WIB', 'Rp 800k')" title="18:00 WIB"></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; font-weight: 700;">
+            <span>08:00</span>
+            <span style="color: var(--text-main);">★ Peak: 16:00 (Rush)</span>
+            <span>20:00</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Dynamic Island -->
+  <div class="dynamic-island" id="island">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--couture-rose); border: 1.5px solid var(--card-border); box-shadow: 0 0 10px var(--couture-rose-glow);"></div>
+      <span class="font-bodoni" style="font-size: 14px; letter-spacing: 0.05em; color: var(--text-main); font-weight: 800;">L'IONOWU RUNWAY</span>
+    </div>
+    <div style="height: 16px; width: 2px; background: rgba(0,0,0,0.15);"></div>
+    <span id="islandText" class="font-mono" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">HAUTE COUTURE PERFORMANCE ENGINE ACTIVE</span>
+  </div>
+
+  <!-- ================= FLUID iOS BOTTOM DRAWER ================= -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="bottom-drawer" id="bottomDrawer">
+    <div class="drawer-pill-handle"></div>
+    <div id="drawerContent">
+      <!-- Injected via JS -->
+    </div>
+  </div>
+
+  <!-- JavaScript for Web Audio Synthesizer, iOS Spring Drawer, and 3D Tilt -->
+  <script>
+    // 1. Web Audio Synth
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function playSynthSound(type = 'pop') {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'pop') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'success') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, now); // C5
+          osc.frequency.setValueAtTime(659.25, now + 0.06); // E5
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        }
+      } catch (err) {
+        console.log("Audio waiting for user gesture:", err);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundBtn');
+      btn.innerText = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+      playSynthSound('pop');
+      triggerAlert(soundEnabled ? '🔊 Haptic Audio Aktif' : '🔇 Haptic Audio Dimatikan');
+    }
+
+    // 2. Interactive Cart & POS System
+    let cart = [];
+    let cartTotalAmount = 0;
+
+    function addToCart(name, price) {
+      playSynthSound('pop');
+      cart.push({ name, price });
+      cartTotalAmount += price;
+      
+      document.getElementById('cartCount').innerText = `${cart.length} Item`;
+      document.getElementById('cartTotal').innerText = `Rp ${cartTotalAmount.toLocaleString('id-ID')}`;
+      
+      const itemNames = cart.map(i => i.name).join(', ');
+      document.getElementById('cartItemsText').innerText = itemNames.length > 38 ? itemNames.slice(0, 38) + '...' : itemNames;
+      
+      triggerAlert(`✨ Masuk Bag: ${name} (Rp ${price.toLocaleString('id-ID')})`);
+    }
+
+    function checkoutCart() {
+      if (cart.length === 0) {
+        playSynthSound('pop');
+        triggerAlert('⚠️ Shopping bag masih kosong, pilih menu runway dulu!');
+        return;
+      }
+      playSynthSound('success');
+      triggerAlert(`💳 Transaksi Rp ${cartTotalAmount.toLocaleString('id-ID')} Sukses via QRIS!`);
+      
+      const currentOmzet = 6120000 + cartTotalAmount;
+      document.getElementById('omzetVal').innerText = currentOmzet.toLocaleString('id-ID');
+      
+      cart = [];
+      cartTotalAmount = 0;
+      document.getElementById('cartCount').innerText = `0 Item`;
+      document.getElementById('cartTotal').innerText = `Rp 0`;
+      document.getElementById('cartItemsText').innerText = `Transaksi selesai · Siap melayani pelanggan berikutnya`;
+    }
+
+    function barClick(el, time, amount) {
+      playSynthSound('pop');
+      triggerAlert(`📊 ${time} • Estimasi Omzet: ${amount}`);
+    }
+
+    // 3. iOS Bottom Drawer Handlers
+    function openDrawer(type) {
+      playSynthSound('pop');
+      const drawer = document.getElementById('bottomDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+      const content = document.getElementById('drawerContent');
+
+      if (type === 'promo') {
+        content.innerHTML = `
+          <div style="font-family: 'Space Mono'; font-size: 11px; color: var(--couture-rose); font-weight: 700; margin-bottom: 4px;">HAUTE AI RECOMMENDATION</div>
+          <h2 class="font-bodoni" style="font-size: 1.7rem; margin-bottom: 8px; font-weight: 800;">Kurasi Paket Bundling Runway</h2>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+            Sistem otomatis menerapkan diskon 15% untuk paket <strong>Velvet Matcha + Berry Shortcake</strong> pada jam 12:00 - 16:00 WIB.
+          </p>
+          <div style="display: flex; gap: 10px;">
+            <button class="spring-btn btn-rose" style="flex: 1;" onclick="applyPromo()">✅ Terapkan Sekarang</button>
+            <button class="spring-btn btn-glass" onclick="closeDrawer()">Batal</button>
+          </div>
+        `;
+      } else if (type === 'supplier') {
+        content.innerHTML = `
+          <div style="font-family: 'Space Mono'; font-size: 11px; color: var(--couture-sky); font-weight: 700; margin-bottom: 4px;">ATELIER SUPPLY CHAIN</div>
+          <h2 class="font-bodoni" style="font-size: 1.7rem; margin-bottom: 8px; font-weight: 800;">Restock Fresh Oat Milk & Biji Kopi</h2>
+          <div style="background: rgba(0,0,0,0.05); border: 2px solid var(--card-border); border-radius: 14px; padding: 12px; font-family: 'Space Mono'; font-size: 12px; margin-bottom: 16px;">
+            "Halo Supplier Atelier, mohon kirimkan 12 Karton Oat Milk Barista & 5kg Arabica House Blend ke Atelier ionowu Jaksel. Terima kasih."
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="spring-btn btn-sky" style="flex: 1;" onclick="sendWA()">📲 Kirim ke WhatsApp Supplier</button>
+            <button class="spring-btn btn-glass" onclick="closeDrawer()">Tutup</button>
+          </div>
+        `;
+      } else if (type === 'editorial') {
+        content.innerHTML = `
+          <div style="font-family: 'Space Mono'; font-size: 11px; color: var(--couture-champagne); font-weight: 700; margin-bottom: 4px;">LOOKBOOK SPECIFICATION</div>
+          <h2 class="font-bodoni" style="font-size: 1.7rem; margin-bottom: 8px; font-weight: 800;">Haute Couture Glassbrut v2.7</h2>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+            Kombinasi tipografi Didone <em>Bodoni Moda</em>, akrilik transparan lembut, dan palet <strong>Haute Sweet Pastel</strong> menghadirkan rasa mewah layaknya cover majalah mode internasional.
+          </p>
+          <button class="spring-btn btn-champagne" style="width: 100%;" onclick="closeDrawer()">✨ Sempurna, Tutup Lookbook</button>
+        `;
+      }
+
+      overlay.classList.add('active');
+      drawer.classList.add('active');
+    }
+
+    function closeDrawer() {
+      playSynthSound('pop');
+      document.getElementById('bottomDrawer').classList.remove('active');
+      document.getElementById('drawerOverlay').classList.remove('active');
+    }
+
+    function applyPromo() {
+      playSynthSound('success');
+      closeDrawer();
+      triggerAlert('🎉 Kurasi Bundling 15% Berhasil Diaktifkan!');
+    }
+
+    function sendWA() {
+      playSynthSound('success');
+      closeDrawer();
+      triggerAlert('📲 Template WhatsApp Berhasil Dikirim!');
+    }
+
+    // 4. Dynamic Island & 3D Tilt
+    function triggerAlert(msg) {
+      const island = document.getElementById('island');
+      const text = document.getElementById('islandText');
+      text.innerHTML = `<span>${msg}</span>`;
+      island.style.borderColor = 'var(--couture-rose)';
+      island.style.transform = 'translateX(-50%) translateY(-8px) scale(1.04)';
+      setTimeout(() => {
+        island.style.borderColor = 'var(--card-border)';
+        island.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+      }, 1500);
+    }
+
+    const tiltWrapper = document.querySelector('.tilt-wrapper');
+    const tiltCard = document.getElementById('tiltCard');
+    if (tiltWrapper && tiltCard) {
+      tiltWrapper.addEventListener('mousemove', (e) => {
+        const rect = tiltWrapper.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        tiltCard.style.transform = `rotateX(${-(y / rect.height) * 14}deg) rotateY(${(x / rect.width) * 14}deg) translateY(-4px)`;
+      });
+      tiltWrapper.addEventListener('mouseleave', () => {
+        tiltCard.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0px)';
+      });
+    }
+
+    // Theme Switcher
+    let currentTheme = 'pastel';
+    function toggleTheme() {
+      playSynthSound('pop');
+      currentTheme = currentTheme === 'pastel' ? 'dark' : 'pastel';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      const btn = document.getElementById('themeBtn');
+      btn.innerText = currentTheme === 'pastel' ? '🍨 Palette: Haute Pastel' : '🖤 Palette: Noir Runway';
+      triggerAlert(currentTheme === 'pastel' ? '🍨 Haute Pastel Diaktifkan' : '🖤 Noir Runway Diaktifkan');
+    }
+  </script>
+</body>
+</html>

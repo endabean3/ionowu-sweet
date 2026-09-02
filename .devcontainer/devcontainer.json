@@ -1,0 +1,26 @@
+{
+  "name": "ionowu sweet",
+  "dockerComposeFile": ["../docker-compose.dev.yml"],
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "biomejs.biome",
+        "bradlc.vscode-tailwindcss",
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ckolkman.vscode-postgres"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "off",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+
+  "postCreateCommand": "make tools-check",
+  "remoteUser": "dev"
+}

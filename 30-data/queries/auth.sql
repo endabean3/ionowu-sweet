@@ -1,0 +1,59 @@
+-- Kueri autentikasi untuk jalur /auth/*.
+-- Dipakai hanya oleh internal/httpapi/auth.go — bukan seeder.
+
+-- name: GetUserByEmail :one
+-- Lookup user berdasarkan email untuk login. Hanya user aktif.
+SELECT id, tenant_id, name, email, password_hash, role, pin_hash, is_active
+FROM users
+WHERE email = $1 AND tenant_id = $2 AND is_active = TRUE
+LIMIT 1;
+
+-- name: GetUserWithTenant :one
+-- Setelah login sukses, ambil info tenant untuk disertakan dalam JWT claims.
+SELECT
+    u.id         AS user_id,
+    u.tenant_id,
+    u.name       AS user_name,
+    u.email,
+    u.role,
+    t.name       AS tenant_name,
+    t.plan_tier,
+    t.plan_status
+FROM users u
+JOIN tenants t ON t.id = u.tenant_id
+WHERE u.id = $1 AND u.is_active = TRUE;
+
+-- name: CreateRefreshToken :exec
+-- Simpan refresh token (sudah di-hash SHA-256) dengan TTL 7 hari.
+INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, device_label, device_label)
+VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days', $5, $6);
+
+-- name: GetRefreshTokenByHash :one
+-- Verifikasi refresh token. Kembalikan error bila sudah direvokasi atau expired.
+SELECT id, tenant_id, user_id, expires_at, revoked_at
+FROM refresh_tokens
+WHERE token_hash = $1
+  AND revoked_at IS NULL
+  AND expires_at > NOW()
+LIMIT 1;
+
+-- name: RevokeRefreshToken :exec
+-- Revoke satu token spesifik (logout atau rotate).
+UPDATE refresh_tokens
+SET revoked_at = NOW()
+WHERE token_hash = $1 AND revoked_at IS NULL;
+
+-- name: RevokeAllUserTokens :exec
+-- Revoke semua token aktif milik user (logout-all / compromised account).
+UPDATE refresh_tokens
+SET revoked_at = NOW()
+WHERE user_id = $1 AND revoked_at IS NULL;
+
+-- name: RegisterTenantOwner :one
+-- sqlc-vet-disable: wajib-tenant-scope
+-- Buat tenant baru + user owner sekaligus dalam satu transaksi (dipanggil
+-- dari handler POST /auth/register). Query ini hanya untuk registrasi awal —
+-- tenant_id belum ada, jadi dikecualikan dari aturan wajib-tenant-scope.
+INSERT INTO users (id, tenant_id, name, email, password_hash, role)
+VALUES ($1, $2, $3, $4, $5, 'owner')
+RETURNING id;

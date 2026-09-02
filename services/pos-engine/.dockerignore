@@ -1,0 +1,19 @@
+# Wajib (DOCKER.md §2) — tanpa ini, COPY . . menyalin .env ke dalam LAYER
+# image, dan rahasia tetap terbaca di situ meski dihapus di layer berikutnya.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.git/
+*.md
+
+# Biner hasil build lokal — jangan sampai menimpa hasil build di dalam image
+api
+seed
+pos-engine
+
+# Cache & artefak uji
+*.test
+*.out

@@ -1,0 +1,52 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Cocoa Drop Shadow -->
+    <filter id="qrisShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF3C4"/>
+      <stop offset="50%" stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="holoCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#DDD0FA" stop-opacity="0.85"/>
+      <stop offset="80%" stop-color="#A7D8F8" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFA4B6" stop-opacity="0.95"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#qrisShadow)">
+    <!-- Golden Coin Base -->
+    <circle cx="50" cy="58" r="36" fill="url(#goldGrad)" stroke="#2D231E" stroke-width="2.5"/>
+    <circle cx="50" cy="58" r="28" fill="none" stroke="#2D231E" stroke-width="1.8" stroke-dasharray="3 2"/>
+
+    <!-- Cloud Face on Coin -->
+    <path d="M38 64 C32 64 28 60 28 54 C28 48 34 44 40 44 C42 38 48 34 54 36 C60 38 62 44 62 48 C66 48 70 52 70 56 C70 62 66 64 60 64 Z" fill="#FFFFFF" stroke="#2D231E" stroke-width="1.8"/>
+    <circle cx="44" cy="52" r="1.5" fill="#2D231E"/>
+    <circle cx="56" cy="52" r="1.5" fill="#2D231E"/>
+    <path d="M48 55 Q50 58 52 55" stroke="#2D231E" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+
+    <!-- Holographic QRIS Card Floating on Right -->
+    <g transform="translate(48, 40) rotate(-6)">
+      <rect x="0" y="0" width="56" height="38" rx="8" fill="url(#holoCard)" stroke="#2D231E" stroke-width="2"/>
+      
+      <!-- Mini QR Pattern -->
+      <rect x="6" y="6" width="16" height="16" rx="3" fill="#2D231E"/>
+      <rect x="8" y="8" width="12" height="12" rx="1" fill="#FFFFFF"/>
+      <rect x="11" y="11" width="6" height="6" fill="#2D231E"/>
+
+      <!-- QRIS Text -->
+      <text x="26" y="16" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="8" fill="#2D231E">QRIS</text>
+      
+      <!-- Card Chip & Dots -->
+      <rect x="6" y="26" width="8" height="6" rx="1.5" fill="#FCD34D" stroke="#2D231E" stroke-width="1"/>
+      <circle cx="40" cy="29" r="4" fill="#FFA4B6" fill-opacity="0.8"/>
+      <circle cx="46" cy="29" r="4" fill="#FFEAA7" fill-opacity="0.8"/>
+    </g>
+
+    <!-- Shiny Sparkle -->
+    <path d="M88 30 L90 22 L92 30 L100 32 L92 34 L90 42 L88 34 L80 32 Z" fill="#FCD34D" stroke="#2D231E" stroke-width="1.2"/>
+  </g>
+</svg>

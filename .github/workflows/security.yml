@@ -1,0 +1,131 @@
+# Pipeline keamanan otomatis.
+#
+# 40-security/ menjelaskan MODEL keamanan (RBAC, tenancy, kripto).
+# Berkas ini MENEGAKKANNYA plus menutup kelas ancaman yang tidak bisa
+# dijaga oleh desain: rantai pasok, CVE dependensi, rahasia yang bocor.
+#
+# Sistem ini menyimpan PII pelanggan (ADR-0006) dan uang UMKM.
+# Rujukan: 40-security/THREAT-MODEL.md · SECURITY-PIPELINE.md
+
+name: Security
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Setiap Senin 02:00 UTC — CVE baru muncul pada kode yang TIDAK berubah.
+    # Tanpa jadwal, kerentanan baru tidak akan pernah terdeteksi.
+    - cron: '0 2 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  secrets:
+    name: Pemindaian rahasia (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }   # seluruh riwayat: rahasia lama tetap rahasia
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ada kode bahasa ini?
+        id: cek
+        run: |
+          case "${{ matrix.language }}" in
+            go) [ -f go.mod ] && echo "ada=true" >> $GITHUB_OUTPUT || echo "ada=false" >> $GITHUB_OUTPUT ;;
+            javascript-typescript) [ -f package.json ] && echo "ada=true" >> $GITHUB_OUTPUT || echo "ada=false" >> $GITHUB_OUTPUT ;;
+            python) ls services/*/pyproject.toml >/dev/null 2>&1 && echo "ada=true" >> $GITHUB_OUTPUT || echo "ada=false" >> $GITHUB_OUTPUT ;;
+          esac
+      - uses: github/codeql-action/init@v3
+        if: steps.cek.outputs.ada == 'true'
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/autobuild@v3
+        if: steps.cek.outputs.ada == 'true'
+      - uses: github/codeql-action/analyze@v3
+        if: steps.cek.outputs.ada == 'true'
+
+  deps:
+    name: Kerentanan dependensi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26' }
+      - name: govulncheck (Go)
+        run: |
+          [ -f go.mod ] || { echo "⏭️  kode Go belum ada"; exit 0; }
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      - uses: pnpm/action-setup@v6
+      - name: pnpm audit
+        run: |
+          [ -f package.json ] || { echo "⏭️  kode Node belum ada"; exit 0; }
+          pnpm audit --audit-level high
+
+  containers:
+    name: CVE pada image (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Base image devcontainer sekaligus image CI — CVE di sini menyebar
+      # ke seluruh lingkungan pengembangan.
+      - name: Trivy — base image devcontainer
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: golang:1.26-bookworm
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-base.sarif'
+          exit-code: '0'          # laporkan, jangan blokir: base image di luar kendali kita
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: 'trivy-base.sarif', category: 'trivy-base' }
+
+      - name: Trivy — konfigurasi IaC (compose, Dockerfile)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'          # ini kendali kita — blokir bila salah
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: sbom.cyclonedx.json
+
+  permissions-check:
+    name: Izin workflow tidak berlebihan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setiap workflow wajib membatasi permissions
+        run: |
+          fail=0
+          for f in .github/workflows/*.yml; do
+            grep -q '^permissions:' "$f" || { echo "❌ $f tanpa blok permissions:"; fail=1; }
+            grep -qE '^\s+contents:\s*write' "$f" && echo "⚠️  $f punya contents: write"
+          done
+          exit $fail

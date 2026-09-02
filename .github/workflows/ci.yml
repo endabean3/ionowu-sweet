@@ -1,0 +1,143 @@
+# Berjalan di setiap PR. TIDAK membangun image aplikasi — itu tugas build.yml
+# setelah merge. Memisahkannya membuat umpan balik PR cepat dan hemat menit CI.
+# Rujukan: 15-development/CI-PIPELINE.md §2
+
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.26'
+  NODE_VERSION: '24'
+
+jobs:
+  docs:
+    name: Validasi dokumentasi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tautan, tabel, blok kode
+        run: make docs-check
+
+  sql:
+    name: sqlc vet — tenant scope
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ env.GO_VERSION }}' }
+      - run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+      # Gerbang terpenting: menolak kueri tanpa tenant_id, SELECT *,
+      # dan DELETE pada tabel keuangan. SECURITY §2B jadi gerbang CI.
+      - run: cd 30-data && sqlc vet
+
+  migrations:
+    name: Migrasi terhadap Postgres nyata
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 3s --health-retries 10
+        ports: ['5432:5432']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ env.GO_VERSION }}' }
+      - run: go install github.com/pressly/goose/v3/cmd/goose@v3.27.3
+      - name: goose up
+        run: goose -dir 30-data/migrations postgres "$DB" up
+        env: { DB: 'postgres://ci:ci@localhost:5432/ci?sslmode=disable' }
+      - name: Verifikasi jumlah tabel
+        run: |
+          n=$(psql "$DB" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
+          echo "tabel: $n"; [ "$n" -ge 47 ] || { echo "❌ harap ≥47"; exit 1; }
+        env: { DB: 'postgres://ci:ci@localhost:5432/ci?sslmode=disable' }
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ env.GO_VERSION }}' }
+      - name: golangci-lint
+        run: |
+          [ -f go.mod ] || { echo "⏭️  kode Go belum ada"; exit 0; }
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+          golangci-lint run ./...
+
+  test-go:
+    name: Uji Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ env.GO_VERSION }}' }
+      - run: |
+          [ -f go.mod ] || { echo "⏭️  kode Go belum ada"; exit 0; }
+          go test ./... -race
+      - name: Coverage rumus uang harus 100%
+        run: bash scripts/check-money-coverage.sh
+
+  money-parity:
+    name: ⭐ Paritas rumus uang Go ↔ TS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ env.GO_VERSION }}' }
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      # `pnpm install` WAJIB ada: tanpa install, direktori store tak pernah
+      # dibuat dan langkah Post `cache: pnpm` gagal — job merah meski ujinya
+      # lulus. Itu yang membuat gerbang ini merah pada e222ffc.
+      - run: pnpm install --frozen-lockfile
+
+      # Paritas ditegakkan dengan KEDUA sisi membaca fixture JSON yang SAMA
+      # (services/pos-engine/internal/money/fixtures/). Sebelumnya job ini
+      # memanggil compare-money-results.sh yang merujuk berkas tak pernah ada
+      # (packages/money-testcases/cases.json), sehingga selalu `exit 0` —
+      # gerbang terpenting di pipeline ini nyatanya tidak menguji apa pun.
+      - name: Go — terhadap fixture bersama
+        run: cd services/pos-engine && go test ./internal/money/... -v
+      - name: TypeScript — terhadap fixture Go yang SAMA
+        run: pnpm --filter web test
+
+  budget:
+    name: Anggaran performa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash scripts/check-bundle-size.sh
+
+  secrets:
+    name: Tidak ada rahasia di log
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash scripts/scan-test-logs-for-secrets.sh
+
+  e2e:
+    name: Playwright E2E Offline Checkout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Jalankan Playwright
+        run: cd apps/web && CI=true npx playwright test

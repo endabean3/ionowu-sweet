@@ -1,0 +1,14 @@
+[
+  {
+    "name": "tunai_dan_qris_pas",
+    "grand_total": "50000",
+    "payments": ["20000", "30000"],
+    "expect_matches": true
+  },
+  {
+    "name": "tiga_metode_kurang",
+    "grand_total": "50000",
+    "payments": ["20000", "20000", "5000"],
+    "expect_matches": false
+  }
+]

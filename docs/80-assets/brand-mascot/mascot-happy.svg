@@ -1,0 +1,61 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Cocoa Drop Shadow -->
+    <filter id="mascotDrop" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+    <linearGradient id="cloudBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFF5EC"/>
+    </linearGradient>
+    <linearGradient id="pinkApron" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFA4B6"/>
+      <stop offset="100%" stop-color="#FF6584"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#mascotDrop)">
+    <!-- Waving Right Hand -->
+    <path d="M116 80 C130 75 140 58 132 50 C124 44 116 60 110 70 Z" fill="url(#cloudBody)" stroke="#2D231E" stroke-width="2.5" stroke-linejoin="round"/>
+
+    <!-- Left Hand Resting -->
+    <ellipse cx="38" cy="92" rx="10" ry="8" fill="url(#cloudBody)" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Main Mochi Cloud Body -->
+    <path d="M40 116 C28 116 20 104 20 92 C20 76 32 68 44 68 C44 52 60 36 80 36 C100 36 116 52 116 68 C128 68 140 76 140 92 C140 104 132 116 120 116 Z" fill="url(#cloudBody)" stroke="#2D231E" stroke-width="2.5" stroke-linejoin="round"/>
+
+    <!-- Mochi Feet -->
+    <ellipse cx="60" cy="124" rx="12" ry="8" fill="#FFF5EC" stroke="#2D231E" stroke-width="2.5"/>
+    <ellipse cx="100" cy="124" rx="12" ry="8" fill="#FFF5EC" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Apron -->
+    <path d="M52 88 L108 88 L102 116 L58 116 Z" fill="url(#pinkApron)" stroke="#2D231E" stroke-width="2.5"/>
+    <path d="M56 88 L46 68" stroke="#2D231E" stroke-width="2" stroke-linecap="round"/>
+    <path d="M104 88 L114 68" stroke="#2D231E" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Brand Tag on Apron -->
+    <rect x="66" y="96" width="28" height="12" rx="4" fill="#FAF6F0" stroke="#2D231E" stroke-width="1.2"/>
+    <text x="80" y="105" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="7" fill="#2D231E" text-anchor="middle">ionowu</text>
+
+    <!-- Face Eyes with Catchlight -->
+    <circle cx="64" cy="74" r="3.5" fill="#2D231E"/>
+    <circle cx="65.5" cy="72.5" r="1.2" fill="#FFFFFF"/>
+    
+    <circle cx="96" cy="74" r="3.5" fill="#2D231E"/>
+    <circle cx="97.5" cy="72.5" r="1.2" fill="#FFFFFF"/>
+
+    <!-- Rosy Cheek Blush -->
+    <ellipse cx="54" cy="80" rx="5" ry="3" fill="#FFA4B6" opacity="0.85"/>
+    <ellipse cx="106" cy="80" rx="5" ry="3" fill="#FFA4B6" opacity="0.85"/>
+
+    <!-- Cheerful Smile -->
+    <path d="M74 78 Q80 85 86 78" stroke="#2D231E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+
+    <!-- Strawberry Sprout Leaf Hat -->
+    <path d="M80 36 C76 28 70 26 66 28 C64 34 70 36 80 36 Z" fill="#A2E8CE" stroke="#2D231E" stroke-width="1.8"/>
+    <path d="M80 36 C84 28 90 26 94 28 C96 34 90 36 80 36 Z" fill="#A2E8CE" stroke="#2D231E" stroke-width="1.8"/>
+
+    <!-- Sparkle Stars -->
+    <path d="M136 34 L138 28 L140 34 L146 36 L140 38 L138 44 L136 38 L130 36 Z" fill="#FFEAA7" stroke="#2D231E" stroke-width="1"/>
+  </g>
+</svg>

@@ -1,0 +1,128 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth/context";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+/**
+ * Halaman login kasir / owner.
+ *
+ * Field yang dibutuhkan:
+ *   - Tenant ID  : ULID tenant yang didapat saat registrasi
+ *   - Email      : email user
+ *   - Password   : password argon2id
+ *
+ * Setelah login sukses, redirect ke /kasir (kasir) atau /dashboard (owner/manager).
+ */
+export default function LoginPage() {
+  const { login, isLoading } = useAuth();
+  const router = useRouter();
+
+  const [tenantId, setTenantId] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(tenantId.trim(), email.trim(), password);
+      // Redirect sesuai role dilakukan oleh middleware/layout
+      // Default: ke halaman kasir
+      router.replace("/kasir");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login gagal");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[--sweet-oat-milk]">
+        <div className="text-[--sweet-dark-cocoa]/60 text-sm">Memuat sesi…</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[--sweet-oat-milk] p-4">
+      {/* Ambient orb */}
+      <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[--sweet-strawberry]/20 blur-[80px]" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[--sweet-matcha]/20 blur-[80px]" />
+      </div>
+
+      <div className="relative w-full max-w-sm">
+        {/* Card */}
+        <div className="milky-glass rounded-[32px] p-8 space-y-6">
+          {/* Logo / brand */}
+          <div className="text-center space-y-1">
+            <div className="text-4xl">🍭</div>
+            <h1 className="text-2xl font-bold text-[--sweet-dark-cocoa] font-display">
+              ionowu sweet
+            </h1>
+            <p className="text-sm text-[--sweet-dark-cocoa]/60">Kasir empuk, cepat & cerdas</p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              label="Tenant ID"
+              type="text"
+              placeholder="01J8ZK9X3QR7VYVEHW8N4T9F5B"
+              value={tenantId}
+              onChange={(e) => setTenantId(e.target.value)}
+              required
+              autoComplete="off"
+              hint="ULID tenant yang diterima saat registrasi"
+            />
+            <Input
+              label="Email"
+              type="email"
+              placeholder="kasir@toko.id"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+            <Input
+              label="Password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+
+            {error && (
+              <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="pos"
+              className="w-full"
+              disabled={submitting || !tenantId || !email || !password}
+            >
+              {submitting ? "Masuk…" : "Masuk"}
+            </Button>
+          </form>
+        </div>
+
+        <p className="text-center text-xs text-[--sweet-dark-cocoa]/40 mt-4">
+          ionowu sweet v0.1 · Fase 0
+        </p>
+      </div>
+    </div>
+  );
+}

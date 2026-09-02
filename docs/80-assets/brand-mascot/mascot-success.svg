@@ -1,0 +1,63 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Cocoa Drop Shadow -->
+    <filter id="successDrop" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0" flood-color="#2D231E"/>
+    </filter>
+    <linearGradient id="cloudBody2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFF5EC"/>
+    </linearGradient>
+    <linearGradient id="matchaApron" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C5F2DF"/>
+      <stop offset="100%" stop-color="#A2E8CE"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#successDrop)">
+    <!-- Both Hands Raised Celebrating -->
+    <ellipse cx="28" cy="66" rx="9" ry="8" fill="#FFF5EC" stroke="#2D231E" stroke-width="2.5"/>
+    <ellipse cx="132" cy="66" rx="9" ry="8" fill="#FFF5EC" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Main Mochi Cloud Body -->
+    <path d="M40 116 C28 116 20 104 20 92 C20 76 32 68 44 68 C44 52 60 36 80 36 C100 36 116 52 116 68 C128 68 140 76 140 92 C140 104 132 116 120 116 Z" fill="url(#cloudBody2)" stroke="#2D231E" stroke-width="2.5" stroke-linejoin="round"/>
+
+    <!-- Mochi Feet -->
+    <ellipse cx="60" cy="124" rx="12" ry="8" fill="#FFF5EC" stroke="#2D231E" stroke-width="2.5"/>
+    <ellipse cx="100" cy="124" rx="12" ry="8" fill="#FFF5EC" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Apron -->
+    <path d="M52 88 L108 88 L102 116 L58 116 Z" fill="url(#matchaApron)" stroke="#2D231E" stroke-width="2.5"/>
+
+    <!-- Joyful Closed Happy Eyes (^_^) -->
+    <path d="M58 72 Q64 66 70 72" stroke="#2D231E" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M90 72 Q96 66 102 72" stroke="#2D231E" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+    <!-- Rosy Cheek Blush -->
+    <ellipse cx="54" cy="78" rx="5" ry="3" fill="#FFA4B6" opacity="0.9"/>
+    <ellipse cx="106" cy="78" rx="5" ry="3" fill="#FFA4B6" opacity="0.9"/>
+
+    <!-- Big Open Happy Mouth -->
+    <path d="M72 78 Q80 90 88 78 Z" fill="#E11D48" stroke="#2D231E" stroke-width="2"/>
+    <ellipse cx="80" cy="83" rx="4" ry="2" fill="#FFA4B6"/>
+
+    <!-- Long Stamped Thermal Receipt Held in Front -->
+    <g transform="translate(62, 82)">
+      <path d="M0 0 L36 0 L36 44 L30 40 L24 44 L18 40 L12 44 L6 40 L0 44 Z" fill="#FFFFFF" stroke="#2D231E" stroke-width="2"/>
+      
+      <!-- Stamped Ribbon Badge -->
+      <rect x="3" y="6" width="30" height="10" rx="3" fill="#FFA4B6" stroke="#2D231E" stroke-width="1.2"/>
+      <text x="18" y="14" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="6.5" fill="#2D231E" text-anchor="middle">LUNAS ✓</text>
+
+      <line x1="4" y1="20" x2="32" y2="20" stroke="#2D231E" stroke-width="1" stroke-dasharray="2 1.5"/>
+      <text x="18" y="27" font-family="'Space Mono', monospace" font-weight="700" font-size="5" fill="#059669" text-anchor="middle">SUCCESS</text>
+      <text x="18" y="34" font-family="'Space Mono', monospace" font-size="4" fill="#7A6F68" text-anchor="middle">Rp 45.000</text>
+    </g>
+
+    <!-- Confetti & Golden Stars -->
+    <circle cx="24" cy="40" r="3" fill="#FFA4B6" stroke="#2D231E" stroke-width="1"/>
+    <circle cx="136" cy="42" r="3.5" fill="#A2E8CE" stroke="#2D231E" stroke-width="1"/>
+    <path d="M78 22 L80 16 L82 22 L88 24 L82 26 L80 32 L78 26 L72 24 Z" fill="#FCD34D" stroke="#2D231E" stroke-width="1.2"/>
+    <path d="M124 24 L126 19 L128 24 L133 25 L128 27 L126 32 L124 27 L119 25 Z" fill="#FCD34D" stroke="#2D231E" stroke-width="1.2"/>
+  </g>
+</svg>

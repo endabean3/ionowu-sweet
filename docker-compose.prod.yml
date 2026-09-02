@@ -1,0 +1,98 @@
+# PRODUKSI — dipakai Dokploy. Bukan untuk lokal (pakai docker-compose.dev.yml).
+#
+# Tiga perbedaan penting dari dev, dan semuanya disengaja:
+#   1. TANPA build:  — image ditarik dari ghcr.io (ADR-0004)
+#   2. TANPA ports:  — hanya Traefik yang menghadap luar. Mem-publish port
+#      di sini berarti melewati Traefik DAN menembus UFW (NETWORK-HARDENING §3)
+#   3. TANPA rahasia literal — seluruh ${VAR} diisi di panel Environment Dokploy
+#
+# Rujukan: 15-development/CI-PIPELINE.md §4 · 15-development/DEV-VS-PROD.md
+
+services:
+  pos-engine:
+    image: ghcr.io/${GH_REPO}/pos-engine:${IMAGE_TAG}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      QRIS_API_KEY: ${QRIS_API_KEY}
+      QRIS_WEBHOOK_SECRET: ${QRIS_WEBHOOK_SECRET}
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 128M }
+
+  web:
+    image: ghcr.io/${GH_REPO}/web:${IMAGE_TAG}
+    environment:
+      POS_API_INTERNAL_URL: http://pos-engine:8080
+      NEXT_PUBLIC_POS_API_URL: ${PUBLIC_API_URL}
+      # Pengguna read-only: menegakkan aturan bahwa TypeScript tidak menulis
+      # ke tabel transaksional (CONFIGURATION §4). Batas jadi nyata, bukan konvensi.
+      DATABASE_URL: ${DATABASE_URL_READONLY}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN}
+      SESSION_SECRET: ${SESSION_SECRET}
+    depends_on: [pos-engine]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 256M }
+
+  intelligence-worker:
+    image: ghcr.io/${GH_REPO}/intelligence-worker:${IMAGE_TAG}
+    environment:
+      DATABASE_URL: ${DATABASE_URL_READONLY}
+      REDIS_URL: redis://redis:6379
+      # Jendela 02.00–05.00 WIB — di luar jam operasional toko
+      SCHEDULE_WINDOW: "02:00-05:00"
+      TZ: Asia/Jakarta
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+    deploy:
+      resources:
+        # Batas WAJIB: worker yang menghabiskan memori dapat menyeret
+        # pos-engine ikut mati (ANALYTICS-BI §5)
+        limits: { memory: 512M }
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 512M }
+
+  redis:
+    image: redis:7-alpine
+    # appendonly no — Redis MURNI cache. Setelah perbaikan REDIS-STRATEGY §2–3,
+    # tidak ada lagi yang tak bisa dibangun ulang, jadi restart Redis
+    # menjadi peristiwa biasa, bukan insiden.
+    command: >-
+      redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 256M }
+
+volumes:
+  pgdata:

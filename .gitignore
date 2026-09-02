@@ -1,0 +1,127 @@
+# Rahasia — JANGAN PERNAH di-commit (CONFIGURATION.md §2)
+.env
+.env.*
+!.env.example
+
+# Kunci & sertifikat. JWT_PRIVATE_KEY (Ed25519) menandatangani SELURUH access
+# token: bocornya satu berkas = siapa pun bisa membuat token untuk tenant mana
+# pun, dan invarian #1 (isolasi tenant) runtuh tanpa jejak di log.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.der
+id_rsa*
+id_ed25519*
+*.ppk
+
+# Kredensial layanan & akses server (ADR-0003 Dokploy/VPS, ADR-0005 telemetri)
+.netrc
+kubeconfig
+*.kubeconfig
+credentials*.json
+service-account*.json
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Dump & backup database — berisi PII pelanggan (nama, telepon, riwayat belanja).
+# Meng-commit-nya memindahkan data pribadi ke GitHub, melanggar invarian #6 dan
+# kewajiban kita sebagai pemroses data (COMPLIANCE-ID). Backup yang sah ada di
+# Cloudflare R2, bukan di repo (BACKUP-DR).
+*.sql.gz
+*.dump
+*.backup
+*.bak
+*.sqlite
+*.sqlite3
+
+# Dependensi & build
+node_modules/
+# Artefak pnpm yang HANYA muncul bila pnpm dijalankan di host, bukan di Dev
+# Container. Keduanya pernah masuk repo (.pnpm-store sempat 452 MB) — di-ignore
+# agar pelanggaran batas host/container tidak ikut ter-commit. Lihat CLAUDE.md §4.
+.npmrc
+.pnpm-store/
+.serwist/
+.next/
+out/
+dist/
+build/
+.turbo/
+__pycache__/
+*.pyc
+.venv/
+
+# Artefak build frontend — semuanya DIHASILKAN ULANG setiap build.
+#   tsbuildinfo   cache incremental TypeScript, 200+ KB dan berubah tiap build
+#   next-env.d.ts ditulis Next.js sendiri ("should not be edited")
+#   public/sw.js  bundel minified Serwist; sumbernya ada di src/sw.ts
+# Meng-commit hasil generate berarti diff review dipenuhi noise, dan lebih buruk:
+# service worker ter-commit bisa BASI terhadap src/sw.ts tanpa ada yang sadar —
+# padahal ia yang menopang invarian #2 (kasir tetap jualan saat offline).
+*.tsbuildinfo
+next-env.d.ts
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+
+# Artefak build & uji Go
+*.exe
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Biner hasil `go build ./cmd/<nama>` — TIDAK berekstensi, jadi pola *.exe /
+# *.out di atas tidak menangkapnya. Satu biner `api` sebesar 15 MB nyaris
+# ter-commit karena ini. Namanya mengikuti nama folder cmd/, jadi didaftarkan
+# eksplisit: glob yang terlalu luas berisiko memblokir berkas sah.
+/services/pos-engine/api
+/services/pos-engine/seed
+/services/pos-engine/pos-engine
+
+# Hasil uji otomatis (Vitest, Playwright — TESTING-STRATEGY §3C)
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+.playwright/
+
+# Kode hasil generate sqlc SENGAJA DI-COMMIT.
+# sqlc memperluas `SELECT *` jadi kolom eksplisit saat generate. Bila hasilnya
+# di-ignore, penambahan kolom masuk ke struct tanpa terlihat di review — termasuk
+# kolom sensitif seperti cost_price. Meng-commit-nya juga menghapus kebutuhan
+# sqlc saat build.
+
+# OS & editor
+# .DS_Store sempat HILANG dari daftar ini (terhapus di commit d06c479 saat blok
+# pnpm ditambahkan) dan langsung muncul lagi sebagai berkas tak terlacak.
+# Ia menyimpan metadata Finder — termasuk nama berkas yang pernah ada di folder,
+# jadi ia membocorkan sedikit isi direktori sekaligus mengotori setiap diff.
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+.VolumeIcon.icns
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+.*.swp
+*~
+
+# Log & sementara
+*.log
+tmp/

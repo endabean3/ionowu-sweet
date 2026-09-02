@@ -1,0 +1,88 @@
+# Stack pengembangan lokal. Jalankan: make dev
+#
+# BUKAN untuk produksi — produksi memakai docker-compose.prod.yml
+# (image dari ghcr.io, tanpa ports:, rahasia di panel Dokploy).
+# Lihat 15-development/DEV-VS-PROD.md
+
+services:
+  # ── Wadah kerja: semua tool ada di sini ───────────────────────────
+  workspace:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace:cached
+      # Volume bernama untuk cache — INI yang membuat devcontainer
+      # tetap cepat di macOS. Tanpa ini, sinkronisasi berkas lintas VM
+      # membuat build terasa lambat.
+      # HARUS sama dengan GOPATH di .devcontainer/Dockerfile (/home/dev/go).
+      # Sebelumnya dipasang di /go/pkg/mod — jalur GOPATH bawaan image golang,
+      # bukan jalur yang dipakai. Akibatnya cache modul tidak pernah bertahan
+      # dan setiap `make seed`/`make test` mengunduh ulang seluruh dependensi.
+      - go-mod:/home/dev/go/pkg/mod
+      - go-build:/home/dev/.cache/go-build
+      # Dipasang TEPAT di jalur store bawaan pnpm, bukan jalur khusus container.
+      # Bawaannya pnpm menaruh store di drive yang sama dengan proyek, yaitu
+      # /workspace/.pnpm-store — di dalam bind mount: lambat di macOS dan
+      # mengotori repo (sempat 452 MB). Menutupinya dengan volume memberi
+      # kecepatan yang sama tanpa mengubah konfigurasi pnpm sedikit pun.
+      #
+      # JANGAN memaksanya lewat `storeDir` di pnpm-workspace.yaml: berkas itu
+      # ikut ter-checkout di GitHub Actions, dan `actions/setup-node` dengan
+      # cache pnpm langsung gagal — jalur container tidak ada di runner.
+      - pnpm-store:/workspace/.pnpm-store
+      # KEDUANYA harus volume, tidak boleh campur dengan bind mount.
+      # Berkas status pnpm (.modules.yaml, .pnpm/) ada di node_modules ROOT.
+      # Ketika hanya apps/web yang jadi volume, `down -v` mengosongkan volume
+      # itu tapi status di bind mount selamat — pnpm lalu membaca status lama,
+      # menyimpulkan "Already up to date", dan volume tetap KOSONG selamanya.
+      # Instalasi tampak sukses padahal aplikasi tak bisa dijalankan.
+      - node-modules-root:/workspace/node_modules
+      - node-modules:/workspace/apps/web/node_modules
+    environment:
+      DATABASE_URL: postgres://ionowu:devpass@postgres:5432/ionowu_dev?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+      # JWT EdDSA key pair — nilai DEV, aman di repo (SECURITY.md §4B).
+      # Untuk produksi, inject lewat secret manager (Dokploy / GitHub Actions secrets).
+      JWT_PUBLIC_KEY: X+d/1cA3OsSEsddwwGh5/ZYwIhfY12A43T0xUBMcdmA=
+      JWT_PRIVATE_KEY: 4IBnftn7j1O4PGUM0+w2Q7L9YSyN/vOOGEbC7GC2xSZf53/VwDc6xISx13DAaHn9ljAiF9jXYDjdPTFQExx2YA==
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    command: sleep infinity
+
+  # TANPA ports: — seluruh tool ada di dalam workspace, jadi ia menjangkau
+  # postgres lewat jaringan Docker internal. Ini sekaligus:
+  #   • menghindari bentrok dengan proyek lain di mesin yang sama
+  #   • menyamai aturan produksi "hanya Traefik yang publish port"
+  # Butuh akses GUI dari host? pakai docker-compose.expose.yml (lihat LOCAL-SETUP)
+  postgres:
+    image: postgres:16-alpine        # versi SAMA dengan produksi
+    environment:
+      POSTGRES_DB: ionowu_dev
+      POSTGRES_USER: ionowu
+      POSTGRES_PASSWORD: devpass     # nilai dev — aman di repo
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ionowu -d ionowu_dev"]
+      interval: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine            # versi SAMA dengan produksi
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 10
+
+volumes:
+  pgdata-dev:
+  node-modules-root:
+  go-mod:
+  go-build:
+  pnpm-store:
+  node-modules:

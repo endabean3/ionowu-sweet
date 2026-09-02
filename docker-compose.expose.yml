@@ -1,0 +1,17 @@
+# Overlay OPSIONAL — hanya bila ingin menyambungkan GUI (TablePlus, DBeaver)
+# dari host ke database dev.
+#
+#   docker compose -f docker-compose.dev.yml -f docker-compose.expose.yml up -d
+#
+# Port sengaja TIDAK memakai 5432/6379 karena keduanya sudah dipakai
+# proyek lain di mesin ini (ionowu-postgres, ionowu-valkey).
+
+services:
+  workspace:
+    ports:
+      - "3005:3000"
+      - "8080:8080"
+  postgres:
+    ports: ["5440:5432"]
+  redis:
+    ports: ["6390:6379"]

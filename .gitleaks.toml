@@ -1,0 +1,31 @@
+# Konfigurasi gitleaks. Rujukan: 40-security/SECURITY.md §7
+
+title = "ionowu sweet"
+[extend]
+useDefault = true
+
+# Aturan khusus proyek ini
+[[rules]]
+id = "pin-kasir-polos"
+description = "PIN kasir tidak boleh muncul sebagai nilai polos"
+regex = '''(?i)(pin_code|pin)\s*[:=]\s*["']?\d{4,6}["']?'''
+tags = ["pos", "pii"]
+
+[[rules]]
+id = "webhook-secret-qris"
+description = "Rahasia webhook payment gateway"
+regex = '''(?i)(qris|midtrans|xendit)[_-]?(webhook|server|api)[_-]?(key|secret)\s*[:=]\s*["'][^"']{12,}["']'''
+tags = ["payment"]
+
+[allowlist]
+description = "Placeholder yang SENGAJA didokumentasikan sebagai contoh buruk"
+paths = [
+  '''50-operations/CONFIGURATION\.md''',   # §1 menunjukkan anti-pola dari FDR
+  '''50-operations/DOCKER\.md''',          # §6 compose lama dalam blok <details>
+  '''\.env\.example''',
+]
+regexes = [
+  '''secret_pass''',
+  '''your_ultra_secure_jwt_secret_key''',
+  '''devpass''',                            # nilai dev di docker-compose.dev.yml
+]

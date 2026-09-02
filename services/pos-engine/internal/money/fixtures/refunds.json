@@ -1,0 +1,26 @@
+[
+  {
+    "name": "refund_parsial_wajar",
+    "grand_total": "100000",
+    "already_refunded": "0",
+    "requested": "30000",
+    "expect_remaining": "70000",
+    "expect_error": false
+  },
+  {
+    "name": "refund_parsial_kedua_masih_wajar",
+    "grand_total": "100000",
+    "already_refunded": "30000",
+    "requested": "40000",
+    "expect_remaining": "30000",
+    "expect_error": false
+  },
+  {
+    "name": "refund_melebihi_sisa",
+    "grand_total": "100000",
+    "already_refunded": "70000",
+    "requested": "40000",
+    "expect_remaining": "0",
+    "expect_error": true
+  }
+]
