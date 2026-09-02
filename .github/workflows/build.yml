@@ -18,15 +18,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: pos-engine,          context: ./services/pos-engine }
-          - { name: web,                 context: ./apps/web }
-          - { name: intelligence-worker, context: ./services/intelligence-worker }
+          # `context` dan `file` DIPISAH karena keduanya tidak selalu sama.
+          # web adalah paket di dalam pnpm workspace: Dockerfile-nya menyalin
+          # package.json + pnpm-lock.yaml + pnpm-workspace.yaml dari ROOT repo,
+          # jadi context-nya WAJIB root. Dengan `context: ./apps/web`, build
+          # gagal di baris COPY pertama ("/pnpm-workspace.yaml": not found) —
+          # dikonfirmasi lewat `docker build` nyata, bukan dugaan.
+          - { name: pos-engine,          context: ./services/pos-engine, file: ./services/pos-engine/Dockerfile }
+          - { name: web,                 context: .,                     file: ./apps/web/Dockerfile }
+          - { name: intelligence-worker, context: ./services/intelligence-worker, file: ./services/intelligence-worker/Dockerfile }
     steps:
       - uses: actions/checkout@v7
       - name: Lewati bila layanan belum ada
         id: cek
         run: |
-          if [ -f "${{ matrix.context }}/Dockerfile" ]; then echo "ada=true" >> $GITHUB_OUTPUT
+          if [ -f "${{ matrix.file }}" ]; then echo "ada=true" >> $GITHUB_OUTPUT
           else echo "⏭️  ${{ matrix.name }} belum ada"; echo "ada=false" >> $GITHUB_OUTPUT; fi
       - uses: docker/setup-buildx-action@v3
         if: steps.cek.outputs.ada == 'true'
@@ -40,6 +46,7 @@ jobs:
         if: steps.cek.outputs.ada == 'true'
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           # Tag SHA yang membuat rollback deterministik: tarik tag lama,
           # bukan bangun ulang dari commit lama yang tak dijamin identik.
