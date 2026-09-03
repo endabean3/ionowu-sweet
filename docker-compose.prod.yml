@@ -50,6 +50,12 @@ services:
       IONOWU_SWEET_DATABASE_URL: postgres://sweet_app:${SWEET_APP_PASSWORD:?wajib}@sweet-pgbouncer:5432/ionowu_sweet
       IONOWU_SWEET_JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?wajib}
       IONOWU_SWEET_JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?wajib}
+      # web dan api SELALU beda origin (domain terpisah, DOKPLOY.md §4) —
+      # tanpa ini pos-engine menolak start (fail-fast, CFG-05) DAN, sebelum
+      # penambahan ini, setiap permintaan browser dari web gagal "Failed
+      # to fetch" tanpa header CORS. Ditemukan lewat uji login nyata di
+      # browser dev, bukan asumsi dari dokumentasi.
+      IONOWU_SWEET_CORS_ORIGINS: ${PUBLIC_APP_URL:?wajib, contoh https://app.ionowu.com}
       PORT: "8080"
     # RUN-07/RUN-08 — TIDAK ada HEALTHCHECK Docker di sini (ADR-0008 §2):
     # image distroless tidak punya shell. Dikonfigurasi di panel Dokploy

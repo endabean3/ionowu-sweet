@@ -9,18 +9,48 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 import { ulid } from "ulid";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+interface OutletRow {
+  id: string;
+  name: string;
+}
+
 export function ShiftModal({ onClose }: { onClose: () => void }) {
   const [openingCash, setOpeningCash] = useState("");
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
   const handleOpenShift = async () => {
     setSubmitting(true);
     try {
-      const shiftId = `sh_${ulid()}`;
+      // ULID MURNI, tanpa prefiks "sh_" — shifts.id di skema (migrations/00001)
+      // adalah VARCHAR(26), pas untuk ULID 26 karakter. Prefiks membuatnya
+      // 29 karakter dan INSERT gagal "value too long for type character
+      // varying(26)" — ditemukan lewat sync push nyata yang diam-diam
+      // ditolak server (client tidak menampilkan error, item cuma tertahan
+      // di antrean lokal selamanya).
+      const shiftId = ulid();
       const tenantId = user?.tenant_id || "tenant_default";
-      // Gunakan string 'outlet_kemang' sebagai hardcoded untuk MVP
-      const outletId = "outlet_kemang";
+
+      // Literal "outlet_kemang" SEBELUMNYA dipakai untuk semua tenant —
+      // OpenShift akan selalu gagal foreign-key violation begitu server
+      // benar-benar menulisnya (outlets.id sungguhan berupa ULID, bukan
+      // string itu). Diambil dari outlet nyata milik tenant ini lewat
+      // GET /outlets. TODO: ini masih memilih outlet PERTAMA — belum ada
+      // pemilihan outlet eksplisit untuk kasir multi-cabang
+      // (MULTI-OUTLET.md §3), lihat catatan follow-up.
+      const outletsRes = await fetch(`${API_URL}/outlets`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!outletsRes.ok) {
+        throw new Error("Gagal memuat daftar outlet");
+      }
+      const { data: outlets }: { data: OutletRow[] } = await outletsRes.json();
+      if (!outlets || outlets.length === 0) {
+        throw new Error("Tenant ini belum punya outlet");
+      }
+      const outletId = outlets[0].id;
 
       const cash = Number.parseFloat(openingCash) || 0;
 

@@ -96,7 +96,17 @@ func (h *AuthHandler) issueSession(r *http.Request, q *store.Queries, userID, te
 		return authSessionResponse{}, err
 	}
 
+	// device_label VARCHAR(120) (migrations/00001) — User-Agent browser
+	// SUNGGUHAN rutin melebihi ini (Chromium dengan detail platform lengkap
+	// mudah >150 karakter), beda dari User-Agent client seperti curl yang
+	// pendek. Tanpa potong ini, SETIAP login lewat browser nyata gagal
+	// "value too long for type character varying(120)" — ditemukan lewat
+	// uji login di browser sungguhan, bukan curl (yang User-Agent-nya
+	// kebetulan selalu muat).
 	ua := r.UserAgent()
+	if len(ua) > 120 {
+		ua = ua[:120]
+	}
 	if err = q.CreateRefreshToken(r.Context(), store.CreateRefreshTokenParams{
 		ID:          ulid.Make().String(),
 		TenantID:    tenantID,

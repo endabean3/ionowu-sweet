@@ -6,10 +6,19 @@ import { type MoneyItem, calculateCart } from "@/lib/money/calc";
 import { Banknote, CreditCard, QrCode, X } from "lucide-react";
 import React, { useState } from "react";
 
+/** Rincian uang yang dihitung modal ini — diteruskan ke server APA ADANYA
+ * lewat payload sync, supaya server tidak perlu (dan tidak bisa) menebak
+ * subtotal/pajak dari nominal pembayaran saja. */
+export interface PaymentBreakdown {
+  subtotal: string;
+  taxTotal: string;
+  grandTotal: string;
+}
+
 interface PaymentModalProps {
   cartItems: CartLine[];
   onClose: () => void;
-  onPay: (method: string, amount: number) => void;
+  onPay: (method: string, appliedAmount: number, breakdown: PaymentBreakdown) => void;
 }
 
 export function PaymentModal({ cartItems, onClose, onPay }: PaymentModalProps) {
@@ -139,7 +148,19 @@ export function PaymentModal({ cartItems, onClose, onPay }: PaymentModalProps) {
           <Button
             variant="primary"
             className="w-full h-14 text-lg shadow-hard"
-            onClick={() => onPay(method, method === "cash" ? givenNum : grandTotal)}
+            onClick={() =>
+              // grandTotal, BUKAN givenNum — jumlah pembayaran yang dicatat
+              // harus nominal yang DITERAPKAN ke tagihan. givenNum (uang
+              // tunai diterima kasir) bisa lebih besar karena ada kembalian
+              // (mis. bayar Rp 50.000 untuk tagihan Rp 27.750); mengirim
+              // givenNum sebagai payments[0].amount membuat server menolak
+              // PAYMENT_AMOUNT_MISMATCH karena jumlah pembayaran ≠ total.
+              onPay(method, grandTotal, {
+                subtotal: totals.subtotal.toString(),
+                taxTotal: totals.taxTotal.toString(),
+                grandTotal: totals.grandTotal.toString(),
+              })
+            }
             disabled={!isEnough}
           >
             Selesaikan Pembayaran

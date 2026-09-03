@@ -6,14 +6,16 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config menyimpan semua konfigurasi runtime pos-engine.
 type Config struct {
-	DatabaseURL   string
-	Port          string
-	JWTPublicKey  ed25519.PublicKey
-	JWTPrivateKey ed25519.PrivateKey // dibutuhkan oleh AuthHandler untuk signing
+	DatabaseURL    string
+	Port           string
+	JWTPublicKey   ed25519.PublicKey
+	JWTPrivateKey  ed25519.PrivateKey // dibutuhkan oleh AuthHandler untuk signing
+	AllowedOrigins []string           // CORS — lihat Load() untuk alasan wajib diisi
 }
 
 // Load membaca konfigurasi dari environment.
@@ -64,10 +66,28 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PRIVATE_KEY harus %d byte, dapat %d", ed25519.PrivateKeySize, len(privBytes))
 	}
 
+	// CORS — WAJIB, bukan default ke "*". apps/web (Next.js) dan pos-engine
+	// SELALU berbeda origin: beda port saat dev (3000/3005 vs 8080), beda
+	// domain saat produksi (app.ionowu.com vs api.ionowu.com — DOKPLOY.md
+	// §4). Tanpa header Access-Control-Allow-Origin yang benar, SETIAP
+	// permintaan browser ke API — login, checkout, sync, semuanya — gagal
+	// "Failed to fetch" sebelum sempat menyentuh handler. Ditemukan lewat
+	// uji login nyata di browser (curl tidak menegakkan CORS, jadi lolos
+	// diam-diam di seluruh pengujian curl sebelumnya).
+	rawOrigins := os.Getenv("IONOWU_SWEET_CORS_ORIGINS")
+	if rawOrigins == "" {
+		return Config{}, fmt.Errorf("IONOWU_SWEET_CORS_ORIGINS wajib diisi (daftar origin dipisah koma, mis. http://localhost:3000)")
+	}
+	origins := strings.Split(rawOrigins, ",")
+	for i, o := range origins {
+		origins[i] = strings.TrimSpace(o)
+	}
+
 	return Config{
-		DatabaseURL:   dbURL,
-		Port:          port,
-		JWTPublicKey:  ed25519.PublicKey(pubBytes),
-		JWTPrivateKey: ed25519.PrivateKey(privBytes),
+		DatabaseURL:    dbURL,
+		Port:           port,
+		JWTPublicKey:   ed25519.PublicKey(pubBytes),
+		JWTPrivateKey:  ed25519.PrivateKey(privBytes),
+		AllowedOrigins: origins,
 	}, nil
 }

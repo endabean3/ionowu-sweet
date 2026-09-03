@@ -101,6 +101,7 @@ export async function pullCatalog(accessToken: string, deviceId: string, tenantI
 interface SyncPushResult {
   client_id: string;
   status: "accepted" | "duplicate" | "rejected";
+  detail?: string;
 }
 
 interface SyncPushResponse {
@@ -152,19 +153,29 @@ export async function pushQueue(accessToken: string, deviceId: string) {
 
     const result: SyncPushResponse = await res.json();
 
-    // Update status di lokal menjadi synced
+    // Update status di lokal. SEBELUMNYA hanya menangani "accepted"/"duplicate"
+    // — status "rejected" diam-diam diabaikan, item tertahan selamanya di
+    // antrean "pending" tanpa pesan apa pun ke kasir. Ditemukan lewat replay
+    // payload manual yang mengungkap FOREIGN KEY VIOLATION di server padahal
+    // klien tidak pernah tahu ada yang salah.
     const pushResults = result.results;
     if (pushResults) {
       await db.transaction("rw", db.syncQueue, async () => {
         for (const resItem of pushResults) {
+          const queueItem = pendingItems.find((q) => q.payload.id === resItem.client_id);
+          if (!queueItem) continue;
+
           if (resItem.status === "accepted" || resItem.status === "duplicate") {
-            const queueItem = pendingItems.find((q) => q.payload.id === resItem.client_id);
-            if (queueItem) {
-              await db.syncQueue.update(queueItem.id, {
-                status: "synced",
-                synced_at: new Date().toISOString(),
-              });
-            }
+            await db.syncQueue.update(queueItem.id, {
+              status: "synced",
+              synced_at: new Date().toISOString(),
+            });
+          } else {
+            await db.syncQueue.update(queueItem.id, {
+              status: "failed",
+              retry_count: queueItem.retry_count + 1,
+              error_message: resItem.detail || "Ditolak server tanpa keterangan",
+            });
           }
         }
       });

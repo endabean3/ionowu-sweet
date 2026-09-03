@@ -6,13 +6,27 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey ed25519.PrivateKey) http.Handler {
+func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey ed25519.PrivateKey, allowedOrigins []string) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
+
+	// TANPA ini, seluruh permintaan dari apps/web (browser) ditolak sebelum
+	// menyentuh handler mana pun — web dan pos-engine selalu berbeda origin
+	// (lihat config.go untuk alasan lengkap). AllowedHeaders menyertakan
+	// Authorization karena access token dikirim lewat header itu (bukan
+	// cookie, SECURITY.md §4B), sehingga AllowCredentials tidak diperlukan.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 
 	// RUN-08 — liveness dan readiness WAJIB terpisah. Lihat health.go untuk
 	// alasan pemisahannya.

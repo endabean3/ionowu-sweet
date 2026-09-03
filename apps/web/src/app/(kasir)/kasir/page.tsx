@@ -4,6 +4,7 @@ import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
+import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -11,10 +12,12 @@ import { ArrowLeft, Barcode, Layers, Search, Wallet } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { PaymentModal } from "./payment-modal";
+import { ulid } from "ulid";
+import { type PaymentBreakdown, PaymentModal } from "./payment-modal";
 import { ShiftModal } from "./shift-modal";
 
 export default function KasirPage() {
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartItems, setCartItems] = useState<CartLine[]>([]);
@@ -129,7 +132,11 @@ export default function KasirPage() {
     setCartItems((prev) => prev.filter((item) => item.variantId !== variantId));
   };
 
-  const processPayment = async (method: string, amount: number) => {
+  const processPayment = async (
+    method: string,
+    appliedAmount: number,
+    breakdown: PaymentBreakdown,
+  ) => {
     if (!activeShift) {
       toast.error("Tidak ada shift aktif! Buka shift terlebih dahulu.");
       return;
@@ -137,22 +144,39 @@ export default function KasirPage() {
 
     try {
       const txId = await enqueueOfflineAction({
-        tenantId: "tenant",
+        // Literal "tenant" SEBELUMNYA dikirim untuk semua tenant — enqueue
+        // masih benar secara mekanis (ULID tetap unik), tapi
+        // SyncQueueEntry.tenant_id jadi tidak berarti apa-apa untuk query
+        // lokal yang memfilternya (db/index.ts). Diambil dari sesi login.
+        tenantId: user?.tenant_id ?? "",
         outletId: activeShift.outlet_id,
         type: "sale",
         payload: {
-          id: `sl_${Date.now()}`,
+          // ULID MURNI — lihat catatan sejenis di shift-modal.tsx. Nilai
+          // sebelumnya (`sl_${Date.now()}`) BUKAN ULID sama sekali dan
+          // tidak konsisten dengan konvensi ID sisanya di sistem ini
+          // (D-02, OFFLINE-SYNC-SPEC).
+          id: ulid(),
           outlet_id: activeShift.outlet_id,
           shift_id: activeShift.id,
           items: cartItems.map((it) => ({
             variant_id: it.variantId,
             qty: it.quantity.toString(),
+            unit_price: it.unitPrice,
             discount: it.discount,
           })),
+          // tax SEBELUMNYA tidak pernah dikirim sama sekali, padahal UI
+          // menampilkan total SUDAH termasuk PPN 11% (payment-modal.tsx).
+          // Tanpa ini, server menghitung ulang grand_total TANPA pajak dan
+          // menolak PAYMENT_AMOUNT_MISMATCH — setiap checkout pasti gagal
+          // sync, ditemukan lewat sync push nyata (bukan asumsi kode benar
+          // karena "terlihat lengkap").
+          discount: "0",
+          tax: breakdown.taxTotal,
           payments: [
             {
               method: method,
-              amount: amount.toString(),
+              amount: appliedAmount.toString(),
             },
           ],
           occurred_at: new Date().toISOString(),
