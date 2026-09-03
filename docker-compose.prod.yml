@@ -1,98 +1,110 @@
-# PRODUKSI — dipakai Dokploy. Bukan untuk lokal (pakai docker-compose.dev.yml).
+# PROYEK DOKPLOY #2 dari 2 — "ionowu-sweet", tipe APPLICATION (Swarm).
 #
-# Tiga perbedaan penting dari dev, dan semuanya disengaja:
-#   1. TANPA build:  — image ditarik dari ghcr.io (ADR-0004)
-#   2. TANPA ports:  — hanya Traefik yang menghadap luar. Mem-publish port
-#      di sini berarti melewati Traefik DAN menembus UFW (NETWORK-HARDENING §3)
-#   3. TANPA rahasia literal — seluruh ${VAR} diisi di panel Environment Dokploy
+# ⚠️ PERINGATAN (persis §4.5b fondasi-server-ionowu.md): berkas ini BUKAN
+# yang dijalankan `docker compose up`. Dokploy tipe Compose menjalankan
+# `docker compose` polos, bukan `docker stack` — terbukti dari perilaku
+# `container_name` yang DIHORMATI pada docker-compose.data.yml (di bawah
+# Swarm, nama kontainer akan ditulis ulang jadi
+# `<stack>_<service>.<slot>.<id>`). Karena itu `deploy.replicas`,
+# `update_config`, dan `rollback_config` DIABAIKAN DIAM-DIAM bila layanan ini
+# didaftarkan sebagai Compose — dan DEP-07 (zero-downtime) gagal tanpa
+# peringatan apa pun.
 #
-# Rujukan: 15-development/CI-PIPELINE.md §4 · 15-development/DEV-VS-PROD.md
+# Layanan di sini WAJIB didaftarkan sebagai Dokploy tipe **Application**,
+# dikonfigurasi lewat panel/API (image ber-digest, replicas, port, env,
+# domain, health check) — bukan lewat `docker compose up` berkas ini. Nilai
+# di bawah adalah ACUAN saat mengisi konfigurasi itu.
+#
+# KENAPA DUA PROYEK TERPISAH (data vs ini): lihat header
+# docker-compose.data.yml dan ADR-0009.
+#
+# intelligence-worker BELUM ada di sini — services/intelligence-worker/
+# belum punya Dockerfile (ADR-0006 belum diimplementasikan). Tambahkan
+# sebagai layanan `worker` (replicas 1, update_config.order: stop-first,
+# TANPA jaringan dokploy-network — tidak menerima trafik masuk) begitu ada,
+# mengikuti pola §4.5b — bukan menulis konfigurasi kosong sekarang.
+
+name: ionowu-sweet
+
+x-defaults: &defaults
+  security_opt: ["no-new-privileges:true"]  # RUN-04
+  cap_drop: ["ALL"]                          # RUN-03
+  read_only: true                            # RUN-02 — diverifikasi lewat
+                                              # `docker run --read-only` nyata:
+                                              # KEDUA image jalan tanpa tmpfs
+                                              # sama sekali (biner Go statis;
+                                              # Next.js standalone tidak
+                                              # menulis apa pun saat runtime).
+  logging:
+    driver: local                            # RUN-16
+    options: { max-size: "10m", max-file: "3" }
+  stop_grace_period: 30s                     # RUN-09
 
 services:
-  pos-engine:
-    image: ghcr.io/${GH_REPO}/pos-engine:${IMAGE_TAG}
+  api:
+    <<: *defaults
+    image: ghcr.io/${GH_REPO}/pos-engine@${API_DIGEST:?digest wajib}   # DEP-01/DEP-08 — digest, bukan tag
+    networks: [data, dokploy-network]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: redis://redis:6379
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
-      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
-      QRIS_API_KEY: ${QRIS_API_KEY}
-      QRIS_WEBHOOK_SECRET: ${QRIS_WEBHOOK_SECRET}
-      ENVIRONMENT: production
-      LOG_LEVEL: info
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-    restart: unless-stopped
+      # DAT-09 — lewat PgBouncer, TIDAK PERNAH langsung ke postgres.
+      IONOWU_SWEET_DATABASE_URL: postgres://sweet_app:${SWEET_APP_PASSWORD:?wajib}@sweet-pgbouncer:5432/ionowu_sweet
+      IONOWU_SWEET_JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?wajib}
+      IONOWU_SWEET_JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?wajib}
+      PORT: "8080"
+    # RUN-07/RUN-08 — TIDAK ada HEALTHCHECK Docker di sini (ADR-0008 §2):
+    # image distroless tidak punya shell. Dikonfigurasi di panel Dokploy
+    # sebagai probe HTTP ke /health/ready (kesiapan, mem-ping DB lewat
+    # PgBouncer) dan /health/live (proses hidup) — lihat
+    # services/pos-engine/internal/httpapi/health.go.
     deploy:
+      replicas: 2                            # DEP-07 — menerima trafik langsung
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 10s
+      rollback_config:
+        order: start-first
       resources:
-        limits: { memory: 128M }
+        # Diturunkan dari SERVER-PROVISIONING.md §1 (pos-engine 128 MB di
+        # dalam subtotal ~2,2 GB pada VPS 8 GB) — dikalikan 2 untuk replicas: 2.
+        limits: { cpus: "0.5", memory: 128M }
+        reservations: { memory: 64M }        # RUN-06
 
   web:
-    image: ghcr.io/${GH_REPO}/web:${IMAGE_TAG}
+    <<: *defaults
+    image: ghcr.io/${GH_REPO}/web@${WEB_DIGEST:?digest wajib}
+    networks: [dokploy-network]              # TANPA `data` — web tidak akses Postgres/Redis
+                                              # langsung (dikonfirmasi: nol import klien DB
+                                              # di apps/web/src). Panggilan ke pos-engine
+                                              # lewat Traefik/dokploy-network, seperti klien luar.
     environment:
-      POS_API_INTERNAL_URL: http://pos-engine:8080
-      NEXT_PUBLIC_POS_API_URL: ${PUBLIC_API_URL}
-      # Pengguna read-only: menegakkan aturan bahwa TypeScript tidak menulis
-      # ke tabel transaksional (CONFIGURATION §4). Batas jadi nyata, bukan konvensi.
-      DATABASE_URL: ${DATABASE_URL_READONLY}
-      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN}
-      SESSION_SECRET: ${SESSION_SECRET}
-    depends_on: [pos-engine]
-    restart: unless-stopped
+      # ⚠️ CATATAN PENTING: NEXT_PUBLIC_API_URL DIBAKAR ke bundle client SAAT
+      # BUILD (batasan Next.js untuk env NEXT_PUBLIC_*) — baris di bawah
+      # TIDAK berpengaruh terhadap image yang sudah jadi. Nilai yang benar
+      # WAJIB diteruskan sebagai --build-arg dari CI (lihat apps/web/Dockerfile,
+      # sudah dicatat di sana). Dicantumkan di sini hanya sebagai dokumentasi
+      # nilai yang SEHARUSNYA dipakai saat build, bukan konfigurasi runtime.
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?wajib — dipakai saat build, bukan runtime}
+    # RUN-07 — HEALTHCHECK sudah ada di apps/web/Dockerfile (wget ke `/`,
+    # node:alpine punya shell+wget). Belum endpoint /health/live+/health/ready
+    # terpisah seperti pos-engine (RUN-08) — apps/web belum punya API route
+    # untuk itu. Dicatat sebagai kesenjangan, bukan diam-diam dianggap selesai.
     deploy:
+      replicas: 2                            # DEP-07 — dashboard + PWA kasir, menerima trafik
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 10s
+      rollback_config:
+        order: start-first
       resources:
-        limits: { memory: 256M }
+        limits: { cpus: "0.5", memory: 256M }
+        reservations: { memory: 128M }
 
-  intelligence-worker:
-    image: ghcr.io/${GH_REPO}/intelligence-worker:${IMAGE_TAG}
-    environment:
-      DATABASE_URL: ${DATABASE_URL_READONLY}
-      REDIS_URL: redis://redis:6379
-      # Jendela 02.00–05.00 WIB — di luar jam operasional toko
-      SCHEDULE_WINDOW: "02:00-05:00"
-      TZ: Asia/Jakarta
-    depends_on:
-      postgres: { condition: service_healthy }
-    restart: unless-stopped
-    deploy:
-      resources:
-        # Batas WAJIB: worker yang menghabiskan memori dapat menyeret
-        # pos-engine ikut mati (ANALYTICS-BI §5)
-        limits: { memory: 512M }
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
-      retries: 5
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits: { memory: 512M }
-
-  redis:
-    image: redis:7-alpine
-    # appendonly no — Redis MURNI cache. Setelah perbaikan REDIS-STRATEGY §2–3,
-    # tidak ada lagi yang tak bisa dibangun ulang, jadi restart Redis
-    # menjadi peristiwa biasa, bukan insiden.
-    command: >-
-      redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly no
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      retries: 5
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits: { memory: 256M }
-
-volumes:
-  pgdata:
+networks:
+  data:
+    name: sweet-internal    # dibuat oleh docker-compose.data.yml
+    external: true
+  dokploy-network:
+    name: dokploy-network   # dikelola Dokploy sendiri — §4.6
+    external: true

@@ -27,25 +27,42 @@ milik sendiri. Dalam sistem ini Dokploy bertanggung jawab atas:
 
 ## 2. Bentuk Aplikasi di Dokploy
 
-Stack ini terdiri dari 5 layanan yang saling bergantung, jadi bentuk yang paling cocok
-adalah **Compose** (bukan mendaftarkan tiap layanan sebagai Application terpisah):
+> **⚠️ Keputusan di bawah DIBALIK 3 September 2026 — lihat
+> [ADR-0009](../10-architecture/adr/0009-model-dua-proyek-dokploy.md).**
+> Versi sebelumnya (satu Compose besar untuk semua layanan) tetap didokumentasikan di
+> riwayat git untuk konteks, tapi **tidak lagi berlaku** — jangan diikuti.
+
+`fondasi-server-ionowu.md` §3.5 (DEP-13) mewajibkan **dua proyek Dokploy terpisah**, bukan
+satu Compose besar seperti rancangan awal repo ini:
 
 ```
 Project: ionowu-sweet
-└── Compose: ionowu-stack
-    ├── pos-engine           (Go)         → api.ionowu.com
-    ├── web-app              (Next.js)    → app.ionowu.com
-    ├── postgres             (internal)
-    ├── redis                (internal)
-    └── intelligence-worker  (Python, internal)
+├── ionowu-sweet-data     tipe: Compose        (docker-compose.data.yml)
+│   ├── postgres          (internal)
+│   ├── pgbouncer         (internal — DAT-09, satu-satunya jalur akses DB)
+│   └── redis             (internal)
+│
+└── ionowu-sweet          tipe: Application     (docker-compose.prod.yml — REFERENSI, bukan
+    ├── api  (pos-engine) replicas 2             yang dijalankan `docker compose up`)
+    └── web                replicas 2             → api.ionowu.com, app.ionowu.com
 ```
 
-**Alasan memilih Compose:** `pos-engine` dan `web-app` harus berbagi jaringan dengan Postgres
-dan Redis yang sama, dan urutan start-nya bergantung pada healthcheck. Memecahnya menjadi
-Application terpisah memaksa membuat jaringan bersama secara manual — kompleksitas tanpa manfaat.
+`intelligence-worker` (Python, ADR-0006) belum ada di sini — belum punya Dockerfile.
 
-**Kapan meninjau ulang:** bila `web-app` perlu diskalakan terpisah dari `pos-engine`,
-atau bila deploy dashboard mulai mengganggu ketersediaan mesin kasir.
+**Kenapa dipisah** (alasan lama "satu Compose lebih sederhana" salah, dan salahnya baru
+ketahuan saat benar-benar diuji): Dokploy tipe Compose menjalankan `docker compose` polos,
+bukan `docker stack`. `pos-engine`/`web-app` butuh rolling update tanpa downtime
+(`DEP-07`), yang **hanya** tersedia di tipe Application (Docker Swarm) — tapi di bawah
+Swarm, `depends_on` tidak bisa diandalkan (diverifikasi Docker 29.7.2, fondasi-server-ionowu
+§3.5): bentuk panjang dengan `condition:` ditolak saat parse; bentuk pendek diterima tapi
+tanpa jaminan urutan runtime. Postgres/Redis/PgBouncer sebaliknya BUTUH `depends_on` yang
+benar-benar dihormati — itu hanya bekerja di bawah Compose asli.
+
+Migrasi skema pindah ke CI sebagai job pre-deploy (`DAT-05`) — bukan lagi bagian dari
+compose data maupun aplikasi.
+
+**Kapan meninjau ulang lagi:** bila Dokploy mengubah cara tipe Compose menangani rolling
+update, atau bila standar `fondasi-server-ionowu.md` merevisi §3.5.
 
 ---
 

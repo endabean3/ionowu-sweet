@@ -40,14 +40,19 @@ services:
       - node-modules-root:/workspace/node_modules
       - node-modules:/workspace/apps/web/node_modules
     environment:
+      # DATABASE_URL polos dipertahankan untuk `goose` (Makefile target
+      # migrate/migrate-status) — itu tooling generik pihak ketiga, bukan
+      # "konfigurasi khusus aplikasi" yang dituju CFG-06. Aplikasi Go sendiri
+      # (config.Load(), cmd/seed) membaca IONOWU_SWEET_DATABASE_URL.
       DATABASE_URL: postgres://ionowu:devpass@postgres:5432/ionowu_dev?sslmode=disable
+      IONOWU_SWEET_DATABASE_URL: postgres://ionowu:devpass@postgres:5432/ionowu_dev?sslmode=disable
       REDIS_URL: redis://redis:6379
       ENVIRONMENT: development
       LOG_LEVEL: debug
       # JWT EdDSA key pair — nilai DEV, aman di repo (SECURITY.md §4B).
       # Untuk produksi, inject lewat secret manager (Dokploy / GitHub Actions secrets).
-      JWT_PUBLIC_KEY: X+d/1cA3OsSEsddwwGh5/ZYwIhfY12A43T0xUBMcdmA=
-      JWT_PRIVATE_KEY: 4IBnftn7j1O4PGUM0+w2Q7L9YSyN/vOOGEbC7GC2xSZf53/VwDc6xISx13DAaHn9ljAiF9jXYDjdPTFQExx2YA==
+      IONOWU_SWEET_JWT_PUBLIC_KEY: X+d/1cA3OsSEsddwwGh5/ZYwIhfY12A43T0xUBMcdmA=
+      IONOWU_SWEET_JWT_PRIVATE_KEY: 4IBnftn7j1O4PGUM0+w2Q7L9YSyN/vOOGEbC7GC2xSZf53/VwDc6xISx13DAaHn9ljAiF9jXYDjdPTFQExx2YA==
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }

@@ -4,6 +4,30 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.4.0] — 2026-09-03
+
+### Ditambahkan
+* **ADR-0008** — tiga penyimpangan dari `fondasi-server-ionowu.md` v3.9 (base image build Go,
+  ketiadaan `HEALTHCHECK` Docker di image distroless, cosign belum aktif), dicatat sesuai
+  prinsip P7 standar itu sendiri: penyimpangan boleh terjadi bila ditulis terbuka.
+* **ADR-0009** — model dua-proyek Dokploy (`ionowu-sweet-data` tipe Compose,
+  `ionowu-sweet` tipe Application), membalik sebagian keputusan ADR-0003. Alasannya
+  diverifikasi lewat pengujian nyata: Swarm mengabaikan `depends_on`, membuat `DEP-07`
+  (zero-downtime) diam-diam gagal bila seluruh stack didaftarkan sebagai satu Compose.
+
+### Diubah
+* **`DOKPLOY.md` §2** — rekomendasi "satu Compose untuk semua layanan" ditandai usang dan
+  digantikan model dua-proyek, dengan peringatan eksplisit alih-alih dihapus diam-diam.
+
+### Diperbaiki
+* **`services/pos-engine/internal/httpapi/router.go`** — `/health/live` dan `/health/ready`
+  dipisah (RUN-08); sebelumnya hanya satu `/healthz` generik.
+* **`.github/workflows/build.yml`** — image `web` tidak akan pernah ter-build karena
+  `context` salah (pnpm workspace butuh context root, bukan `./apps/web`); dikonfirmasi lewat
+  `docker build` nyata sebelum diperbaiki.
+
+---
+
 ## [1.3.0] — 2026-08-22
 
 ### Ditambahkan

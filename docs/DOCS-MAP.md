@@ -84,6 +84,8 @@ RBAC), itu tanda dokumen harus dipecah.
 | ADR-0005 Telemetri eksternal | `10-architecture/adr/` | ✅ **Diterima** | Merevisi OBSERVABILITY §6 |
 | ADR-0001 Hybrid Go/TS | `10-architecture/adr/` | ✅ | |
 | ADR-0002 Design Language | `10-architecture/adr/` | ✅ | |
+| ADR-0008 Penyimpangan Standar Server | `10-architecture/adr/` | ✅ **Diterima** | 3 penyimpangan fondasi-server-ionowu, dicatat sesuai P7 |
+| ADR-0009 Model Dua-Proyek Dokploy | `10-architecture/adr/` | ✅ **Diterima** | Membalik sebagian ADR-0003 — DEP-13 |
 | API Guidelines | `20-api/API-GUIDELINES.md` | ✅ Kuat | RFC 7807, idempotensi, rate limit |
 | OpenAPI Spec | `20-api/openapi.yaml` | ✅ 907 baris | 22 endpoint |
 | Data Model pelengkap | `30-data/DATA-MODEL.md` | 🟡 Draft baru | Menutup 11 celah skema |

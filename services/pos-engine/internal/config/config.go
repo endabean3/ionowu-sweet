@@ -18,15 +18,21 @@ type Config struct {
 
 // Load membaca konfigurasi dari environment.
 //
+// Prefiks IONOWU_SWEET_ (CFG-06, fondasi-server-ionowu.md §2.6) dipakai
+// untuk konfigurasi khusus aplikasi ini — persis pola
+// IONOWU_<APP>_DATABASE_URL di templat referensi standar §4.5b. PORT
+// dibiarkan tanpa prefiks: itu konvensi platform (Dokploy/PaaS umumnya
+// meng-inject PORT polos), bukan konfigurasi khusus aplikasi.
+//
 // Kunci JWT:
-//   - JWT_PUBLIC_KEY  : base64(32 byte public key Ed25519)  — wajib
-//   - JWT_PRIVATE_KEY : base64(64 byte private key Ed25519) — wajib untuk /auth/*
+//   - IONOWU_SWEET_JWT_PUBLIC_KEY  : base64(32 byte public key Ed25519)  — wajib
+//   - IONOWU_SWEET_JWT_PRIVATE_KEY : base64(64 byte private key Ed25519) — wajib untuk /auth/*
 //
 // Format base64 standar, bukan URL-safe (SECURITY.md §4B).
 func Load() (Config, error) {
-	dbURL := os.Getenv("DATABASE_URL")
+	dbURL := os.Getenv("IONOWU_SWEET_DATABASE_URL")
 	if dbURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL wajib diisi")
+		return Config{}, fmt.Errorf("IONOWU_SWEET_DATABASE_URL wajib diisi")
 	}
 
 	port := os.Getenv("PORT")
@@ -34,28 +40,28 @@ func Load() (Config, error) {
 		port = "8080"
 	}
 
-	rawPub := os.Getenv("JWT_PUBLIC_KEY")
+	rawPub := os.Getenv("IONOWU_SWEET_JWT_PUBLIC_KEY")
 	if rawPub == "" {
-		return Config{}, fmt.Errorf("JWT_PUBLIC_KEY wajib diisi (.env.example)")
+		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PUBLIC_KEY wajib diisi (.env.example)")
 	}
 	pubBytes, err := base64.StdEncoding.DecodeString(rawPub)
 	if err != nil {
-		return Config{}, fmt.Errorf("JWT_PUBLIC_KEY bukan base64 valid: %w", err)
+		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PUBLIC_KEY bukan base64 valid: %w", err)
 	}
 	if len(pubBytes) != ed25519.PublicKeySize {
-		return Config{}, fmt.Errorf("JWT_PUBLIC_KEY harus %d byte, dapat %d", ed25519.PublicKeySize, len(pubBytes))
+		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PUBLIC_KEY harus %d byte, dapat %d", ed25519.PublicKeySize, len(pubBytes))
 	}
 
-	rawPriv := os.Getenv("JWT_PRIVATE_KEY")
+	rawPriv := os.Getenv("IONOWU_SWEET_JWT_PRIVATE_KEY")
 	if rawPriv == "" {
-		return Config{}, fmt.Errorf("JWT_PRIVATE_KEY wajib diisi (.env.example)")
+		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PRIVATE_KEY wajib diisi (.env.example)")
 	}
 	privBytes, err := base64.StdEncoding.DecodeString(rawPriv)
 	if err != nil {
-		return Config{}, fmt.Errorf("JWT_PRIVATE_KEY bukan base64 valid: %w", err)
+		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PRIVATE_KEY bukan base64 valid: %w", err)
 	}
 	if len(privBytes) != ed25519.PrivateKeySize {
-		return Config{}, fmt.Errorf("JWT_PRIVATE_KEY harus %d byte, dapat %d", ed25519.PrivateKeySize, len(privBytes))
+		return Config{}, fmt.Errorf("IONOWU_SWEET_JWT_PRIVATE_KEY harus %d byte, dapat %d", ed25519.PrivateKeySize, len(privBytes))
 	}
 
 	return Config{

@@ -1,0 +1,167 @@
+# PROYEK DOKPLOY #1 dari 2 — "ionowu-sweet-data", tipe Compose.
+#
+# Lapisan STATEFUL. Didaftarkan ke Dokploy sebagai proyek Compose TERPISAH
+# dari lapisan aplikasi (docker-compose.prod.yml) — DEP-13.
+#
+# KENAPA DIPISAH dari satu Compose besar (menggantikan rancangan lama di
+# ADR-0003 §Keputusan dan DOKPLOY.md §2, lihat ADR-0009):
+#
+#   Dokploy tipe Compose menjalankan `docker compose` langsung — bukan
+#   `docker stack`. Layanan stateless (pos-engine, web) BUTUH rolling update
+#   tanpa downtime (DEP-07), yang hanya tersedia di Dokploy tipe Application
+#   (Docker Swarm). Tapi di bawah Swarm, `depends_on` TIDAK bisa diandalkan:
+#   bentuk panjang dengan `condition:` ditolak saat parse, bentuk pendek
+#   diterima tapi tanpa jaminan urutan saat runtime (diverifikasi Docker
+#   29.7.2, fondasi-server-ionowu.md §3.5). Postgres/Redis harus tetap punya
+#   `depends_on` yang benar-benar dihormati (healthcheck sebelum layanan lain
+#   start) — itu hanya bekerja di bawah Compose asli, bukan Swarm.
+#
+#   Jadi: data (compose ini) tetap Compose; aplikasi (docker-compose.prod.yml)
+#   pindah ke Dokploy tipe Application. Migrasi skema pindah ke CI (DAT-05),
+#   bukan lagi service di sini atau di sana.
+#
+# Host target: VPS Hostinger KVM khusus aplikasi ini (SERVER-PROVISIONING.md
+# §1, ADR-0003) — BUKAN host bersama §3.9 fondasi-server-ionowu. Karena host
+# ini didedikasikan untuk satu aplikasi, pola "cluster bersama lintas
+# aplikasi" (§3.7) tidak berlaku secara harfiah — tapi seluruh aturan
+# per-layanan (ISO-08, DAT-09, RUN-*, IMG-02) tetap wajib tanpa pengecualian.
+#
+# Nama app-slug: "sweet" (pola ionowu-<app>, §3.6) — dipilih agar tidak
+# bertumpuk "ionowu-ionowu"; belum ada preseden sebelumnya di repo ini.
+
+name: ionowu-sweet-data
+
+x-defaults: &defaults
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]  # RUN-04
+  cap_drop: ["ALL"]                          # RUN-03 — kapabilitas dikembalikan satu per satu di bawah
+  read_only: true                            # RUN-02 — lihat tmpfs per-servis untuk direktori tulis
+  logging:
+    driver: local                            # RUN-16
+    options: { max-size: "10m", max-file: "3" }
+
+# CATATAN RUN-02: §4.5a (templat referensi standar) TIDAK menerapkan
+# read_only pada postgres/pgbouncer/redis-nya sendiri — hanya dicontohkan di
+# §4.5b untuk lapisan aplikasi. Di sini diterapkan ke KETIGANYA, diverifikasi
+# satu per satu lewat `docker run --read-only` nyata (bukan disalin dari
+# templat yang ternyata tidak mendemonstrasikannya):
+#   redis      lolos langsung dengan tmpfs /data
+#   postgres   butuh tmpfs /var/run/postgresql DAN /tmp
+#   pgbouncer  gagal "Permission denied" sampai tmpfs diberi uid:gid=70:70
+#              (user image ini) — tmpfs default root:root tidak cukup
+
+services:
+  postgres:
+    <<: *defaults
+    # PENYIMPANGAN IMG-03 — lihat ADR-0008. §3.1 mewajibkan
+    # pgvector/pgvector:pg17; proyek ini tidak memakai pencarian vektor dan
+    # migrasi (30-data/migrations/) diuji terhadap postgres:16. Melompat ke
+    # mayor 17 + ekstensi yang tak dipakai demi kepatuhan literal adalah
+    # menukar risiko yang sudah diverifikasi dengan risiko yang belum.
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: sweet-postgres
+    cap_add: ["CHOWN", "FOWNER", "DAC_OVERRIDE", "SETUID", "SETGID"]  # §3.1 — entrypoint mulai sbg root, turun ke user postgres
+    networks: [data]
+    environment:
+      # Docker `secrets:` TIDAK didukung di bawah Dokploy tipe Compose —
+      # dibuktikan lewat `docker compose up` nyata: "unsupported external
+      # secret". Ini konsisten dengan §3.2: Dokploy Compose menjalankan
+      # `docker compose` polos, bukan `docker stack`, dan secrets Swarm hanya
+      # berfungsi di bawah Swarm. Templat referensi §4.5a sendiri juga TIDAK
+      # memakai `secrets:` — ia memasok rahasia lewat env var biasa dari
+      # panel Environment Dokploy, yang MEMANG implementasi CFG-03 di
+      # infrastruktur ini (§3.2). Mengikuti pola itu, bukan menambah lapisan
+      # yang ternyata tidak berjalan.
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?wajib}
+      SWEET_APP_PASSWORD: ${SWEET_APP_PASSWORD:?wajib}  # dibaca infra/initdb/10-sweet.sh
+    volumes:
+      - "sweet-pgdata:/var/lib/postgresql/data"
+      - "./infra/initdb:/docker-entrypoint-initdb.d:ro"
+    tmpfs:                                       # RUN-02 + RUN-15 (16+16=32M, di dalam limit 512M)
+      - /var/run/postgresql:size=16m
+      - /tmp:size=16m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+    deploy:
+      resources:
+        # Diturunkan dari anggaran SERVER-PROVISIONING.md §1 (postgres 512 MB
+        # di dalam subtotal ~2,2 GB pada VPS 8 GB), bukan angka bulat baru.
+        limits: { cpus: "1.0", memory: 512M }
+        reservations: { memory: 256M }          # RUN-06 — 50% dari limit
+    blkio_config:                               # RUN-14
+      # ⚠️ BELUM DIVERIFIKASI. VPS ini belum diprovisioning (SERVER-PROVISIONING.md
+      # masih 🟡 Draft). WAJIB dikonfirmasi lewat `lsblk -dno NAME` saat
+      # provisioning nyata sebelum deploy pertama — JANGAN asumsikan /dev/sda
+      # hanya karena itu device host bersama Ionowu (§3.9, host BERBEDA).
+      device_read_iops:  [{ path: /dev/sda, rate: 3000 }]
+      device_write_iops: [{ path: /dev/sda, rate: 3000 }]
+
+  pgbouncer:
+    <<: *defaults
+    image: edoburu/pgbouncer:latest@sha256:4c1ca296ef525f108f5d3552cc337c0c09587cf8dae7f0067fd93349e47dc1cd
+    container_name: sweet-pgbouncer
+    cap_add: ["CHOWN", "SETUID", "SETGID"]      # §3.1
+    networks: [data]
+    environment:
+      DB_HOST: postgres
+      DB_USER: sweet_app
+      DB_PASSWORD: ${SWEET_APP_PASSWORD:?wajib}
+      DB_NAME: ionowu_sweet
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200        # jauh di bawah SERVER-PROVISIONING §1 (VPS kecil, satu aplikasi)
+      DEFAULT_POOL_SIZE: 20
+      # AUTH_TYPE default image ini adalah "md5", sementara postgres:16
+      # menyimpan password sebagai scram-sha-256 (default sejak PG 14+).
+      # Tanpa baris ini, autentikasi gagal "wrong password type" — dibuktikan
+      # lewat `docker exec ... psql` nyata lewat PgBouncer, bukan diasumsikan
+      # dari dokumentasi image.
+      AUTH_TYPE: scram-sha-256
+    tmpfs:                                       # RUN-02 + RUN-15 (8×3=24M, di dalam limit 128M)
+      # uid:gid=70:70 — user "postgres" di dalam image ini (`docker run
+      # --entrypoint id` nyata). tmpfs default root:root membuat entrypoint
+      # gagal "Permission denied" saat menulis userlist.txt.
+      - /etc/pgbouncer:size=8m,uid=70,gid=70
+      - /var/log/pgbouncer:size=8m,uid=70,gid=70
+      - /var/run/pgbouncer:size=8m,uid=70,gid=70
+    depends_on:
+      postgres: { condition: service_healthy }  # dihormati — ini Compose asli, bukan Swarm
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+        reservations: { memory: 64M }
+
+  redis:
+    <<: *defaults
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    container_name: sweet-redis
+    cap_add: ["CHOWN", "SETUID", "SETGID"]      # §3.1
+    networks: [data]
+    # appendonly no — Redis MURNI cache (REDIS-STRATEGY §2-3): tidak ada lagi
+    # yang tak bisa dibangun ulang, jadi restart Redis adalah peristiwa biasa.
+    command: >-
+      redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+      --appendonly no --requirepass ${REDIS_PASSWORD:?wajib}
+    tmpfs:                                        # RUN-02 + RUN-15 (64M, di dalam limit 256M)
+      - /data:size=64m   # snapshot RDB periodik bawaan redis; isinya ephemeral
+                          # by design (§ "Redis MURNI cache" di atas)
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+        reservations: { memory: 128M }
+
+networks:
+  data:
+    name: sweet-internal      # §3.6 — <app>-internal
+    external: true            # dibuat sekali saat provisioning; lihat README deploy
+
+volumes:
+  # Hanya pgdata — DAT-01 mensyaratkan data yang TIDAK BISA dihasilkan ulang
+  # masuk named volume. Redis di sini murni cache (appendonly no, di atas):
+  # tidak ada apa pun untuk dipersist, jadi tidak ada volume untuknya.
+  sweet-pgdata: { name: sweet-pgdata }
