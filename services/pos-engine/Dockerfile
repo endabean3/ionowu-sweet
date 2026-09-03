@@ -1,36 +1,55 @@
-# pos-engine — jalur uang. Target <25 MB (PRD §4), scratch/distroless
-# (DOCKER.md §2). Dibangun di GitHub Actions, TIDAK di VPS (ADR-0004).
+# syntax=docker/dockerfile:1.7
+#
+# pos-engine — jalur uang. Mengikuti templat fondasi-server-ionowu §4.1.
+# Memenuhi: IMG-01 (multi-stage), IMG-02 (digest), IMG-08 (label OCI),
+#           IMG-10 (multi-arch), RUN-01 (UID 65532).
+#
+# PENYIMPANGAN IMG-03 — lihat docs/10-architecture/adr/0008-*.md:
+# §3.1 mewajibkan stage build `golang:1.23-alpine`, tetapi go.mod modul ini
+# menyatakan `go 1.26`. Toolchain 1.23 menolak membangunnya. Dipakai
+# `golang:1.26-alpine` (varian alpine tetap sesuai keluarga yang didaftar);
+# stage runtime tetap persis seperti §3.1.
 
-# ── Build ──────────────────────────────────────────────────────────────
-FROM golang:1.26-bookworm AS builder
+FROM golang:1.26-alpine@sha256:ce864e7223ac17b1775e6fd0b4c0db580c2eb50e7953a427916379e4b92a1628 AS builder
 WORKDIR /src
 
-# Layer dependensi dipisah dari kode: `go.mod`/`go.sum` jarang berubah,
-# kode berubah tiap commit — urutan ini menghindari unduh ulang modul saat
-# hanya kode yang berubah (DOCKER.md §1b aturan #4).
+# Layer dependensi dipisah dari kode: go.mod/go.sum jarang berubah, kode
+# berubah tiap commit — urutan ini menghindari unduh ulang modul saat hanya
+# kode yang berubah.
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
-# CGO_ENABLED=0: biner statis, wajib untuk jalan di scratch/distroless
-# (tidak ada libc di sana). GOOS/GOARCH default ke platform target buildx.
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+# TARGETOS/TARGETARCH diisi buildx saat build multi-arch (IMG-10).
+ARG TARGETOS TARGETARCH VERSION=dev COMMIT=unknown
+# CGO_ENABLED=0: biner statis, wajib untuk distroless (tidak ada libc di sana).
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
 # ── Runtime ────────────────────────────────────────────────────────────
-# distroless, bukan literal `scratch`: sudah menyertakan ca-certificates
-# (wajib untuk sslmode Postgres/TLS keluar) dan user non-root bawaan —
-# DOCKER.md §2 mengizinkan keduanya ("scratch ATAU distroless").
-FROM gcr.io/distroless/static-debian12:nonroot
-WORKDIR /
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+
+ARG VERSION=dev COMMIT=unknown CREATED=unknown
+LABEL org.opencontainers.image.source="https://github.com/endabean3/ionowu-sweet" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${COMMIT}" \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.title="ionowu-sweet pos-engine" \
+      org.opencontainers.image.description="Jalur uang POS offline-first — checkout, shift, sync"
+
 COPY --from=builder /out/api /api
 
-# CATATAN HEALTHCHECK: distroless tidak punya shell/wget, jadi
-# `HEALTHCHECK CMD` tidak bisa dieksekusi di sini (beda dari image web/
-# Alpine yang punya wget). Endpoint /healthz tetap ada (lihat
-# internal/httpapi/router.go) — pemeriksaan kesiapan dilakukan Traefik di
-# level HTTP, bukan lewat Docker HEALTHCHECK. Ini penyimpangan yang
-# didokumentasikan dari DOCKER.md §2, bukan diam-diam dilewati.
+# CATATAN HEALTHCHECK (RUN-07): distroless tidak punya shell maupun wget,
+# jadi `HEALTHCHECK CMD` tidak dapat dieksekusi di sini. Kesiapan diperiksa
+# lewat probe HTTP platform ke /health/ready (RUN-08) yang dikonfigurasi di
+# panel Dokploy — bukan lewat Docker HEALTHCHECK. Ini penyimpangan yang
+# didokumentasikan, bukan diam-diam dilewati.
 
-USER nonroot:nonroot
+# RUN-01 — UID/GID standar Ionowu. Tag `nonroot` distroless memang sudah
+# 65532, tetapi ditulis eksplisit agar terbaca linter dan tidak berubah
+# diam-diam bila tag base bergeser.
+USER 65532:65532
 EXPOSE 8080
 ENTRYPOINT ["/api"]

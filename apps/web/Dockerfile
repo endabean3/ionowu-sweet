@@ -1,8 +1,14 @@
-# web — PWA kasir. node:22-alpine + output:standalone (DOCKER.md §2).
-# Dibangun di GitHub Actions, TIDAK di VPS (ADR-0004).
+# syntax=docker/dockerfile:1.7
+#
+# web — PWA kasir. node:22-alpine + output:standalone (DOCKER.md §2,
+# fondasi-server-ionowu §3.1). Dibangun di GitHub Actions, TIDAK di VPS
+# (ADR-0004 · IMG-11).
+#
+# Memenuhi: IMG-01 (multi-stage), IMG-02 (digest), IMG-04 (--frozen-lockfile),
+#           IMG-08 (label OCI), RUN-01 (UID 65532), RUN-07 (healthcheck).
 
 # ── Dependensi ─────────────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS deps
 WORKDIR /app
 RUN corepack enable
 # Layer terpisah dari kode: lockfile jarang berubah dibanding kode
@@ -12,7 +18,7 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --filter web...
 
 # ── Build ──────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS builder
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
@@ -29,10 +35,22 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter web build
 
 # ── Runtime ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+
+ARG VERSION=dev COMMIT=unknown CREATED=unknown
+LABEL org.opencontainers.image.source="https://github.com/endabean3/ionowu-sweet" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${COMMIT}" \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.title="ionowu-sweet web" \
+      org.opencontainers.image.description="PWA kasir offline-first"
+
+# RUN-01 — UID/GID standar Ionowu adalah 65532, bukan 1001 bawaan contoh
+# Next.js. Nilai seragam lintas seluruh aplikasi Ionowu supaya kepemilikan
+# berkas pada volume dan tmpfs dapat diprediksi.
+RUN addgroup -g 65532 -S nodejs && adduser -S -u 65532 -G nodejs nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 # server.js standalone TIDAK berada di /app/server.js seperti proyek
@@ -44,7 +62,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
-USER nextjs
+USER 65532:65532
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0
 

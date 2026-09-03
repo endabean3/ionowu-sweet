@@ -14,9 +14,15 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	// RUN-08 — liveness dan readiness WAJIB terpisah. Lihat health.go untuk
+	// alasan pemisahannya.
+	health := NewHealthHandler(pool)
+	r.Get("/health/live", health.Live)
+	r.Get("/health/ready", health.Ready)
+
+	// Dipertahankan demi kompatibilitas: docker-compose dan skrip lama masih
+	// menunjuk ke sini. Jalur baru adalah /health/live.
+	r.Get("/healthz", health.Live)
 
 	authHandler := NewAuthHandler(pool, jwtPrivateKey)
 	r.Post("/auth/register", authHandler.PostRegister)

@@ -34,6 +34,12 @@ jobs:
         run: |
           if [ -f "${{ matrix.file }}" ]; then echo "ada=true" >> $GITHUB_OUTPUT
           else echo "⏭️  ${{ matrix.name }} belum ada"; echo "ada=false" >> $GITHUB_OUTPUT; fi
+      # IMG-10 — amd64 WAJIB (host produksi), arm64 SEBAIKNYA (mesin dev Apple
+      # Silicon). QEMU WAJIB didaftarkan SEBELUM buildx membuat builder-nya:
+      # binfmt handler dipasang di host, dan builder hanya melihat emulator
+      # yang sudah terdaftar saat ia dibuat.
+      - uses: docker/setup-qemu-action@v3
+        if: steps.cek.outputs.ada == 'true'
       - uses: docker/setup-buildx-action@v3
         if: steps.cek.outputs.ada == 'true'
       - uses: docker/login-action@v4
@@ -43,18 +49,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v7
+        id: build
         if: steps.cek.outputs.ada == 'true'
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
           push: true
           # Tag SHA yang membuat rollback deterministik: tarik tag lama,
           # bukan bangun ulang dari commit lama yang tak dijamin identik.
           tags: |
             ghcr.io/${{ github.repository }}/${{ matrix.name }}:${{ github.sha }}
             ghcr.io/${{ github.repository }}/${{ matrix.name }}:main
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # IMG-08 — label OCI diisi dari konteks CI, bukan dihardcode di
+          # Dockerfile (nilai default di sana hanya untuk build lokal).
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+            CREATED=${{ github.event.repository.updated_at }}
+          # IMG-12 — SBOM + provenance. Penandatanganan cosign belum aktif
+          # (butuh keputusan identitas OIDC penandatangan) — lihat ADR-0008.
+          sbom: true
+          provenance: true
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # DEP-01 / DEP-08 — digest dicetak agar rilis dapat ditelusuri dan
+      # deployment dapat mereferensikan digest, bukan tag yang bergerak.
+      - name: Digest image
+        if: steps.cek.outputs.ada == 'true'
+        run: echo "${{ matrix.name }} → ${{ steps.build.outputs.digest }}"
       - name: Anggaran ukuran image
         if: steps.cek.outputs.ada == 'true'
         run: bash scripts/check-image-size.sh
