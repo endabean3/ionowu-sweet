@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
-	
+
 	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
 )
 
@@ -28,7 +28,7 @@ func NewCatalogHandler(pool *pgxpool.Pool) *CatalogHandler {
 // GetProducts menangani GET /products
 func (h *CatalogHandler) GetProducts(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := r.Context().Value(tenantIDKey).(string)
-	
+
 	prods, err := h.queries.ListProducts(r.Context(), store.ListProductsParams{
 		TenantID: tenantID,
 		Limit:    50,
@@ -39,8 +39,7 @@ func (h *CatalogHandler) GetProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"data": prods})
+	RespondJSON(w, http.StatusOK, map[string]any{"data": prods})
 }
 
 // PostProduct menangani POST /products
@@ -76,7 +75,7 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "Gagal memulai tx"}`, http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op setelah Commit berhasil
 
 	productID := "pr_" + ulid.Make().String()
 
@@ -106,8 +105,7 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{
+	RespondJSON(w, http.StatusCreated, map[string]any{
 		"message":    "Produk berhasil dibuat",
 		"product_id": productID,
 	})
@@ -144,8 +142,7 @@ func (h *CatalogHandler) PatchProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message":"Produk diupdate"}`))
+	RespondJSON(w, http.StatusOK, map[string]any{"message": "Produk diupdate"})
 }
 
 // PatchVariant menangani PATCH /variants/{id}
@@ -164,7 +161,7 @@ func (h *CatalogHandler) PatchVariant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "Payload tidak valid"}`, http.StatusBadRequest)
 		return
 	}
-	
+
 	var p decimal.NullDecimal
 	if req.Price != nil {
 		d, err := decimal.NewFromString(*req.Price)
@@ -187,6 +184,5 @@ func (h *CatalogHandler) PatchVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message":"Varian diupdate"}`))
+	RespondJSON(w, http.StatusOK, map[string]any{"message": "Varian diupdate"})
 }

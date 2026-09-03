@@ -30,6 +30,14 @@ type Querier interface {
 	CreateOutlet(ctx context.Context, arg CreateOutletParams) (string, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (string, error)
 	// Simpan refresh token (sudah di-hash SHA-256) dengan TTL 7 hari.
+	//
+	// BUG DITEMUKAN & DIPERBAIKI (3 Sept 2026): daftar kolom sebelumnya menyebut
+	// `device_label` DUA KALI (bukan device_label + device_fingerprint yang ada
+	// di skema, migrations/00001). Postgres menolak INSERT dengan kolom
+	// terduplikasi ("column device_label specified more than once") — setiap
+	// login/register/refresh gagal total. Ditemukan lewat `make sqlc-vet` +
+	// pembacaan manual, dikonfirmasi lewat login end-to-end nyata setelah
+	// diperbaiki, bukan diasumsikan benar dari nama variabel Go.
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	// Dipakai HANYA oleh seeder untuk mengisi kasus tepi "refund parsial"
 	// (TESTING-STRATEGY.md §4). Jalur HTTP /sales/{id}/refund BELUM diimplementasikan
@@ -159,9 +167,12 @@ type Querier interface {
 	// tenant_id belum ada, jadi dikecualikan dari aturan wajib-tenant-scope.
 	RegisterTenantOwner(ctx context.Context, arg RegisterTenantOwnerParams) (string, error)
 	// Revoke semua token aktif milik user (logout-all / compromised account).
-	RevokeAllUserTokens(ctx context.Context, userID string) error
-	// Revoke satu token spesifik (logout atau rotate).
-	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	RevokeAllUserTokens(ctx context.Context, arg RevokeAllUserTokensParams) error
+	// Revoke satu token spesifik (logout atau rotate). tenant_id sebagai
+	// parameter WAJIB (SECURITY.md §2B "Aturan Emas SQL") meski token_hash
+	// sendiri unik secara global — pertahanan berlapis, bukan cuma soal
+	// tereksploitasi atau tidak.
+	RevokeRefreshToken(ctx context.Context, arg RevokeRefreshTokenParams) error
 	// Retensi 7 hari; dibersihkan job harian. (RETENTION §2)
 	SaveSyncReceipt(ctx context.Context, arg SaveSyncReceiptParams) error
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)

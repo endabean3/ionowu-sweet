@@ -15,18 +15,18 @@ import (
 // TIDAK dikerjakan di sesi ini.
 
 type cartTotalFixture struct {
-	Name                 string `json:"name"`
-	Items                []struct {
+	Name  string `json:"name"`
+	Items []struct {
 		Quantity  string `json:"quantity"`
 		UnitPrice string `json:"unit_price"`
 		Discount  string `json:"discount"`
 	} `json:"items"`
-	Discount             string `json:"discount"`
-	TaxRate              string `json:"tax_rate"`
-	ExpectSubtotal       string `json:"expect_subtotal"`
-	ExpectDiscountTotal  string `json:"expect_discount_total"`
-	ExpectTaxTotal       string `json:"expect_tax_total"`
-	ExpectGrandTotal     string `json:"expect_grand_total"`
+	Discount            string `json:"discount"`
+	TaxRate             string `json:"tax_rate"`
+	ExpectSubtotal      string `json:"expect_subtotal"`
+	ExpectDiscountTotal string `json:"expect_discount_total"`
+	ExpectTaxTotal      string `json:"expect_tax_total"`
+	ExpectGrandTotal    string `json:"expect_grand_total"`
 }
 
 func loadFixtures[T any](t *testing.T, path string) []T {
@@ -95,12 +95,12 @@ func TestSumPayments(t *testing.T) {
 }
 
 type refundFixture struct {
-	Name             string `json:"name"`
-	GrandTotal       string `json:"grand_total"`
-	AlreadyRefunded  string `json:"already_refunded"`
-	Requested        string `json:"requested"`
-	ExpectRemaining  string `json:"expect_remaining"`
-	ExpectError      bool   `json:"expect_error"`
+	Name            string `json:"name"`
+	GrandTotal      string `json:"grand_total"`
+	AlreadyRefunded string `json:"already_refunded"`
+	Requested       string `json:"requested"`
+	ExpectRemaining string `json:"expect_remaining"`
+	ExpectError     bool   `json:"expect_error"`
 }
 
 // TestRemainingRefundable menutup kasus tepi wajib "refund parsial".

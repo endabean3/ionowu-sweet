@@ -139,7 +139,6 @@ func (h *ShiftHandler) PostShiftClose(w http.ResponseWriter, r *http.Request, sh
 	})
 }
 
-
 type cashMovementInput struct {
 	Direction string          `json:"direction"` // "in" atau "out"
 	Amount    decimal.Decimal `json:"amount"`
@@ -184,7 +183,7 @@ func (h *ShiftHandler) PostCashMovement(w http.ResponseWriter, r *http.Request, 
 		Reason:      req.Reason,
 		ActorUserID: userID,
 	})
-	
+
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal merekam cash movement")
 		return

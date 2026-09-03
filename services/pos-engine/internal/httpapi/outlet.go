@@ -29,15 +29,14 @@ func NewOutletHandler(pool *pgxpool.Pool) *OutletHandler {
 // GetOutlets menangani GET /outlets
 func (h *OutletHandler) GetOutlets(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := r.Context().Value(tenantIDKey).(string)
-	
+
 	outlets, err := h.queries.ListOutlets(r.Context(), tenantID)
 	if err != nil {
 		http.Error(w, `{"error": "Gagal memuat outlet"}`, http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"data": outlets})
+	RespondJSON(w, http.StatusOK, map[string]any{"data": outlets})
 }
 
 // PostOutlet menangani POST /outlets
@@ -65,7 +64,7 @@ func (h *OutletHandler) PostOutlet(w http.ResponseWriter, r *http.Request) {
 	if req.Timezone == "" {
 		req.Timezone = "Asia/Jakarta"
 	}
-	
+
 	var bdStart pgtype.Time
 	if req.BusinessDayStart != "" {
 		t, err := time.Parse("15:04", req.BusinessDayStart)
@@ -93,8 +92,7 @@ func (h *OutletHandler) PostOutlet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{
+	RespondJSON(w, http.StatusCreated, map[string]any{
 		"message": "Outlet dibuat",
 		"data":    out,
 	})
@@ -146,6 +144,5 @@ func (h *OutletHandler) PatchOutlet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message":"Outlet diupdate"}`))
+	RespondJSON(w, http.StatusOK, map[string]any{"message": "Outlet diupdate"})
 }

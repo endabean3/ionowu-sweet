@@ -1,9 +1,39 @@
-import type { AuthSession } from "../auth/api";
 import { db } from "../db";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-export async function pullCatalog(accessToken: string, deviceId: string) {
+// Bentuk PERSIS respons Go (services/pos-engine/internal/httpapi/sync.go
+// syncProduct/syncVariant) — products dan variants adalah dua larik
+// TERPISAH, bukan satu larik variant dengan nama produk ikut nempel.
+interface SyncPullProduct {
+  id: string;
+  category_id: string;
+  name: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
+interface SyncPullVariant {
+  id: string;
+  product_id: string;
+  name: string;
+  sku?: string;
+  barcode?: string;
+  item_type: string;
+  uom: string;
+  uom_precision: number;
+  price: string;
+  stock_quantity: string;
+  min_stock_alert: string;
+  is_active: boolean;
+}
+
+interface SyncPullResponse {
+  products: SyncPullProduct[];
+  variants: SyncPullVariant[];
+}
+
+export async function pullCatalog(accessToken: string, deviceId: string, tenantId: string) {
   try {
     const res = await fetch(`${API_URL}/sync/pull`, {
       method: "POST",
@@ -18,18 +48,19 @@ export async function pullCatalog(accessToken: string, deviceId: string) {
       throw new Error("Gagal pull katalog dari server");
     }
 
-    const data = await res.json();
+    const data: SyncPullResponse = await res.json();
 
-    // Tulis ke Dexie
+    // Tulis ke Dexie. `tenant_id` diambil dari sesi login (bukan
+    // dihardcode) — field ini terindeks di skema Dexie (lihat db/index.ts)
+    // dan dipakai memfilter data lokal per tenant. Nilai hardcode
+    // sebelumnya membuat filter itu tidak berarti apa-apa.
     await db.transaction("rw", db.products, db.variants, async () => {
-      // Upsert products
       if (data.products && data.products.length > 0) {
-        // Hapus semua dulu untuk MVP (nanti pakai delta sync)
         await db.products.clear();
         await db.products.bulkAdd(
-          data.products.map((p: any) => ({
+          data.products.map((p) => ({
             id: p.id,
-            tenant_id: "tenant", // Harus ambil dari token
+            tenant_id: tenantId,
             category_id: p.category_id,
             name: p.name,
             is_active: p.is_active,
@@ -38,18 +69,17 @@ export async function pullCatalog(accessToken: string, deviceId: string) {
         );
       }
 
-      // Upsert variants
       if (data.variants && data.variants.length > 0) {
         await db.variants.clear();
         await db.variants.bulkAdd(
-          data.variants.map((v: any) => ({
+          data.variants.map((v) => ({
             id: v.id,
-            tenant_id: "tenant",
+            tenant_id: tenantId,
             product_id: v.product_id,
             name: v.name,
             sku: v.sku,
             barcode: v.barcode,
-            item_type: v.item_type,
+            item_type: v.item_type as "single" | "composite" | "weight" | "bulk_liquid",
             uom: v.uom,
             uom_precision: v.uom_precision,
             price: v.price,
@@ -68,13 +98,30 @@ export async function pullCatalog(accessToken: string, deviceId: string) {
   }
 }
 
+interface SyncPushResult {
+  client_id: string;
+  status: "accepted" | "duplicate" | "rejected";
+}
+
+interface SyncPushResponse {
+  results?: SyncPushResult[];
+}
+
+interface SyncPushPayload {
+  device_id: string;
+  shifts_open: Record<string, unknown>[];
+  sales: Record<string, unknown>[];
+  stock_events: Record<string, unknown>[];
+  shifts_close: Record<string, unknown>[];
+}
+
 export async function pushQueue(accessToken: string, deviceId: string) {
   // Ambil semua item dari queue yang pending atau failed
   const pendingItems = await db.syncQueue.where("status").anyOf(["pending", "failed"]).toArray();
 
   if (pendingItems.length === 0) return true;
 
-  const payload: any = {
+  const payload: SyncPushPayload = {
     device_id: deviceId,
     shifts_open: [],
     sales: [],
@@ -103,12 +150,13 @@ export async function pushQueue(accessToken: string, deviceId: string) {
       throw new Error("Gagal push data ke server");
     }
 
-    const result = await res.json();
+    const result: SyncPushResponse = await res.json();
 
     // Update status di lokal menjadi synced
-    if (result.results) {
+    const pushResults = result.results;
+    if (pushResults) {
       await db.transaction("rw", db.syncQueue, async () => {
-        for (const resItem of result.results) {
+        for (const resItem of pushResults) {
           if (resItem.status === "accepted" || resItem.status === "duplicate") {
             const queueItem = pendingItems.find((q) => q.payload.id === resItem.client_id);
             if (queueItem) {

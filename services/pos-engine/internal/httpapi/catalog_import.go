@@ -37,7 +37,7 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Berkas CSV tidak ditemukan pada field 'file'")
 		return
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // hanya-baca, tidak ada state untuk diselamatkan
 
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
@@ -45,7 +45,7 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Format CSV tidak valid")
 		return
 	}
-	
+
 	if len(records) <= 1 {
 		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "CSV kosong atau hanya berisi header")
 		return
@@ -56,7 +56,7 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memulai transaksi impor")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op setelah Commit berhasil
 
 	productMap := make(map[string]string) // product_name -> product_id
 	totalImported := 0
@@ -73,7 +73,7 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 		variantName := strings.TrimSpace(row[1])
 		sku := strings.TrimSpace(row[2])
 		barcode := strings.TrimSpace(row[3])
-		
+
 		priceStr := strings.TrimSpace(row[4])
 		costStr := strings.TrimSpace(row[5])
 		unit := strings.TrimSpace(row[6])
@@ -99,16 +99,20 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 		}
 
 		variantID := "va_" + ulid.Make().String()
-		
+
 		var skuPtr, barcodePtr *string
-		if sku != "" { skuPtr = &sku }
-		if barcode != "" { barcodePtr = &barcode }
+		if sku != "" {
+			skuPtr = &sku
+		}
+		if barcode != "" {
+			barcodePtr = &barcode
+		}
 
 		_, err = tx.Exec(ctx, `
 			INSERT INTO variants (id, tenant_id, product_id, name, sku, barcode, price, cost, unit, stock_quantity, min_stock_alert, is_active) 
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, true)
 		`, variantID, tenantID, productID, variantName, skuPtr, barcodePtr, price, cost, unit)
-		
+
 		if err == nil {
 			totalImported++
 		}

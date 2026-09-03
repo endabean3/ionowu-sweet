@@ -21,8 +21,8 @@ func NewStockOpnameHandler(pool *pgxpool.Pool) *StockOpnameHandler {
 }
 
 type opnameItemInput struct {
-	VariantID      string          `json:"variant_id"`
-	SystemQuantity decimal.Decimal `json:"system_quantity"`
+	VariantID       string          `json:"variant_id"`
+	SystemQuantity  decimal.Decimal `json:"system_quantity"`
 	CountedQuantity decimal.Decimal `json:"counted_quantity"`
 }
 
@@ -53,16 +53,16 @@ func (h *StockOpnameHandler) PostStockOpname(w http.ResponseWriter, r *http.Requ
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memulai tx")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op setelah Commit berhasil
 
 	qtx := h.q.WithTx(tx)
 
 	opnameID := "op_" + ulid.Make().String()
-	
+
 	// Untuk simplicity, kita set auto-approved oleh yang mengajukan.
 	// Di enterprise, ini bisa draft dulu, lalu direview manager.
 	userIDPtr := &userID
-	
+
 	_, err = qtx.InsertStockOpname(ctx, store.InsertStockOpnameParams{
 		ID:         opnameID,
 		TenantID:   tenantID,
@@ -71,7 +71,7 @@ func (h *StockOpnameHandler) PostStockOpname(w http.ResponseWriter, r *http.Requ
 		StartedBy:  userID,
 		ApprovedBy: userIDPtr,
 	})
-	
+
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan header opname")
 		return
@@ -91,7 +91,7 @@ func (h *StockOpnameHandler) PostStockOpname(w http.ResponseWriter, r *http.Requ
 			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan item opname")
 			return
 		}
-		
+
 		// Insert adjustment (opname_adjust) if variance != 0
 		if !item.SystemQuantity.Equal(item.CountedQuantity) {
 			variance := item.CountedQuantity.Sub(item.SystemQuantity)

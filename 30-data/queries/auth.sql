@@ -25,7 +25,15 @@ WHERE u.id = $1 AND u.is_active = TRUE;
 
 -- name: CreateRefreshToken :exec
 -- Simpan refresh token (sudah di-hash SHA-256) dengan TTL 7 hari.
-INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, device_label, device_label)
+--
+-- BUG DITEMUKAN & DIPERBAIKI (3 Sept 2026): daftar kolom sebelumnya menyebut
+-- `device_label` DUA KALI (bukan device_label + device_fingerprint yang ada
+-- di skema, migrations/00001). Postgres menolak INSERT dengan kolom
+-- terduplikasi ("column device_label specified more than once") — setiap
+-- login/register/refresh gagal total. Ditemukan lewat `make sqlc-vet` +
+-- pembacaan manual, dikonfirmasi lewat login end-to-end nyata setelah
+-- diperbaiki, bukan diasumsikan benar dari nama variabel Go.
+INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, device_label, device_fingerprint)
 VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days', $5, $6);
 
 -- name: GetRefreshTokenByHash :one
@@ -38,16 +46,19 @@ WHERE token_hash = $1
 LIMIT 1;
 
 -- name: RevokeRefreshToken :exec
--- Revoke satu token spesifik (logout atau rotate).
+-- Revoke satu token spesifik (logout atau rotate). tenant_id sebagai
+-- parameter WAJIB (SECURITY.md §2B "Aturan Emas SQL") meski token_hash
+-- sendiri unik secara global — pertahanan berlapis, bukan cuma soal
+-- tereksploitasi atau tidak.
 UPDATE refresh_tokens
 SET revoked_at = NOW()
-WHERE token_hash = $1 AND revoked_at IS NULL;
+WHERE tenant_id = $1 AND token_hash = $2 AND revoked_at IS NULL;
 
 -- name: RevokeAllUserTokens :exec
 -- Revoke semua token aktif milik user (logout-all / compromised account).
 UPDATE refresh_tokens
 SET revoked_at = NOW()
-WHERE user_id = $1 AND revoked_at IS NULL;
+WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL;
 
 -- name: RegisterTenantOwner :one
 -- sqlc-vet-disable: wajib-tenant-scope

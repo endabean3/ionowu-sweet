@@ -10,10 +10,10 @@ import (
 
 // Config menyimpan semua konfigurasi runtime pos-engine.
 type Config struct {
-	DatabaseURL     string
-	Port            string
-	JWTPublicKey    ed25519.PublicKey
-	JWTPrivateKey   ed25519.PrivateKey // dibutuhkan oleh AuthHandler untuk signing
+	DatabaseURL   string
+	Port          string
+	JWTPublicKey  ed25519.PublicKey
+	JWTPrivateKey ed25519.PrivateKey // dibutuhkan oleh AuthHandler untuk signing
 }
 
 // Load membaca konfigurasi dari environment.

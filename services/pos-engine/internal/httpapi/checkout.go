@@ -369,7 +369,7 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memulai tx refund")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op setelah Commit berhasil
 
 	qtx := h.q.WithTx(tx)
 

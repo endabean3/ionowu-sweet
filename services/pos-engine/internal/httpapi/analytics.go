@@ -1,11 +1,10 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	
+
 	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
 )
 
@@ -36,7 +35,7 @@ func (h *AnalyticsHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error": "Gagal memuat top produk"}`, http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Convert topProducts structure to match frontend JSON structure
 	var productsResponse []map[string]any
 	for _, p := range topProducts {
@@ -48,8 +47,7 @@ func (h *AnalyticsHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	RespondJSON(w, http.StatusOK, map[string]any{
 		"summary": map[string]any{
 			"transaction_count": summary.TransactionCount,
 			"gross_sales":       summary.GrossSales,

@@ -12,20 +12,28 @@ import (
 )
 
 const createRefreshToken = `-- name: CreateRefreshToken :exec
-INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, device_label, device_label)
+INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, device_label, device_fingerprint)
 VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days', $5, $6)
 `
 
 type CreateRefreshTokenParams struct {
-	ID            string  `db:"id" json:"id"`
-	TenantID      string  `db:"tenant_id" json:"tenant_id"`
-	UserID        string  `db:"user_id" json:"user_id"`
-	TokenHash     string  `db:"token_hash" json:"token_hash"`
-	DeviceLabel   *string `db:"device_label" json:"device_label"`
-	DeviceLabel_2 *string `db:"device_label_2" json:"device_label_2"`
+	ID                string  `db:"id" json:"id"`
+	TenantID          string  `db:"tenant_id" json:"tenant_id"`
+	UserID            string  `db:"user_id" json:"user_id"`
+	TokenHash         string  `db:"token_hash" json:"token_hash"`
+	DeviceLabel       *string `db:"device_label" json:"device_label"`
+	DeviceFingerprint *string `db:"device_fingerprint" json:"device_fingerprint"`
 }
 
 // Simpan refresh token (sudah di-hash SHA-256) dengan TTL 7 hari.
+//
+// BUG DITEMUKAN & DIPERBAIKI (3 Sept 2026): daftar kolom sebelumnya menyebut
+// `device_label` DUA KALI (bukan device_label + device_fingerprint yang ada
+// di skema, migrations/00001). Postgres menolak INSERT dengan kolom
+// terduplikasi ("column device_label specified more than once") — setiap
+// login/register/refresh gagal total. Ditemukan lewat `make sqlc-vet` +
+// pembacaan manual, dikonfirmasi lewat login end-to-end nyata setelah
+// diperbaiki, bukan diasumsikan benar dari nama variabel Go.
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error {
 	_, err := q.db.Exec(ctx, createRefreshToken,
 		arg.ID,
@@ -33,7 +41,7 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 		arg.UserID,
 		arg.TokenHash,
 		arg.DeviceLabel,
-		arg.DeviceLabel_2,
+		arg.DeviceFingerprint,
 	)
 	return err
 }
@@ -189,23 +197,36 @@ func (q *Queries) RegisterTenantOwner(ctx context.Context, arg RegisterTenantOwn
 const revokeAllUserTokens = `-- name: RevokeAllUserTokens :exec
 UPDATE refresh_tokens
 SET revoked_at = NOW()
-WHERE user_id = $1 AND revoked_at IS NULL
+WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL
 `
 
+type RevokeAllUserTokensParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	UserID   string `db:"user_id" json:"user_id"`
+}
+
 // Revoke semua token aktif milik user (logout-all / compromised account).
-func (q *Queries) RevokeAllUserTokens(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, revokeAllUserTokens, userID)
+func (q *Queries) RevokeAllUserTokens(ctx context.Context, arg RevokeAllUserTokensParams) error {
+	_, err := q.db.Exec(ctx, revokeAllUserTokens, arg.TenantID, arg.UserID)
 	return err
 }
 
 const revokeRefreshToken = `-- name: RevokeRefreshToken :exec
 UPDATE refresh_tokens
 SET revoked_at = NOW()
-WHERE token_hash = $1 AND revoked_at IS NULL
+WHERE tenant_id = $1 AND token_hash = $2 AND revoked_at IS NULL
 `
 
-// Revoke satu token spesifik (logout atau rotate).
-func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
-	_, err := q.db.Exec(ctx, revokeRefreshToken, tokenHash)
+type RevokeRefreshTokenParams struct {
+	TenantID  string `db:"tenant_id" json:"tenant_id"`
+	TokenHash string `db:"token_hash" json:"token_hash"`
+}
+
+// Revoke satu token spesifik (logout atau rotate). tenant_id sebagai
+// parameter WAJIB (SECURITY.md §2B "Aturan Emas SQL") meski token_hash
+// sendiri unik secara global — pertahanan berlapis, bukan cuma soal
+// tereksploitasi atau tidak.
+func (q *Queries) RevokeRefreshToken(ctx context.Context, arg RevokeRefreshTokenParams) error {
+	_, err := q.db.Exec(ctx, revokeRefreshToken, arg.TenantID, arg.TokenHash)
 	return err
 }

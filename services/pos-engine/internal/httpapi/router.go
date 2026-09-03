@@ -45,7 +45,7 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 		r.Post("/products", catalogHandler.PostProduct)
 		r.Patch("/products/{id}", catalogHandler.PatchProduct)
 		r.Patch("/variants/{id}", catalogHandler.PatchVariant)
-		
+
 		catalogImportHandler := NewCatalogImportHandler(pool)
 		r.Post("/products/import", catalogImportHandler.PostProductsImport)
 
@@ -53,11 +53,11 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 		r.Get("/outlets", outletHandler.GetOutlets)
 		r.Post("/outlets", outletHandler.PostOutlet)
 		r.Patch("/outlets/{id}", outletHandler.PatchOutlet)
-		
+
 		stockHandler := NewStockHandler(pool)
 		r.Get("/stock/levels", stockHandler.GetStockLevels)
 		r.Post("/stock/events", stockHandler.PostStockEvent)
-		
+
 		stockOpnameHandler := NewStockOpnameHandler(pool)
 		r.Post("/stock/opname", stockOpnameHandler.PostStockOpname)
 

@@ -67,7 +67,7 @@ func (h *SyncHandler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := store.New(h.pool)
-	
+
 	// Untuk MVP, kita ambil outlet_id pertama milik user (sementara ambil dummy)
 	// Kita harusnya ambil outlet_id dari session, tapi kita pakai query sementara
 	var outletID string
@@ -98,14 +98,14 @@ func (h *SyncHandler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
 			if row.CategoryID != nil {
 				catID = *row.CategoryID
 			}
-			
+
 			var updTime time.Time
 			if t, ok := row.UpdatedAt.(time.Time); ok {
-			    updTime = t
+				updTime = t
 			} else {
-			    updTime = time.Now()
+				updTime = time.Now()
 			}
-			
+
 			res.Products = append(res.Products, syncProduct{
 				ID:         row.ProductID,
 				CategoryID: catID,

@@ -37,9 +37,6 @@ func NewAuthHandler(pool *pgxpool.Pool, privateKey ed25519.PrivateKey) *AuthHand
 // accessTokenTTL adalah durasi access token (pendek, per SECURITY.md §4B).
 const accessTokenTTL = 15 * time.Minute
 
-// refreshTokenTTL adalah durasi refresh token (7 hari = durasi retensi sync).
-const refreshTokenTTL = 7 * 24 * time.Hour
-
 // authSessionResponse adalah respons standar untuk semua auth endpoint.
 type authSessionResponse struct {
 	AccessToken  string   `json:"access_token"`
@@ -101,11 +98,15 @@ func (h *AuthHandler) issueSession(r *http.Request, q *store.Queries, userID, te
 
 	ua := r.UserAgent()
 	if err = q.CreateRefreshToken(r.Context(), store.CreateRefreshTokenParams{
-		ID:        ulid.Make().String(),
-		TenantID:  tenantID,
-		UserID:    userID,
-		TokenHash: hashRefresh,
+		ID:          ulid.Make().String(),
+		TenantID:    tenantID,
+		UserID:      userID,
+		TokenHash:   hashRefresh,
 		DeviceLabel: &ua,
+		// DeviceFingerprint belum dihitung di klien mana pun (PWA belum
+		// mengirim fingerprint perangkat) — nil, bukan dipaksa isi nilai
+		// yang tidak berarti apa-apa.
+		DeviceFingerprint: nil,
 	}); err != nil {
 		return authSessionResponse{}, err
 	}
@@ -311,7 +312,9 @@ func (h *AuthHandler) PostRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Revoke token lama (rotate)
-	if err = q.RevokeRefreshToken(ctx, tokenHash); err != nil {
+	if err = q.RevokeRefreshToken(ctx, store.RevokeRefreshTokenParams{
+		TenantID: stored.TenantID, TokenHash: tokenHash,
+	}); err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal revoke token lama")
 		return
 	}
@@ -352,9 +355,20 @@ func (h *AuthHandler) PostLogout(w http.ResponseWriter, r *http.Request) {
 	sum := sha256.Sum256([]byte(req.RefreshToken))
 	tokenHash := hex.EncodeToString(sum[:])
 
+	ctx := r.Context()
 	q := store.New(h.pool)
-	// Abaikan error revoke — idempoten (token mungkin sudah expired)
-	_ = q.RevokeRefreshToken(r.Context(), tokenHash)
+
+	// tenant_id wajib untuk RevokeRefreshToken (SECURITY.md §2B) — belum
+	// diketahui dari request logout itu sendiri, jadi dicari dulu lewat
+	// hash. Kegagalan lookup DIABAIKAN dengan sengaja: token mungkin sudah
+	// expired/revoked, dan logout tetap harus idempoten dari sudut pandang
+	// klien.
+	stored, err := q.GetRefreshTokenByHash(ctx, tokenHash)
+	if err == nil {
+		_ = q.RevokeRefreshToken(ctx, store.RevokeRefreshTokenParams{
+			TenantID: stored.TenantID, TokenHash: tokenHash,
+		})
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
