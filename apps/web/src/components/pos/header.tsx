@@ -26,18 +26,29 @@ interface HeaderProps {
 export function POSHeader({ outletId }: HeaderProps) {
   const { user } = useAuth();
   const { isSyncing, syncNow, lastSyncedAt } = useSync();
-  // Lazy-init dari navigator.onLine langsung (bukan default true lalu
-  // dikoreksi di effect) — kasir yang membuka aplikasi saat toko SUDAH
-  // offline sebelumnya sempat melihat "Online" palsu selama satu frame.
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
+  // null = BELUM diketahui. Status jaringan hanya ada di klien, jadi server
+  // dan render pertama klien wajib sepakat pada "belum tahu" — kalau tidak,
+  // React membuang seluruh HTML server dan merender ulang dari nol.
+  //
+  // Lazy-init `navigator.onLine` TIDAK bisa dipakai di sini: Node 21+ punya
+  // global `navigator` TANPA properti onLine, jadi `typeof navigator !==
+  // "undefined"` lolos di server tapi nilainya undefined → server merender
+  // "Offline" sementara klien merender "Online". Itu persis hydration error
+  // yang sempat terjadi.
+  //
+  // Default `true` juga ditolak: kasir yang membuka aplikasi saat toko sudah
+  // offline akan melihat "Online" palsu. "Memeriksa…" jujur untuk keduanya.
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isDark, setIsDark] = useState<boolean>(false);
 
   const outlet = useLiveQuery(() => (outletId ? db.outlets.get(outletId) : undefined), [outletId]);
 
   useEffect(() => {
+    // Tetapkan status nyata SETELAH mount — di sinilah navigator.onLine
+    // benar-benar tersedia dan aman dibaca.
+    setIsOnline(navigator.onLine);
+
     const handleOnline = () => {
       setIsOnline(true);
       syncNow();
@@ -116,17 +127,26 @@ export function POSHeader({ outletId }: HeaderProps) {
         {/* Offline/Online Indicator */}
         <div
           className={`flex items-center gap-2 rounded-pill border-2 border-card-border px-3 py-1.5 font-sans text-xs font-bold shadow-hard-sm ${
-            isOnline ? "bg-sweet-matcha text-main" : "bg-sweet-taro text-main"
+            isOnline === null
+              ? "bg-card text-muted"
+              : isOnline
+                ? "bg-sweet-matcha text-main"
+                : "bg-sweet-taro text-main"
           }`}
         >
-          {isOnline ? (
+          {isOnline === null ? (
             <>
-              <Wifi className="h-4 w-4" />
+              <Wifi className="h-4 w-4" aria-hidden="true" />
+              <span>Memeriksa…</span>
+            </>
+          ) : isOnline ? (
+            <>
+              <Wifi className="h-4 w-4" aria-hidden="true" />
               <span>Online</span>
             </>
           ) : (
             <>
-              <WifiOff className="h-4 w-4" />
+              <WifiOff className="h-4 w-4" aria-hidden="true" />
               <span>Offline (Tersimpan Lokal)</span>
             </>
           )}
