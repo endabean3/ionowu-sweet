@@ -18,12 +18,17 @@ export interface PaymentBreakdown {
 interface PaymentModalProps {
   cartItems: CartLine[];
   onClose: () => void;
-  onPay: (method: string, appliedAmount: number, breakdown: PaymentBreakdown) => void;
+  onPay: (
+    method: string,
+    appliedAmount: number,
+    breakdown: PaymentBreakdown,
+  ) => void | Promise<void>;
 }
 
 export function PaymentModal({ cartItems, onClose, onPay }: PaymentModalProps) {
   const [method, setMethod] = useState("cash");
   const [givenAmount, setGivenAmount] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
 
   const moneyItems: MoneyItem[] = cartItems.map((it) => ({
     quantity: it.quantity,
@@ -153,22 +158,33 @@ export function PaymentModal({ cartItems, onClose, onPay }: PaymentModalProps) {
           <Button
             variant="primary"
             className="w-full h-14 text-lg shadow-hard"
-            onClick={() =>
-              // grandTotal, BUKAN givenNum — jumlah pembayaran yang dicatat
-              // harus nominal yang DITERAPKAN ke tagihan. givenNum (uang
-              // tunai diterima kasir) bisa lebih besar karena ada kembalian
-              // (mis. bayar Rp 50.000 untuk tagihan Rp 27.750); mengirim
-              // givenNum sebagai payments[0].amount membuat server menolak
-              // PAYMENT_AMOUNT_MISMATCH karena jumlah pembayaran ≠ total.
-              onPay(method, grandTotal, {
-                subtotal: totals.subtotal.toString(),
-                taxTotal: totals.taxTotal.toString(),
-                grandTotal: totals.grandTotal.toString(),
-              })
-            }
-            disabled={!isEnough}
+            onClick={async () => {
+              // Guard submit-ganda. Dua ketukan cepat pada tombol ini
+              // SEBELUMNYA menghasilkan DUA transaksi dengan ULID berbeda —
+              // pelanggan ter-charge dua kali dan idempotensi server tidak
+              // bisa menolongnya (ULID-nya memang beda). Terbukti lewat
+              // dua klik sinkron nyata di browser, bukan dugaan.
+              if (submitting) return;
+              setSubmitting(true);
+              try {
+                // grandTotal, BUKAN givenNum — jumlah pembayaran yang dicatat
+                // harus nominal yang DITERAPKAN ke tagihan. givenNum (uang
+                // tunai diterima kasir) bisa lebih besar karena ada kembalian
+                // (mis. bayar Rp 50.000 untuk tagihan Rp 27.750); mengirim
+                // givenNum sebagai payments[0].amount membuat server menolak
+                // PAYMENT_AMOUNT_MISMATCH karena jumlah pembayaran ≠ total.
+                await onPay(method, grandTotal, {
+                  subtotal: totals.subtotal.toString(),
+                  taxTotal: totals.taxTotal.toString(),
+                  grandTotal: totals.grandTotal.toString(),
+                });
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            disabled={!isEnough || submitting}
           >
-            Selesaikan Pembayaran
+            {submitting ? "Memproses…" : "Selesaikan Pembayaran"}
           </Button>
         </div>
       </div>

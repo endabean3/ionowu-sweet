@@ -25,6 +25,7 @@ export default function KasirPage() {
   const [showShiftModal, setShowShiftModal] = useState<boolean>(true); // Tampilkan shift modal di awal
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const processingPaymentRef = useRef(false);
 
   // Ambil data dari Dexie
   const dbProducts = useLiveQuery(() => db.products.toArray(), []);
@@ -169,6 +170,12 @@ export default function KasirPage() {
       return;
     }
 
+    // Guard submit-ganda pakai ref, BUKAN useState: dua klik sinkron
+    // sama-sama membaca state lama sebelum React sempat re-render, jadi
+    // guard berbasis state akan lolos begitu saja. Ref berubah seketika.
+    if (processingPaymentRef.current) return;
+    processingPaymentRef.current = true;
+
     try {
       const txId = await enqueueOfflineAction({
         // Literal "tenant" SEBELUMNYA dikirim untuk semua tenant — enqueue
@@ -220,6 +227,8 @@ export default function KasirPage() {
       barcodeInputRef.current?.focus();
     } catch (err) {
       toast.error("Gagal menyimpan transaksi lokal");
+    } finally {
+      processingPaymentRef.current = false;
     }
   };
 

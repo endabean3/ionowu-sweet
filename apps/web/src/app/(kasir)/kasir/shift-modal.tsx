@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { Clock, Coffee, Lock, Store } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ulid } from "ulid";
 
@@ -20,6 +20,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
   const [openingCash, setOpeningCash] = useState("");
   const { user, accessToken } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const openingRef = useRef(false);
   const [outlets, setOutlets] = useState<OutletRow[] | null>(null);
   const [selectedOutletId, setSelectedOutletId] = useState<string>("");
 
@@ -80,6 +81,12 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
       toast.error("Pilih outlet dulu sebelum membuka shift");
       return;
     }
+    // Ref, bukan state `submitting`: dua ketukan sinkron sama-sama membaca
+    // state lama sebelum re-render, sehingga dua shift ikut terbuat (yang
+    // kedua pasti ditolak server oleh idx_shifts_one_open, tapi terlanjur
+    // mengotori db lokal + antrean sync). Ref berubah seketika.
+    if (openingRef.current) return;
+    openingRef.current = true;
     setSubmitting(true);
     try {
       // ULID MURNI, tanpa prefiks "sh_" — shifts.id di skema (migrations/00001)
@@ -121,6 +128,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
       toast.error("Gagal membuka shift");
     } finally {
       setSubmitting(false);
+      openingRef.current = false;
     }
   };
 
