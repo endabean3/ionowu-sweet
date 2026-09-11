@@ -1,27 +1,43 @@
 "use client";
 
+import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { useSync } from "@/lib/sync/provider";
+import { useLiveQuery } from "dexie-react-hooks";
 import { Moon, RefreshCw, Sun, Wifi, WifiOff } from "lucide-react";
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
+const ROLE_LABEL: Record<string, string> = {
+  owner: "Owner",
+  manager: "Manager",
+  cashier: "Kasir",
+  warehouse: "Gudang",
+  sales_floor: "Sales",
+};
+
 interface HeaderProps {
-  outletName?: string;
-  cashierName?: string;
+  /** outlet_id shift yang sedang aktif — nama diambil dari cache db.outlets
+   * (diisi ShiftModal), bukan dihardcode. Undefined berarti belum ada shift
+   * terbuka, header tetap menampilkan identitas kasir tanpa nama outlet. */
+  outletId?: string;
 }
 
-export function POSHeader({
-  outletName = "Kopi Senja — Senopati",
-  cashierName = "Sari (Kasir)",
-}: HeaderProps) {
+export function POSHeader({ outletId }: HeaderProps) {
+  const { user } = useAuth();
   const { isSyncing, syncNow, lastSyncedAt } = useSync();
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  // Lazy-init dari navigator.onLine langsung (bukan default true lalu
+  // dikoreksi di effect) — kasir yang membuka aplikasi saat toko SUDAH
+  // offline sebelumnya sempat melihat "Online" palsu selama satu frame.
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isDark, setIsDark] = useState<boolean>(false);
 
-  useEffect(() => {
-    setIsOnline(navigator.onLine);
+  const outlet = useLiveQuery(() => (outletId ? db.outlets.get(outletId) : undefined), [outletId]);
 
+  useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       syncNow();
@@ -59,15 +75,23 @@ export function POSHeader({
     <header className="milky-glass flex flex-wrap items-center justify-between gap-4 rounded-squircle p-4">
       {/* Brand & Outlet */}
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-strawberry text-xl shadow-hard-sm">
-          🍓
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-strawberry shadow-hard-sm">
+          <Image
+            src="/icons/icon-mark.png"
+            alt=""
+            width={22}
+            height={24}
+            priority
+            className="h-[22px] w-auto"
+          />
         </span>
         <div>
           <h1 className="font-display text-lg font-bold tracking-tight text-main">
             ionowu <span className="font-italic text-sweet-strawberry">sweet</span>
           </h1>
           <p className="font-sans text-xs font-semibold text-muted">
-            {outletName} • {cashierName}
+            {outlet?.name ?? "Memuat outlet..."} • {user?.name ?? "Kasir"}
+            {user?.role && ` (${ROLE_LABEL[user.role] ?? user.role})`}
           </p>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/context";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -44,18 +45,23 @@ export default function LoginPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[--sweet-oat-milk]">
-        <div className="text-[--sweet-dark-cocoa]/60 text-sm">Memuat sesi…</div>
+      <div className="min-h-screen flex items-center justify-center bg-base">
+        <div className="text-muted text-sm">Memuat sesi…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[--sweet-oat-milk] p-4">
-      {/* Ambient orb */}
+    <div className="min-h-screen flex items-center justify-center bg-base p-4">
+      {/* Ambient orb — rgba() literal, bukan token/opacity: Tailwind tidak
+         bisa menerapkan modifier opacity pada warna yang didefinisikan
+         sebagai string var(--x) di tailwind.config.ts (butuh nilai resolved
+         saat build), jadi bg-sweet-strawberry/20 diam-diam menjadi transparan
+         penuh — ditemukan lewat pengecekan getComputedStyle nyata di browser,
+         bukan cuma baca kode. */}
       <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[--sweet-strawberry]/20 blur-[80px]" />
-        <div className="absolute bottom-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[--sweet-matcha]/20 blur-[80px]" />
+        <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[rgba(255,164,182,0.2)] blur-[80px]" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[rgba(162,232,206,0.2)] blur-[80px]" />
       </div>
 
       <div className="relative w-full max-w-sm">
@@ -63,11 +69,16 @@ export default function LoginPage() {
         <div className="milky-glass rounded-[32px] p-8 space-y-6">
           {/* Logo / brand */}
           <div className="text-center space-y-1">
-            <div className="text-4xl">🍭</div>
-            <h1 className="text-2xl font-bold text-[--sweet-dark-cocoa] font-display">
-              ionowu sweet
-            </h1>
-            <p className="text-sm text-[--sweet-dark-cocoa]/60">Kasir empuk, cepat & cerdas</p>
+            <Image
+              src="/icons/icon-mark.png"
+              alt=""
+              width={40}
+              height={42}
+              priority
+              className="mx-auto h-10 w-auto"
+            />
+            <h1 className="text-2xl font-bold text-main font-display">ionowu sweet</h1>
+            <p className="text-sm text-muted">Kasir empuk, cepat & cerdas</p>
           </div>
 
           {/* Form */}
@@ -119,9 +130,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-[--sweet-dark-cocoa]/40 mt-4">
-          ionowu sweet v0.1 · Fase 0
-        </p>
+        <p className="text-center text-xs text-muted mt-4">ionowu sweet v0.1 · Fase 0</p>
       </div>
     </div>
   );

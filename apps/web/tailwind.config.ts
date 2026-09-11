@@ -10,25 +10,32 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        base: "var(--bg-base)",
+        // "rgb(var(--x) / <alpha-value>)" — bukan "var(--x)" polos — supaya
+        // modifier opacity Tailwind (bg-sweet-strawberry/20, text-main/70,
+        // dst.) benar-benar dikompilasi jadi CSS valid. Tailwind mengganti
+        // <alpha-value> dengan 1 kalau tidak ada modifier, jadi kelas tanpa
+        // opacity (bg-base, text-main) tidak berubah perilakunya. Token CSS
+        // di globals.css HARUS berformat triplet RGB ("250 246 240"), bukan
+        // hex, agar rgb(var(--x) / n) valid.
+        base: "rgb(var(--bg-base) / <alpha-value>)",
         card: {
           DEFAULT: "var(--card-bg)",
-          border: "var(--card-border)",
+          border: "rgb(var(--card-border) / <alpha-value>)",
         },
-        main: "var(--text-main)",
-        muted: "var(--text-muted)",
+        main: "rgb(var(--text-main) / <alpha-value>)",
+        muted: "rgb(var(--text-muted) / <alpha-value>)",
         sweet: {
-          strawberry: "var(--sweet-strawberry)",
-          matcha: "var(--sweet-matcha)",
-          custard: "var(--sweet-custard)",
-          sky: "var(--sweet-sky)",
-          taro: "var(--sweet-taro)",
-          peach: "var(--sweet-peach)",
+          strawberry: "rgb(var(--sweet-strawberry) / <alpha-value>)",
+          matcha: "rgb(var(--sweet-matcha) / <alpha-value>)",
+          custard: "rgb(var(--sweet-custard) / <alpha-value>)",
+          sky: "rgb(var(--sweet-sky) / <alpha-value>)",
+          taro: "rgb(var(--sweet-taro) / <alpha-value>)",
+          peach: "rgb(var(--sweet-peach) / <alpha-value>)",
         },
       },
       boxShadow: {
         hard: "var(--shadow-hard)",
-        "hard-sm": "3px 3px 0px var(--card-border)",
+        "hard-sm": "3px 3px 0px rgb(var(--card-border))",
         "strawberry-glow": "0px 15px 35px var(--sweet-strawberry-glow)",
         "card-specular": "0 1px 0 0 rgba(255, 255, 255, 0.98) inset",
       },

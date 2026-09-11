@@ -18,7 +18,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-[--sweet-dark-cocoa]">
+          <label htmlFor={inputId} className="text-sm font-medium text-main">
             {label}
           </label>
         )}
@@ -31,12 +31,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             // Background & border
             "bg-white/60 backdrop-blur-sm border border-white/40",
             "shadow-[0_1px_3px_rgba(45,35,30,0.08)]",
-            // Focus — ring matcha
-            "focus:border-[--sweet-matcha] focus:ring-2 focus:ring-[--sweet-matcha]/30",
+            // Focus — ring matcha. Warna literal, bukan token+opacity: lihat
+            // catatan di login/page.tsx soal keterbatasan opacity-modifier
+            // pada warna yang didefinisikan sebagai var(--x) di tailwind.config.
+            "focus:border-[#A2E8CE] focus:ring-2 focus:ring-[rgba(162,232,206,0.3)]",
             // Error
             error && "border-red-400 focus:border-red-500 focus:ring-red-200",
             // Placeholder
-            "placeholder:text-[--sweet-dark-cocoa]/40",
+            "placeholder:text-muted",
             // Disabled
             "disabled:opacity-50 disabled:cursor-not-allowed",
             className,
@@ -44,7 +46,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {error && <p className="text-xs text-red-500">{error}</p>}
-        {hint && !error && <p className="text-xs text-[--sweet-dark-cocoa]/60">{hint}</p>}
+        {hint && !error && <p className="text-xs text-muted">{hint}</p>}
       </div>
     );
   },

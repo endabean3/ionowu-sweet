@@ -2,45 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Token warna disimpan sebagai TRIPLET RGB dipisah spasi ("250 246 240"),
+   BUKAN string hex — supaya Tailwind bisa menyusun rgb(var(--x) / <alpha>)
+   dan modifier opacity (bg-sweet-strawberry/20, text-main/70, dst.) benar-benar
+   berlaku. Format hex sebelumnya membuat SEMUA kelas token+opacity di seluruh
+   app diam-diam menjadi CSS tidak valid dan diabaikan browser (transparan
+   penuh) — ditemukan lewat getComputedStyle nyata di halaman login, bukan
+   asumsi baca kode. Lihat tailwind.config.ts untuk sisi pemetaannya. */
 :root {
-  --bg-base: #faf6f0;
-  --text-main: #2d231e;
-  --text-muted: #7a6f68;
+  --bg-base: 250 246 240;
+  --text-main: 45 35 30;
+  --text-muted: 122 111 104;
   --card-bg: rgba(255, 255, 255, 0.88);
-  --card-border: #2d231e;
+  --card-border: 45 35 30;
 
-  --sweet-strawberry: #ffa4b6;
-  --sweet-matcha: #a2e8ce;
-  --sweet-custard: #ffeaa7;
-  --sweet-sky: #a7d8f8;
-  --sweet-taro: #ddd0fa;
-  --sweet-peach: #ffd5bd;
+  --sweet-strawberry: 255 164 182;
+  --sweet-matcha: 162 232 206;
+  --sweet-custard: 255 234 167;
+  --sweet-sky: 167 216 248;
+  --sweet-taro: 221 208 250;
+  --sweet-peach: 255 213 189;
 
   --shadow-hard: 5px 5px 0px #2d231e;
   --sweet-strawberry-glow: rgba(255, 164, 182, 0.4);
 }
 
 [data-theme="dark-cocoa"] {
-  --bg-base: #1c1512;
-  --text-main: #faf6f0;
-  --text-muted: #bfafa5;
+  --bg-base: 28 21 18;
+  --text-main: 250 246 240;
+  --text-muted: 191 175 165;
   --card-bg: rgba(42, 32, 27, 0.86);
-  --card-border: #524036;
+  --card-border: 82 64 54;
 
-  --sweet-strawberry: #ff7597;
-  --sweet-matcha: #88e2c0;
-  --sweet-custard: #ffeaa7;
-  --sweet-sky: #a7d8f8;
-  --sweet-taro: #ddd0fa;
-  --sweet-peach: #ffd5bd;
+  --sweet-strawberry: 255 117 151;
+  --sweet-matcha: 136 226 192;
+  --sweet-custard: 255 234 167;
+  --sweet-sky: 167 216 248;
+  --sweet-taro: 221 208 250;
+  --sweet-peach: 255 213 189;
 
   --shadow-hard: 5px 5px 0px #0d0907;
   --sweet-strawberry-glow: rgba(255, 117, 151, 0.4);
 }
 
 body {
-  background-color: var(--bg-base);
-  color: var(--text-main);
+  background-color: rgb(var(--bg-base));
+  color: rgb(var(--text-main));
   font-family: var(--font-plus-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -52,7 +59,7 @@ body {
   background: var(--card-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 2.5px solid var(--card-border);
+  border: 2.5px solid rgb(var(--card-border));
   box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.98) inset, var(--shadow-hard);
 }
 
@@ -62,12 +69,12 @@ body {
 
 .mochi-button:hover {
   transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px var(--card-border);
+  box-shadow: 6px 6px 0px rgb(var(--card-border));
 }
 
 .mochi-button:active {
   transform: translate(2px, 2px) scale(0.96);
-  box-shadow: 1px 1px 0px var(--card-border);
+  box-shadow: 1px 1px 0px rgb(var(--card-border));
 }
 
 /* POS specific touch optimization */
