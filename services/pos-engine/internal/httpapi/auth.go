@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/auth"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/businesstype"
 	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/store"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
@@ -145,6 +146,11 @@ type registerRequest struct {
 	OwnerName        string `json:"owner_name"`
 	OwnerEmail       string `json:"owner_email"`
 	OwnerPassword    string `json:"owner_password"`
+	// BusinessType opsional: slug dari internal/businesstype. Dibiarkan
+	// kosong bila pemilik melewati pilihan kategori — kolomnya memang
+	// nullable, dan memaksa memilih akan menahan pendaftaran hanya demi
+	// data pemasaran.
+	BusinessType string `json:"business_type"`
 }
 
 // PostRegister membuat tenant baru + outlet + user owner dalam satu transaksi.
@@ -162,6 +168,18 @@ func (h *AuthHandler) PostRegister(w http.ResponseWriter, r *http.Request) {
 	if len(req.OwnerPassword) < 8 {
 		RespondError(w, http.StatusBadRequest, "PASSWORD_TOO_SHORT", "Password minimal 8 karakter")
 		return
+	}
+	// Divalidasi, bukan disimpan apa adanya: business_type nanti dipakai
+	// memilih template onboarding, jadi slug asing akan terlihat sebagai
+	// tenant tanpa template — gejalanya muncul jauh dari sebabnya.
+	var businessType *string
+	if req.BusinessType != "" {
+		if !businesstype.IsValid(req.BusinessType) {
+			RespondError(w, http.StatusBadRequest, "INVALID_BUSINESS_TYPE",
+				"Jenis usaha tidak dikenal")
+			return
+		}
+		businessType = &req.BusinessType
 	}
 
 	passwordHash, err := auth.HashPassword(req.OwnerPassword)
@@ -187,10 +205,11 @@ func (h *AuthHandler) PostRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err = q.CreateTenant(ctx, store.CreateTenantParams{
-		ID:         tenantID,
-		Name:       req.OrganizationName,
-		PlanTier:   "free",
-		PlanStatus: "active",
+		ID:           tenantID,
+		Name:         req.OrganizationName,
+		BusinessType: businessType,
+		PlanTier:     "free",
+		PlanStatus:   "active",
 	}); err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal membuat tenant")
 		return

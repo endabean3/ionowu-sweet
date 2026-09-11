@@ -4,6 +4,31 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.5.0] — 2026-09-11
+
+### Ditambahkan
+* **Katalog jenis usaha** — `services/pos-engine/internal/businesstype/catalog.json`
+  beserta pembacanya di Go (`//go:embed`) dan TypeScript. Isinya diturunkan dari
+  `MARKET-SEGMENTS.md` §3 dan §5; tidak ada kategori di luar yang tertulis di sana.
+  Berkasnya **satu** dan dibaca kedua bahasa — bukan konstanta kembar — mengikuti pola
+  paritas `internal/money/fixtures`. Kategori `parfum_refill` ("Toko Parfum Refil")
+  melayani Warung Wangi, satu dari dua pelanggan pasti (CLAUDE.md §2).
+* **Halaman `/daftar`** (`apps/web`) — pendaftaran tenant + pemilik dengan pemilih jenis
+  usaha, dikelompokkan per arketipe A–F dan ditandai fase fiturnya, supaya pemilik tahu
+  arketipe yang belum digarap **sebelum** mendaftar. Sebelumnya `POST /auth/register`
+  sudah ada di backend tetapi tidak punya layar sama sekali.
+* **`components/ui/select.tsx`** — token dan bentuknya disalin persis dari `input.tsx`.
+
+### Diubah
+* **`openapi.yaml` `/auth/register`** — menerima `business_type` (opsional) dan
+  mendokumentasikan respons `400 INVALID_BUSINESS_TYPE`.
+* **`httpapi/auth.go`** — `PostRegister` memvalidasi lalu menyimpan `business_type`.
+  Sebelumnya kolom itu **selalu `NULL`** untuk setiap tenant yang mendaftar lewat HTTP:
+  `CreateTenantParams` sudah punya field-nya, tetapi handler tidak pernah mengisinya —
+  hanya seeder yang mengisi, sehingga cacatnya tidak terlihat dari data contoh.
+
+---
+
 ## [1.4.0] — 2026-09-03
 
 ### Ditambahkan

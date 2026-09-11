@@ -52,12 +52,27 @@ paths:
                 owner_email: { type: string, format: email }
                 owner_password: { type: string, minLength: 10 }
                 owner_name: { type: string, minLength: 1, maxLength: 200 }
+                business_type:
+                  type: string
+                  maxLength: 40
+                  description: >-
+                    Slug jenis usaha, tersimpan di kolom tenants.business_type.
+                    Opsional — kolomnya nullable dan pendaftaran tidak ditahan
+                    kalau pemilik melewatinya. Daftar slug yang sah ada di
+                    services/pos-engine/internal/businesstype/catalog.json
+                    (berkas yang sama dibaca frontend), diturunkan dari
+                    MARKET-SEGMENTS.md §3. Contoh: parfum_refill, toko_bahan_kue.
+                  example: parfum_refill
       responses:
         "201":
           description: Tenant terdaftar
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthSession" }
+        "400":
+          description: business_type tidak ada di katalog (INVALID_BUSINESS_TYPE)
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Error" } }
         "409":
           description: Email sudah terdaftar
           content:

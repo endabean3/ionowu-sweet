@@ -55,6 +55,8 @@ export function apiRegister(data: {
   owner_name: string;
   owner_email: string;
   owner_password: string;
+  /** Slug dari src/lib/business-type. Opsional — kolomnya nullable. */
+  business_type?: string;
 }): Promise<AuthSession> {
   return apiFetch("/auth/register", { method: "POST", body: JSON.stringify(data) });
 }
