@@ -50,7 +50,7 @@ export default function KasirPage() {
         category: "Kategori", // TODO: Ambil nama kategori jika sudah ada db.categories
         price: v.price,
         stock: v.stock_quantity,
-        emoji: "📦",
+        minStockAlert: v.min_stock_alert,
       };
     });
   }, [dbProducts, dbVariants]);
@@ -75,8 +75,11 @@ export default function KasirPage() {
         if (isCheckingOut) {
           setIsCheckingOut(false);
         } else if (cartItems.length > 0) {
+          const snapshot = cartItems;
           setCartItems([]);
-          toast.info("Keranjang dibatalkan");
+          toast(`Keranjang dikosongkan (${snapshot.length} item)`, {
+            action: { label: "Urungkan", onClick: () => setCartItems(snapshot) },
+          });
         }
       } else if (e.key === "F2") {
         e.preventDefault();
@@ -128,8 +131,32 @@ export default function KasirPage() {
     });
   };
 
+  // Hapus baris DENGAN undo (pages/kasir.md: "Delete: Hapus baris terpilih
+  // dengan undo di toast") — kasir yang terburu-buru mudah salah pencet
+  // tombol hapus di daftar item yang padat; tanpa jalan pulih, satu tap
+  // salah berarti mengulang input dari nol.
   const handleRemoveItem = (variantId: string) => {
+    const removed = cartItems.find((item) => item.variantId === variantId);
+    if (!removed) return;
     setCartItems((prev) => prev.filter((item) => item.variantId !== variantId));
+    toast(`${removed.name} dihapus dari keranjang`, {
+      action: {
+        label: "Urungkan",
+        onClick: () => setCartItems((prev) => [...prev, removed]),
+      },
+    });
+  };
+
+  const handleClearCart = () => {
+    if (cartItems.length === 0) return;
+    const snapshot = cartItems;
+    setCartItems([]);
+    toast(`Keranjang dikosongkan (${snapshot.length} item)`, {
+      action: {
+        label: "Urungkan",
+        onClick: () => setCartItems(snapshot),
+      },
+    });
   };
 
   const processPayment = async (
@@ -206,7 +233,7 @@ export default function KasirPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-base p-4 md:p-6">
-      <POSHeader />
+      <POSHeader outletId={activeShift?.outlet_id} />
 
       <div className="mt-4 grid flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Kiri: Katalog */}
@@ -274,7 +301,7 @@ export default function KasirPage() {
             items={cartItems}
             onUpdateQty={handleUpdateQty}
             onRemoveItem={handleRemoveItem}
-            onClearCart={() => setCartItems([])}
+            onClearCart={handleClearCart}
             onCheckout={() => setIsCheckingOut(true)}
           />
         </div>

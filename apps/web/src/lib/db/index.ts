@@ -77,6 +77,17 @@ export interface LocalSetting {
   value: string;
 }
 
+// Cache lokal dari GET /outlets. Tanpa ini, ShiftModal gagal total saat
+// kasir membuka shift dalam kondisi benar-benar offline (pelanggaran
+// invarian #2 "kasir tetap bisa berjualan meski internet mati") — dan
+// POSHeader tidak punya cara menampilkan nama outlet asli tanpa panggilan
+// jaringan setiap render.
+export interface LocalOutlet {
+  id: string;
+  tenant_id: string;
+  name: string;
+}
+
 export class IonowuDB extends Dexie {
   categories!: EntityTable<LocalCategory, "id">;
   products!: EntityTable<LocalProduct, "id">;
@@ -85,6 +96,7 @@ export class IonowuDB extends Dexie {
   shifts!: EntityTable<LocalShift, "id">;
   syncQueue!: EntityTable<SyncQueueEntry, "id">;
   settings!: EntityTable<LocalSetting, "key">;
+  outlets!: EntityTable<LocalOutlet, "id">;
 
   constructor() {
     super("ionowu_pos_offline");
@@ -96,6 +108,9 @@ export class IonowuDB extends Dexie {
       shifts: "id, tenant_id, cashier_id, status, opened_at",
       syncQueue: "id, tenant_id, status, created_at, type",
       settings: "key",
+    });
+    this.version(2).stores({
+      outlets: "id, tenant_id",
     });
   }
 }

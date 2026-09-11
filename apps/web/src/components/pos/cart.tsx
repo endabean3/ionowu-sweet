@@ -3,7 +3,7 @@
 import { Button } from "@/lib/../components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { type MoneyItem, calculateCart } from "@/lib/money/calc";
-import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, Zap } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
 
@@ -83,7 +83,11 @@ export function POSCart({
         <div className="mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <span className="text-4xl opacity-50">🛒</span>
+              <ShoppingBag
+                className="h-10 w-10 text-muted/50"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
               <p className="mt-2 font-sans text-sm font-semibold text-muted">
                 Belum ada item dipilih
               </p>
@@ -104,31 +108,36 @@ export function POSCart({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Qty Controls */}
+                  <div className="flex items-center gap-1.5">
+                    {/* Qty Controls — 44px minimum (WCAG 2.5.5 / UI-UX Pro Max
+                       touch-target-size): kasir sering mengetuk cepat berulang
+                       kali sambil terburu-buru, target 28px sebelumnya
+                       menyebabkan salah pencet baris tetangga. */}
                     <div className="flex items-center rounded-pill border border-card-border bg-base p-0.5">
                       <button
                         type="button"
+                        aria-label={`Kurangi qty ${it.name}`}
                         onClick={() => {
                           playPop();
                           onUpdateQty(it.variantId, -1);
                         }}
-                        className="flex h-7 w-7 items-center justify-center rounded-pill hover:bg-black/5"
+                        className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <span className="w-7 text-center font-mono text-sm font-bold tabular-nums">
                         {it.quantity}
                       </span>
                       <button
                         type="button"
+                        aria-label={`Tambah qty ${it.name}`}
                         onClick={() => {
                           playPop();
                           onUpdateQty(it.variantId, 1);
                         }}
-                        className="flex h-7 w-7 items-center justify-center rounded-pill hover:bg-black/5"
+                        className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </div>
 
@@ -140,13 +149,14 @@ export function POSCart({
                     {/* Delete */}
                     <button
                       type="button"
+                      aria-label={`Hapus ${it.name} dari keranjang`}
                       onClick={() => {
                         playPop();
                         onRemoveItem(it.variantId);
                       }}
-                      className="text-muted hover:text-red-500"
+                      className="flex h-11 w-11 items-center justify-center text-muted hover:text-red-500 active:scale-95"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -171,12 +181,18 @@ export function POSCart({
               Rp {Number(totals.taxTotal.toString()).toLocaleString("id-ID")}
             </span>
           </div>
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-base font-extrabold text-main">Total Bayar</span>
-            <span className="font-mono text-2xl font-black tabular-nums text-main">
-              Rp {Number(totals.grandTotal.toString()).toLocaleString("id-ID")}
-            </span>
-          </div>
+        </div>
+
+        {/* Blok --primary tinta hitam (pages/kasir.md §Warna): "Total belanja
+           memakai blok --primary dengan tinta hitam, bukan teks pink" —
+           sebelumnya cuma teks polos tanpa blok sama sekali, dan payment-modal
+           memakai custard 30% opacity, dua treatment berbeda untuk angka yang
+           sama. */}
+        <div className="mt-3 flex items-center justify-between rounded-squircle-sm border-2 border-card-border bg-sweet-strawberry px-4 py-3">
+          <span className="text-base font-extrabold text-main">Total Bayar</span>
+          <span className="font-mono text-2xl font-black tabular-nums text-main">
+            Rp {Number(totals.grandTotal.toString()).toLocaleString("id-ID")}
+          </span>
         </div>
 
         {/* 64px Checkout Button (pos-lg per pages/kasir.md) */}
@@ -184,9 +200,10 @@ export function POSCart({
           onClick={handleCheckoutClick}
           size="pos-lg"
           variant="primary"
-          className="mt-4 w-full text-xl shadow-hard"
+          className="mt-4 w-full gap-2 text-xl shadow-hard"
         >
-          ⚡ Bayar Sekarang (Enter)
+          <Zap className="h-5 w-5" fill="currentColor" aria-hidden="true" />
+          Bayar Sekarang (Enter)
         </Button>
       </div>
     </div>

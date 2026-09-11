@@ -1,6 +1,7 @@
 "use client";
 
 import { playPop } from "@/lib/audio/haptics";
+import { AlertTriangle, Package, PackageX } from "lucide-react";
 import React from "react";
 
 export interface MacaronProduct {
@@ -9,12 +10,29 @@ export interface MacaronProduct {
   category: string;
   price: string;
   stock: string;
-  emoji?: string;
+  minStockAlert: string;
 }
 
 interface MacaronItemProps {
   product: MacaronProduct;
   onSelect: (product: MacaronProduct) => void;
+}
+
+// FR-14 (Pengingat Bahan Menipis): indikator stok berbasis warna —
+// Matcha = Aman, Custard = Sedang, Strawberry = Kritis. Warna TIDAK berdiri
+// sendiri (README §"Batasan yang Berlaku" #3 — pasangan tersulit bagi
+// penglihatan buta warna merah-hijau), jadi setiap level juga punya ikon dan
+// label teks berbeda.
+function stockLevel(stock: string, minStockAlert: string) {
+  const qty = Number(stock);
+  const min = Number(minStockAlert);
+  if (qty <= 0) {
+    return { label: "Habis", badge: "bg-sweet-strawberry", Icon: PackageX };
+  }
+  if (qty <= min) {
+    return { label: "Menipis", badge: "bg-sweet-custard", Icon: AlertTriangle };
+  }
+  return { label: "Aman", badge: "bg-sweet-matcha", Icon: null };
 }
 
 export function MacaronItem({ product, onSelect }: MacaronItemProps) {
@@ -24,6 +42,7 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
   };
 
   const formattedPrice = Number(product.price).toLocaleString("id-ID");
+  const level = stockLevel(product.stock, product.minStockAlert);
 
   return (
     <button
@@ -32,9 +51,14 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
       className="mochi-button flex flex-col justify-between rounded-squircle-sm border-2 border-card-border bg-card p-4 text-left shadow-hard transition-all hover:bg-sweet-custard/30 pos-touch-target"
     >
       <div className="flex items-start justify-between">
-        <span className="text-3xl">{product.emoji || "☕"}</span>
-        <span className="rounded-pill border border-card-border bg-base px-2 py-0.5 font-mono text-xs font-semibold text-muted">
-          Stok: {product.stock}
+        <span className="flex h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-base">
+          <Package className="h-5 w-5 text-main" strokeWidth={2} aria-hidden="true" />
+        </span>
+        <span
+          className={`flex items-center gap-1 rounded-pill border border-card-border px-2 py-0.5 font-mono text-xs font-semibold text-main ${level.badge}`}
+        >
+          {level.Icon && <level.Icon className="h-3 w-3" aria-hidden="true" />}
+          {level.label} · {product.stock}
         </span>
       </div>
 

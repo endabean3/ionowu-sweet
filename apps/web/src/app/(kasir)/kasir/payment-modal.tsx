@@ -61,8 +61,13 @@ export function PaymentModal({ cartItems, onClose, onPay }: PaymentModalProps) {
         </div>
 
         <div className="p-6">
-          <div className="mb-6 rounded-2xl border-2 border-card-border bg-sweet-custard/30 p-4 text-center">
-            <p className="font-sans text-sm font-bold text-muted uppercase">Total Tagihan</p>
+          {/* Blok --primary tinta hitam (pages/kasir.md §Warna) — sama
+             seperti blok Total Bayar di sidebar keranjang, supaya kasir
+             melihat angka yang identik dengan treatment visual yang identik
+             di sepanjang alur checkout. Label pakai text-main, bukan
+             text-muted: abu-abu hilang di bawah silau matahari (kasir.md). */}
+          <div className="mb-6 rounded-2xl border-2 border-card-border bg-sweet-strawberry p-4 text-center">
+            <p className="font-sans text-sm font-bold text-main uppercase">Total Tagihan</p>
             <p className="font-mono text-4xl font-black tabular-nums text-main mt-1">
               Rp {grandTotal.toLocaleString("id-ID")}
             </p>
