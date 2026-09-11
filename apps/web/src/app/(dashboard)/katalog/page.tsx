@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db } from "@/lib/db";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ArrowLeft, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 
@@ -82,32 +82,42 @@ export default function KatalogPage() {
                 <p className="font-sans text-xs text-muted">ID: {product.id.slice(-8)}</p>
 
                 <div className="mt-4 space-y-2">
-                  {product.variants.map((variant) => (
-                    <div
-                      key={variant.id}
-                      className="flex items-center justify-between rounded-md bg-white/50 px-3 py-2 text-sm border border-card-border/50"
-                    >
-                      <div>
-                        <p className="font-bold text-main">{variant.name || "Regular"}</p>
-                        <p
-                          className={`font-mono text-xs ${
-                            Number(variant.stock_quantity) <= Number(variant.min_stock_alert || 0)
-                              ? "font-bold text-sweet-strawberry animate-pulse"
-                              : "text-muted"
-                          }`}
-                        >
-                          Stock: {variant.stock_quantity}{" "}
-                          {Number(variant.stock_quantity) <= Number(variant.min_stock_alert || 0) &&
-                            "⚠️ Low"}
-                        </p>
+                  {product.variants.map((variant) => {
+                    const isLow =
+                      Number(variant.stock_quantity) <= Number(variant.min_stock_alert || 0);
+                    return (
+                      <div
+                        key={variant.id}
+                        className="flex items-center justify-between rounded-md bg-white/50 px-3 py-2 text-sm border border-card-border/50"
+                      >
+                        <div>
+                          <p className="font-bold text-main">{variant.name || "Regular"}</p>
+                          {/* Stok rendah ditandai BADGE berlatar strawberry dengan
+                             tinta cocoa + ikon, bukan teks pastel berkedip:
+                             pastel di atas putih cuma 1,4:1 (jauh di bawah
+                             ambang ≥7:1 sistem desain) dan animate-pulse
+                             mengabaikan prefers-reduced-motion. */}
+                          <p className="mt-0.5 flex items-center gap-1 font-mono text-xs text-muted">
+                            {isLow ? (
+                              <span className="inline-flex items-center gap-1 rounded-pill bg-sweet-strawberry px-2 py-0.5 font-bold text-main">
+                                <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                                Menipis
+                              </span>
+                            ) : null}
+                            <span>Stok: {variant.stock_quantity}</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {/* text-main, bukan text-sweet-matcha: pastel hijau di
+                             atas putih hanya 1,4:1 — harga adalah angka
+                             terpenting di layar ini dan harus terbaca. */}
+                          <p className="font-mono font-bold tabular-nums text-main">
+                            Rp {Number.parseFloat(variant.price).toLocaleString("id-ID")}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-mono font-bold text-sweet-matcha">
-                          Rp {Number.parseFloat(variant.price).toLocaleString("id-ID")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </Card>

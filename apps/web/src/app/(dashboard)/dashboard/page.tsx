@@ -3,7 +3,15 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth/context";
-import { ArrowLeft, DollarSign, ShieldCheck, ShoppingBag, Store, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  DollarSign,
+  ShieldCheck,
+  ShoppingBag,
+  Store,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 
@@ -103,7 +111,7 @@ export default function DashboardPage() {
               <p className="font-mono text-3xl font-black tabular-nums text-main">
                 {formatRp(data?.summary?.net_sales || 0)}
               </p>
-              <p className="font-sans text-xs font-semibold text-sweet-matcha">Real-time terkini</p>
+              <p className="font-sans text-xs font-semibold text-muted">Real-time terkini</p>
             </Card>
 
             <Card variant="milky" className="space-y-2 shadow-hard">
@@ -184,8 +192,9 @@ export default function DashboardPage() {
             </Card>
 
             <Card variant="milky" className="shadow-hard">
-              <h2 className="font-display text-lg font-bold text-main">
-                📊 Status Kas & Sinkronisasi
+              <h2 className="flex items-center gap-2 font-display text-lg font-bold text-main">
+                <Activity className="h-5 w-5" aria-hidden="true" />
+                Status Kas & Sinkronisasi
               </h2>
               <div className="mt-4 space-y-4">
                 <div className="rounded-squircle-sm border border-card-border bg-sweet-custard/40 p-4">
