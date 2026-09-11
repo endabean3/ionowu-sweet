@@ -111,6 +111,68 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 	return items, nil
 }
 
+const listOutletsForUser = `-- name: ListOutletsForUser :many
+SELECT o.id, o.tenant_id, o.name, o.address, o.phone, o.is_active, o.created_at,
+       o.timezone, o.business_day_start
+FROM outlets o
+JOIN user_outlet_assignments uoa ON uoa.outlet_id = o.id
+WHERE uoa.tenant_id = $1 AND uoa.user_id = $2
+ORDER BY uoa.is_primary DESC, o.created_at ASC
+`
+
+type ListOutletsForUserParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	UserID   string `db:"user_id" json:"user_id"`
+}
+
+type ListOutletsForUserRow struct {
+	ID               string             `db:"id" json:"id"`
+	TenantID         string             `db:"tenant_id" json:"tenant_id"`
+	Name             string             `db:"name" json:"name"`
+	Address          *string            `db:"address" json:"address"`
+	Phone            *string            `db:"phone" json:"phone"`
+	IsActive         bool               `db:"is_active" json:"is_active"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Timezone         string             `db:"timezone" json:"timezone"`
+	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
+}
+
+// MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
+// ini, GET /outlets mengembalikan SELURUH outlet tenant ke siapa pun yang
+// login, termasuk kasir yang seharusnya hanya melihat cabang tempat ia
+// ditugaskan. Seeder (internal/seed) sudah menugaskan owner/manager ke
+// SELURUH outlet dan kasir hanya ke outlet utama, jadi join ini otomatis
+// benar untuk semua peran tanpa cabang kasus khusus di kode Go.
+func (q *Queries) ListOutletsForUser(ctx context.Context, arg ListOutletsForUserParams) ([]ListOutletsForUserRow, error) {
+	rows, err := q.db.Query(ctx, listOutletsForUser, arg.TenantID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOutletsForUserRow{}
+	for rows.Next() {
+		var i ListOutletsForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.Address,
+			&i.Phone,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.Timezone,
+			&i.BusinessDayStart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateOutlet = `-- name: UpdateOutlet :exec
 UPDATE outlets
 SET

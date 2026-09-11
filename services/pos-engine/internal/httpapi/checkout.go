@@ -13,6 +13,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
 
+	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/auth"
 	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/money"
 	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
 )
@@ -345,13 +346,19 @@ type refundInput struct {
 	Reason     string            `json:"reason"`
 	Restock    bool              `json:"restock"`
 	Items      []refundItemInput `json:"items"`
+	// ApproverUserID + Pin WAJIB diisi bila aktor berperan "cashier"
+	// (RBAC-MODEL §"Void transaksi": kasir butuh PIN manager). Owner/manager
+	// yang sedang login boleh menyetujui sendiri, keduanya diabaikan.
+	ApproverUserID string `json:"approver_user_id"`
+	Pin            string `json:"pin"`
 }
 
 // PostRefund menangani POST /sales/{id}/refund
 func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, transactionID string) {
 	ctx := r.Context()
 	tenantID := TenantID(ctx)
-	userID := UserID(ctx) // In reality this requires manager PIN check, for now we assume the actor has rights
+	actorID := UserID(ctx)
+	actorRole := UserRole(ctx)
 
 	var req refundInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -362,6 +369,70 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 	if req.RefundType != "full" && req.RefundType != "partial" {
 		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "refund_type harus full atau partial")
 		return
+	}
+	if req.Reason == "" || !req.Amount.IsPositive() {
+		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "reason dan amount (>0) wajib diisi")
+		return
+	}
+
+	sale, err := h.q.GetSaleForRefund(ctx, store.GetSaleForRefundParams{TenantID: tenantID, ID: transactionID})
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		RespondError(w, http.StatusNotFound, "TRANSACTION_NOT_FOUND", "Transaksi tidak ditemukan")
+		return
+	case err != nil:
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal mengambil data transaksi")
+		return
+	case sale.PaymentStatus != "paid":
+		RespondError(w, http.StatusUnprocessableEntity, "TRANSACTION_ALREADY_VOIDED", "Transaksi ini sudah void, tidak bisa direfund")
+		return
+	}
+
+	// REFUND_EXCEEDS_TOTAL (ERROR-CATALOG §B): refund kumulatif (termasuk yang
+	// sebelumnya) tidak boleh melebihi grand_total transaksi asli.
+	alreadyRefunded, err := h.q.SumRefundsForTransaction(ctx, store.SumRefundsForTransactionParams{
+		TenantID: tenantID, TransactionID: transactionID,
+	})
+	if err != nil {
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menghitung refund sebelumnya")
+		return
+	}
+	if _, err := money.RemainingRefundable(sale.GrandTotal, alreadyRefunded, req.Amount); err != nil {
+		RespondError(w, http.StatusUnprocessableEntity, "REFUND_EXCEEDS_TOTAL", "Nominal refund melebihi sisa yang bisa dikembalikan")
+		return
+	}
+
+	// RBAC-MODEL §"Void transaksi": kasir wajib PIN manager. Owner/manager
+	// yang sedang login boleh menyetujui refundnya sendiri.
+	approvedBy := actorID
+	if actorRole == "cashier" {
+		if req.ApproverUserID == "" || req.Pin == "" {
+			RespondError(w, http.StatusForbidden, "MANAGER_PIN_REQUIRED", "Refund oleh kasir butuh persetujuan PIN manager")
+			return
+		}
+		approver, err := h.q.GetApproverForPin(ctx, store.GetApproverForPinParams{TenantID: tenantID, ID: req.ApproverUserID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			RespondError(w, http.StatusUnauthorized, "INVALID_PIN", "Approver tidak ditemukan")
+			return
+		}
+		if err != nil {
+			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memeriksa approver")
+			return
+		}
+		if !approver.IsActive || (approver.Role != "owner" && approver.Role != "manager") {
+			RespondError(w, http.StatusForbidden, "MANAGER_PIN_REQUIRED", "Approver harus manager/owner aktif")
+			return
+		}
+		if approver.PinHash == nil {
+			RespondError(w, http.StatusUnauthorized, "INVALID_PIN", "Manager ini belum mengatur PIN")
+			return
+		}
+		ok, err := auth.VerifyPassword(req.Pin, *approver.PinHash)
+		if err != nil || !ok {
+			RespondError(w, http.StatusUnauthorized, "INVALID_PIN", "PIN salah")
+			return
+		}
+		approvedBy = approver.ID
 	}
 
 	tx, err := h.pool.Begin(ctx)
@@ -379,7 +450,11 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 		shiftID = &req.ShiftID
 	}
 
-	refundID := "rf_" + ulid.Make().String()
+	// ULID MURNI, tanpa prefiks — refunds.id & refund_items.id adalah
+	// VARCHAR(26) (migrations/00005). Prefiks "rf_"/"ri_" membuatnya 29
+	// karakter dan INSERT gagal "value too long", pola bug yang sama persis
+	// dengan shifts.id/sales.id sebelum diperbaiki (lihat shift-modal.tsx).
+	refundID := ulid.Make().String()
 	_, err = qtx.InsertRefund(ctx, store.InsertRefundParams{
 		ID:            refundID,
 		TenantID:      tenantID,
@@ -388,7 +463,7 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 		RefundType:    req.RefundType,
 		Amount:        req.Amount,
 		Reason:        req.Reason,
-		ApprovedBy:    userID,
+		ApprovedBy:    approvedBy,
 		Restock:       req.Restock,
 	})
 	if err != nil {
@@ -397,7 +472,7 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 	}
 
 	for _, item := range req.Items {
-		itemID := "ri_" + ulid.Make().String()
+		itemID := ulid.Make().String()
 		_, err = qtx.InsertRefundItem(ctx, store.InsertRefundItemParams{
 			ID:          itemID,
 			TenantID:    tenantID,
@@ -408,6 +483,52 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 		})
 		if err != nil {
 			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan item refund")
+			return
+		}
+
+		if !req.Restock {
+			continue
+		}
+
+		saleItem, err := qtx.GetSalesItemForRefund(ctx, store.GetSalesItemForRefundParams{
+			TenantID: tenantID, TransactionID: transactionID, ID: item.SalesItemID,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			RespondError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "sales_item_id tidak ditemukan di transaksi ini: "+item.SalesItemID)
+			return
+		}
+		if err != nil {
+			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal mengambil item transaksi")
+			return
+		}
+
+		newStock, err := qtx.IncrementStockForRefund(ctx, store.IncrementStockForRefundParams{
+			TenantID: tenantID, ID: saleItem.VariantID, StockQuantity: item.Quantity,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Varian bukan 'stock'/'composite' (mis. jasa) — memang tidak ada
+			// yang direstock, bukan kegagalan.
+			continue
+		}
+		if err != nil {
+			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal mengembalikan stok")
+			return
+		}
+
+		refID, actorRef := refundID, actorID
+		if _, err := qtx.InsertStockEvents(ctx, []store.InsertStockEventsParams{{
+			ID:            ulid.Make().String(),
+			TenantID:      tenantID,
+			OutletID:      sale.OutletID,
+			VariantID:     saleItem.VariantID,
+			EventType:     "refund",
+			QuantityDelta: item.Quantity,
+			BalanceAfter:  newStock,
+			Uom:           saleItem.Uom,
+			ReferenceID:   &refID,
+			ActorUserID:   &actorRef,
+		}}); err != nil {
+			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal mencatat event stok refund")
 			return
 		}
 	}

@@ -26,16 +26,35 @@ func NewOutletHandler(pool *pgxpool.Pool) *OutletHandler {
 	}
 }
 
-// GetOutlets menangani GET /outlets
+// GetOutlets menangani GET /outlets.
+//
+// MULTI-OUTLET.md §3: owner melihat SELURUH outlet secara otomatis (bukan
+// lewat penugasan — outlet baru harus langsung terlihat tanpa baris
+// assignment tambahan); manager/kasir hanya melihat outlet yang mereka
+// ditugaskan. Sebelumnya kueri ini mengembalikan seluruh outlet tenant ke
+// SIAPA PUN yang login — didokumentasikan sebagai "celah keamanan, bukan
+// fitur Fase 2" meski UI multi-outlet belum dibangun.
 func (h *OutletHandler) GetOutlets(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(tenantIDKey).(string)
+	ctx := r.Context()
+	tenantID, _ := ctx.Value(tenantIDKey).(string)
 
-	outlets, err := h.queries.ListOutlets(r.Context(), tenantID)
+	if UserRole(ctx) == "owner" {
+		outlets, err := h.queries.ListOutlets(ctx, tenantID)
+		if err != nil {
+			http.Error(w, `{"error": "Gagal memuat outlet"}`, http.StatusInternalServerError)
+			return
+		}
+		RespondJSON(w, http.StatusOK, map[string]any{"data": outlets})
+		return
+	}
+
+	outlets, err := h.queries.ListOutletsForUser(ctx, store.ListOutletsForUserParams{
+		TenantID: tenantID, UserID: UserID(ctx),
+	})
 	if err != nil {
 		http.Error(w, `{"error": "Gagal memuat outlet"}`, http.StatusInternalServerError)
 		return
 	}
-
 	RespondJSON(w, http.StatusOK, map[string]any{"data": outlets})
 }
 
@@ -76,7 +95,9 @@ func (h *OutletHandler) PostOutlet(w http.ResponseWriter, r *http.Request) {
 		bdStart = pgtype.Time{Microseconds: 0, Valid: true}
 	}
 
-	outletID := "ot_" + ulid.Make().String()
+	// ULID MURNI — outlets.id adalah VARCHAR(26) (migrations/00001); prefiks
+	// membuatnya 29+ karakter dan INSERT gagal "value too long".
+	outletID := ulid.Make().String()
 
 	out, err := h.queries.InsertOutlet(r.Context(), store.InsertOutletParams{
 		ID:               outletID,

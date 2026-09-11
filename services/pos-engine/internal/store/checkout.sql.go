@@ -183,6 +183,39 @@ func (q *Queries) DecrementStockStrict(ctx context.Context, arg DecrementStockSt
 	return stock_quantity, err
 }
 
+const getApproverForPin = `-- name: GetApproverForPin :one
+SELECT id, role, pin_hash, is_active
+FROM users
+WHERE tenant_id = $1 AND id = $2
+`
+
+type GetApproverForPinParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+type GetApproverForPinRow struct {
+	ID       string  `db:"id" json:"id"`
+	Role     string  `db:"role" json:"role"`
+	PinHash  *string `db:"pin_hash" json:"pin_hash"`
+	IsActive bool    `db:"is_active" json:"is_active"`
+}
+
+// Manager/owner yang MENYETUJUI refund kasir (RBAC-MODEL §"Void transaksi":
+// kasir wajib PIN manager). Bukan user yang sedang login — approved_by
+// HARUS identitas manager, bukan kasir menyetujui diri sendiri.
+func (q *Queries) GetApproverForPin(ctx context.Context, arg GetApproverForPinParams) (GetApproverForPinRow, error) {
+	row := q.db.QueryRow(ctx, getApproverForPin, arg.TenantID, arg.ID)
+	var i GetApproverForPinRow
+	err := row.Scan(
+		&i.ID,
+		&i.Role,
+		&i.PinHash,
+		&i.IsActive,
+	)
+	return i, err
+}
+
 const getSaleByID = `-- name: GetSaleByID :one
 SELECT id, receipt_number, grand_total, subtotal, discount_total, tax_total, created_at
 FROM sales_transactions
@@ -223,6 +256,66 @@ func (q *Queries) GetSaleByID(ctx context.Context, arg GetSaleByIDParams) (GetSa
 	return i, err
 }
 
+const getSaleForRefund = `-- name: GetSaleForRefund :one
+SELECT id, outlet_id, cashier_id, grand_total, payment_status
+FROM sales_transactions
+WHERE tenant_id = $1 AND id = $2
+`
+
+type GetSaleForRefundParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+type GetSaleForRefundRow struct {
+	ID            string          `db:"id" json:"id"`
+	OutletID      string          `db:"outlet_id" json:"outlet_id"`
+	CashierID     string          `db:"cashier_id" json:"cashier_id"`
+	GrandTotal    decimal.Decimal `db:"grand_total" json:"grand_total"`
+	PaymentStatus string          `db:"payment_status" json:"payment_status"`
+}
+
+// Dipakai PostRefund untuk menegakkan REFUND_EXCEEDS_TOTAL (ERROR-CATALOG §B)
+// — tanpa ini, refund_total tidak pernah dibandingkan dengan grand_total asli.
+func (q *Queries) GetSaleForRefund(ctx context.Context, arg GetSaleForRefundParams) (GetSaleForRefundRow, error) {
+	row := q.db.QueryRow(ctx, getSaleForRefund, arg.TenantID, arg.ID)
+	var i GetSaleForRefundRow
+	err := row.Scan(
+		&i.ID,
+		&i.OutletID,
+		&i.CashierID,
+		&i.GrandTotal,
+		&i.PaymentStatus,
+	)
+	return i, err
+}
+
+const getSalesItemForRefund = `-- name: GetSalesItemForRefund :one
+SELECT variant_id, uom
+FROM sales_items
+WHERE tenant_id = $1 AND transaction_id = $2 AND id = $3
+`
+
+type GetSalesItemForRefundParams struct {
+	TenantID      string `db:"tenant_id" json:"tenant_id"`
+	TransactionID string `db:"transaction_id" json:"transaction_id"`
+	ID            string `db:"id" json:"id"`
+}
+
+type GetSalesItemForRefundRow struct {
+	VariantID string `db:"variant_id" json:"variant_id"`
+	Uom       string `db:"uom" json:"uom"`
+}
+
+// Validasi item yang mau di-restock benar-benar milik transaksi ini
+// (mencegah refund_items menunjuk ke sales_item transaksi/tenant lain).
+func (q *Queries) GetSalesItemForRefund(ctx context.Context, arg GetSalesItemForRefundParams) (GetSalesItemForRefundRow, error) {
+	row := q.db.QueryRow(ctx, getSalesItemForRefund, arg.TenantID, arg.TransactionID, arg.ID)
+	var i GetSalesItemForRefundRow
+	err := row.Scan(&i.VariantID, &i.Uom)
+	return i, err
+}
+
 const getSyncReceipt = `-- name: GetSyncReceipt :one
 SELECT idempotency_key, request_hash, response_status, response_body
 FROM sync_receipts
@@ -255,6 +348,30 @@ func (q *Queries) GetSyncReceipt(ctx context.Context, arg GetSyncReceiptParams) 
 		&i.ResponseBody,
 	)
 	return i, err
+}
+
+const incrementStockForRefund = `-- name: IncrementStockForRefund :one
+UPDATE variants
+SET stock_quantity = stock_quantity + $3
+WHERE tenant_id = $1
+  AND id        = $2
+  AND item_type IN ('stock', 'composite')
+RETURNING stock_quantity
+`
+
+type IncrementStockForRefundParams struct {
+	TenantID      string          `db:"tenant_id" json:"tenant_id"`
+	ID            string          `db:"id" json:"id"`
+	StockQuantity decimal.Decimal `db:"stock_quantity" json:"stock_quantity"`
+}
+
+// Kebalikan DecrementStockAllowNegative — barang fisik kembali ke rak.
+// item_type dibatasi sama seperti pemotongan stok checkout.
+func (q *Queries) IncrementStockForRefund(ctx context.Context, arg IncrementStockForRefundParams) (decimal.Decimal, error) {
+	row := q.db.QueryRow(ctx, incrementStockForRefund, arg.TenantID, arg.ID, arg.StockQuantity)
+	var stock_quantity decimal.Decimal
+	err := row.Scan(&stock_quantity)
+	return stock_quantity, err
 }
 
 const insertAuditLog = `-- name: InsertAuditLog :exec
@@ -487,6 +604,26 @@ func (q *Queries) SaveSyncReceipt(ctx context.Context, arg SaveSyncReceiptParams
 		arg.ResponseBody,
 	)
 	return err
+}
+
+const sumRefundsForTransaction = `-- name: SumRefundsForTransaction :one
+SELECT COALESCE(SUM(amount), 0)::decimal AS total_refunded
+FROM refunds
+WHERE tenant_id = $1 AND transaction_id = $2
+`
+
+type SumRefundsForTransactionParams struct {
+	TenantID      string `db:"tenant_id" json:"tenant_id"`
+	TransactionID string `db:"transaction_id" json:"transaction_id"`
+}
+
+// Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
+// baru lewat money.RemainingRefundable sebelum refund ini disimpan.
+func (q *Queries) SumRefundsForTransaction(ctx context.Context, arg SumRefundsForTransactionParams) (decimal.Decimal, error) {
+	row := q.db.QueryRow(ctx, sumRefundsForTransaction, arg.TenantID, arg.TransactionID)
+	var total_refunded decimal.Decimal
+	err := row.Scan(&total_refunded)
+	return total_refunded, err
 }
 
 const upsertDeviceSyncState = `-- name: UpsertDeviceSyncState :exec

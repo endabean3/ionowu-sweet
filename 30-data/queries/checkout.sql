@@ -190,6 +190,45 @@ INSERT INTO audit_logs (
     $1, $2, $3, $4, $5, $6, $7, $8, $9
 );
 
+-- name: GetSaleForRefund :one
+-- Dipakai PostRefund untuk menegakkan REFUND_EXCEEDS_TOTAL (ERROR-CATALOG §B)
+-- — tanpa ini, refund_total tidak pernah dibandingkan dengan grand_total asli.
+SELECT id, outlet_id, cashier_id, grand_total, payment_status
+FROM sales_transactions
+WHERE tenant_id = $1 AND id = $2;
+
+-- name: SumRefundsForTransaction :one
+-- Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
+-- baru lewat money.RemainingRefundable sebelum refund ini disimpan.
+SELECT COALESCE(SUM(amount), 0)::decimal AS total_refunded
+FROM refunds
+WHERE tenant_id = $1 AND transaction_id = $2;
+
+-- name: GetApproverForPin :one
+-- Manager/owner yang MENYETUJUI refund kasir (RBAC-MODEL §"Void transaksi":
+-- kasir wajib PIN manager). Bukan user yang sedang login — approved_by
+-- HARUS identitas manager, bukan kasir menyetujui diri sendiri.
+SELECT id, role, pin_hash, is_active
+FROM users
+WHERE tenant_id = $1 AND id = $2;
+
+-- name: GetSalesItemForRefund :one
+-- Validasi item yang mau di-restock benar-benar milik transaksi ini
+-- (mencegah refund_items menunjuk ke sales_item transaksi/tenant lain).
+SELECT variant_id, uom
+FROM sales_items
+WHERE tenant_id = $1 AND transaction_id = $2 AND id = $3;
+
+-- name: IncrementStockForRefund :one
+-- Kebalikan DecrementStockAllowNegative — barang fisik kembali ke rak.
+-- item_type dibatasi sama seperti pemotongan stok checkout.
+UPDATE variants
+SET stock_quantity = stock_quantity + $3
+WHERE tenant_id = $1
+  AND id        = $2
+  AND item_type IN ('stock', 'composite')
+RETURNING stock_quantity;
+
 -- name: InsertRefund :one
 INSERT INTO refunds (id, tenant_id, transaction_id, shift_id, refund_type, amount, reason, approved_by, restock)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

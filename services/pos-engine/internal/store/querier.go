@@ -101,6 +101,10 @@ type Querier interface {
 	//
 	// 0 baris kembali → INSUFFICIENT_STOCK (kelas PERMANENT).
 	DecrementStockStrict(ctx context.Context, arg DecrementStockStrictParams) (decimal.Decimal, error)
+	// Manager/owner yang MENYETUJUI refund kasir (RBAC-MODEL §"Void transaksi":
+	// kasir wajib PIN manager). Bukan user yang sedang login — approved_by
+	// HARUS identitas manager, bukan kasir menyetujui diri sendiri.
+	GetApproverForPin(ctx context.Context, arg GetApproverForPinParams) (GetApproverForPinRow, error)
 	GetBomComponents(ctx context.Context, arg GetBomComponentsParams) ([]GetBomComponentsRow, error)
 	GetDailySummary(ctx context.Context, tenantID string) (GetDailySummaryRow, error)
 	// Shift kasir. Kasir tidak bisa bertransaksi tanpa shift terbuka (FR-30).
@@ -113,6 +117,12 @@ type Querier interface {
 	// ERROR-CATALOG §B DUPLICATE_TRANSACTION) — klien menerima record yang SUDAH
 	// ada, bukan error, persis seperti openapi.yaml POST /sales respons 200.
 	GetSaleByID(ctx context.Context, arg GetSaleByIDParams) (GetSaleByIDRow, error)
+	// Dipakai PostRefund untuk menegakkan REFUND_EXCEEDS_TOTAL (ERROR-CATALOG §B)
+	// — tanpa ini, refund_total tidak pernah dibandingkan dengan grand_total asli.
+	GetSaleForRefund(ctx context.Context, arg GetSaleForRefundParams) (GetSaleForRefundRow, error)
+	// Validasi item yang mau di-restock benar-benar milik transaksi ini
+	// (mencegah refund_items menunjuk ke sales_item transaksi/tenant lain).
+	GetSalesItemForRefund(ctx context.Context, arg GetSalesItemForRefundParams) (GetSalesItemForRefundRow, error)
 	// Dipanggil SEBELUM memproses batch. Bila key sudah ada dengan hash body yang
 	// sama, kembalikan respons tersimpan apa adanya — klien menerima jawaban
 	// identik seperti percobaan pertama.
@@ -125,6 +135,9 @@ type Querier interface {
 	// Setelah login sukses, ambil info tenant untuk disertakan dalam JWT claims.
 	GetUserWithTenant(ctx context.Context, id string) (GetUserWithTenantRow, error)
 	GetVariantForCheckout(ctx context.Context, arg GetVariantForCheckoutParams) (GetVariantForCheckoutRow, error)
+	// Kebalikan DecrementStockAllowNegative — barang fisik kembali ke rak.
+	// item_type dibatasi sama seperti pemotongan stok checkout.
+	IncrementStockForRefund(ctx context.Context, arg IncrementStockForRefundParams) (decimal.Decimal, error)
 	// SECURITY §6 — append-only. Setiap aksi sensitif: void, diskon manual,
 	// buka laci tanpa transaksi, akses break-glass platform admin.
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
@@ -153,6 +166,13 @@ type Querier interface {
 	InsertStockOpnameItem(ctx context.Context, arg InsertStockOpnameItemParams) (InsertStockOpnameItemRow, error)
 	ListCatalogForSync(ctx context.Context, arg ListCatalogForSyncParams) ([]ListCatalogForSyncRow, error)
 	ListOutlets(ctx context.Context, tenantID string) ([]ListOutletsRow, error)
+	// MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
+	// ini, GET /outlets mengembalikan SELURUH outlet tenant ke siapa pun yang
+	// login, termasuk kasir yang seharusnya hanya melihat cabang tempat ia
+	// ditugaskan. Seeder (internal/seed) sudah menugaskan owner/manager ke
+	// SELURUH outlet dan kasir hanya ke outlet utama, jadi join ini otomatis
+	// benar untuk semua peran tanpa cabang kasus khusus di kode Go.
+	ListOutletsForUser(ctx context.Context, arg ListOutletsForUserParams) ([]ListOutletsForUserRow, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)
 	LookupVariantByBarcode(ctx context.Context, arg LookupVariantByBarcodeParams) (LookupVariantByBarcodeRow, error)
@@ -176,6 +196,9 @@ type Querier interface {
 	// Retensi 7 hari; dibersihkan job harian. (RETENTION §2)
 	SaveSyncReceipt(ctx context.Context, arg SaveSyncReceiptParams) error
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
+	// Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
+	// baru lewat money.RemainingRefundable sebelum refund ini disimpan.
+	SumRefundsForTransaction(ctx context.Context, arg SumRefundsForTransactionParams) (decimal.Decimal, error)
 	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) error
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) error
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) error

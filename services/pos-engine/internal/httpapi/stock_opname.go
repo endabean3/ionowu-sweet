@@ -57,7 +57,9 @@ func (h *StockOpnameHandler) PostStockOpname(w http.ResponseWriter, r *http.Requ
 
 	qtx := h.q.WithTx(tx)
 
-	opnameID := "op_" + ulid.Make().String()
+	// ULID MURNI — stock_opname*.id adalah VARCHAR(26) (migrations/00006);
+	// prefiks membuatnya 29+ karakter dan INSERT gagal "value too long".
+	opnameID := ulid.Make().String()
 
 	// Untuk simplicity, kita set auto-approved oleh yang mengajukan.
 	// Di enterprise, ini bisa draft dulu, lalu direview manager.
@@ -78,7 +80,7 @@ func (h *StockOpnameHandler) PostStockOpname(w http.ResponseWriter, r *http.Requ
 	}
 
 	for _, item := range req.Items {
-		itemID := "opi_" + ulid.Make().String()
+		itemID := ulid.Make().String()
 		_, err = qtx.InsertStockOpnameItem(ctx, store.InsertStockOpnameItemParams{
 			ID:              itemID,
 			TenantID:        tenantID,
@@ -95,7 +97,7 @@ func (h *StockOpnameHandler) PostStockOpname(w http.ResponseWriter, r *http.Requ
 		// Insert adjustment (opname_adjust) if variance != 0
 		if !item.SystemQuantity.Equal(item.CountedQuantity) {
 			variance := item.CountedQuantity.Sub(item.SystemQuantity)
-			eventID := "se_" + ulid.Make().String()
+			eventID := ulid.Make().String()
 			_, err = tx.Exec(ctx, `
 				INSERT INTO stock_events (id, tenant_id, outlet_id, variant_id, event_type, quantity_delta, balance_after, uom, reference_id, actor_user_id)
 				VALUES ($1, $2, $3, $4, 'opname_adjust', $5, $6, 'pcs', $7, $8)

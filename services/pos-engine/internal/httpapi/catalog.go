@@ -56,6 +56,16 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 			CostPrice string `json:"cost_price"`
 			SKU       string `json:"sku"`
 			Barcode   string `json:"barcode"`
+			// UOM/UomPrecision/ItemType: default "pcs"/0/"stock" bila kosong —
+			// arketipe A (retail satuan). Arketipe B (Warung Wangi ml, Media
+			// Boga gram) WAJIB mengirim uom eksplisit ("ml"/"g") supaya stok
+			// desimal (MARKET-SEGMENTS §4) benar-benar tersimpan sebagai
+			// satuan yang dimaksud, bukan diam-diam jadi "pcs".
+			Uom           string `json:"uom"`
+			UomPrecision  int16  `json:"uom_precision"`
+			ItemType      string `json:"item_type"`
+			StockQuantity string `json:"stock_quantity"`
+			MinStockAlert string `json:"min_stock_alert"`
 		} `json:"variants"`
 	}
 
@@ -69,6 +79,18 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	validItemTypes := map[string]bool{"stock": true, "composite": true, "service": true, "time_based": true}
+	for _, v := range req.Variants {
+		if v.ItemType != "" && !validItemTypes[v.ItemType] {
+			http.Error(w, `{"error": "item_type harus salah satu dari stock, composite, service, time_based"}`, http.StatusBadRequest)
+			return
+		}
+		if v.UomPrecision < 0 || v.UomPrecision > 3 {
+			http.Error(w, `{"error": "uom_precision harus 0-3"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	ctx := r.Context()
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
@@ -77,7 +99,9 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op setelah Commit berhasil
 
-	productID := "pr_" + ulid.Make().String()
+	// ULID MURNI — products.id/variants.id adalah VARCHAR(26) (migrations/00003);
+	// prefiks membuatnya 29+ karakter dan INSERT gagal "value too long".
+	productID := ulid.Make().String()
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO products (id, tenant_id, name, description, is_active)
@@ -89,11 +113,29 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, v := range req.Variants {
-		varID := "vr_" + ulid.Make().String()
+		varID := ulid.Make().String()
+
+		uom := v.Uom
+		if uom == "" {
+			uom = "pcs"
+		}
+		itemType := v.ItemType
+		if itemType == "" {
+			itemType = "stock"
+		}
+		stockQty := v.StockQuantity
+		if stockQty == "" {
+			stockQty = "0"
+		}
+		minStock := v.MinStockAlert
+		if minStock == "" {
+			minStock = "0"
+		}
+
 		_, err = tx.Exec(ctx, `
-			INSERT INTO variants (id, tenant_id, product_id, name, price, cost_price, sku, barcode, item_type, uom, is_active)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'stock', 'pcs', true)
-		`, varID, tenantID, productID, v.Name, v.Price, v.CostPrice, v.SKU, v.Barcode)
+			INSERT INTO variants (id, tenant_id, product_id, name, price, cost_price, sku, barcode, item_type, uom, uom_precision, stock_quantity, min_stock_alert, is_active)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
+		`, varID, tenantID, productID, v.Name, v.Price, v.CostPrice, v.SKU, v.Barcode, itemType, uom, v.UomPrecision, stockQty, minStock)
 		if err != nil {
 			http.Error(w, `{"error": "Gagal menyimpan varian"}`, http.StatusInternalServerError)
 			return

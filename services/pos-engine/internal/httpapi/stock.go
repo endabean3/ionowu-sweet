@@ -61,7 +61,9 @@ func (h *StockHandler) PostStockEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	eventID := "evt_" + ulid.Make().String()
+	// ULID MURNI — stock_events.id adalah VARCHAR(26) (migrations/00006);
+	// prefiks membuatnya 29+ karakter dan INSERT gagal "value too long".
+	eventID := ulid.Make().String()
 
 	_, err = h.queries.InsertStockEvent(r.Context(), store.InsertStockEventParams{
 		ID:            eventID,

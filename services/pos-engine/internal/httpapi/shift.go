@@ -172,7 +172,9 @@ func (h *ShiftHandler) PostCashMovement(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	movementID := "cm_" + ulid.Make().String()
+	// ULID MURNI — cash_movements.id adalah VARCHAR(26) (migrations/00005);
+	// prefiks membuatnya 29+ karakter dan INSERT gagal "value too long".
+	movementID := ulid.Make().String()
 
 	_, err := h.q.InsertCashMovement(ctx, store.InsertCashMovementParams{
 		ID:          movementID,
