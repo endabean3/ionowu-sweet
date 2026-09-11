@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/dbconn"
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/seed"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/dbconn"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/seed"
 )
 
 func main() {

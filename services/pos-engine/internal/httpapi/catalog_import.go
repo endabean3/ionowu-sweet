@@ -10,7 +10,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
 
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/store"
 )
 
 // validImportItemTypes cocok dengan CHECK constraint variants.item_type

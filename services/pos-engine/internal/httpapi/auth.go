@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/auth"
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/auth"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/store"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

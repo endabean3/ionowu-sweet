@@ -17,9 +17,9 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
 
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/auth"
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/money"
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/auth"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/money"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/store"
 )
 
 const historyDays = 30

@@ -5,7 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/store"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/store"
 )
 
 type AnalyticsHandler struct {

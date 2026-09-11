@@ -1,4 +1,4 @@
-module github.com/endabean3/docs-umkm-intelligence/services/pos-engine
+module github.com/endabean3/ionowu-sweet/services/pos-engine
 
 go 1.26
 

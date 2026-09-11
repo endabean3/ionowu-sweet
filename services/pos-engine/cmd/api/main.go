@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/config"
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/dbconn"
-	"github.com/endabean3/docs-umkm-intelligence/services/pos-engine/internal/httpapi"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/config"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/dbconn"
+	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/httpapi"
 )
 
 func main() {
