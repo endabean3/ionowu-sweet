@@ -46,14 +46,17 @@ export default function TambahProdukPage() {
     setError(null);
 
     try {
-      // 1. Post ke server
+      // 1. Post ke server. uom diterapkan ke SETIAP varian — backend
+      // menaruh satuan di level varian, bukan level produk (satu produk
+      // bisa punya varian dengan uom berbeda), tapi form ini sengaja hanya
+      // menampilkan satu input UoM untuk kasus umum (semua varian sesatuan).
       await createProduct(accessToken, {
         name,
-        unit,
         variants: variants.map((v) => ({
           name: v.name,
-          price: Number.parseFloat(v.price) || 0,
-          cost: Number.parseFloat(v.cost) || 0,
+          price: v.price || "0",
+          costPrice: v.cost || "0",
+          uom: unit,
         })),
       });
 
@@ -125,8 +128,18 @@ export default function TambahProdukPage() {
             </div>
 
             {variants.map((v, i) => (
+              // key HANYA index — sebelumnya key ikut menyertakan v.name
+              // (nilai yang sedang diketik user), jadi SETIAP huruf yang
+              // diketik di Nama Varian mengubah key dan memaksa React
+              // unmount+remount seluruh baris, termasuk field Harga Jual/
+              // Modal di dalamnya: fokus dan nilai yang sedang diisi jadi
+              // tidak stabil. Daftar ini hanya tumbuh/menyusut tanpa
+              // reorder (addVariant menambah di akhir, removeVariant
+              // memfilter), jadi index AMAN dipakai sebagai key di sini —
+              // linter tidak tahu invarian itu.
               <div
-                key={`${i}-${v.name}`}
+                // biome-ignore lint/suspicious/noArrayIndexKey: list hanya tumbuh/menyusut di akhir, tanpa reorder
+                key={i}
                 className="flex flex-col gap-3 rounded-xl border border-card-border/50 bg-white p-4 shadow-sm sm:flex-row sm:items-start"
               >
                 <div className="flex-1 space-y-3">
