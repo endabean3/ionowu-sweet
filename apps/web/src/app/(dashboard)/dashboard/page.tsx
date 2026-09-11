@@ -66,27 +66,30 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-base p-4 md:p-8">
-      {/* Top Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      {/* Top Header. Sebelumnya satu baris flex tanpa wrap: dua tombol + judul
+         "Ringkasan Operasional Owner" + badge tenant dipaksa muat di satu
+         baris, meluber ~123px di layar 375px (scroll horizontal — dilarang)
+         dan badge tenant terdorong ke luar viewport, tak pernah terlihat. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <Link href="/kasir">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 pos-touch-target">
               <ArrowLeft className="h-4 w-4" />
               <span>Kembali ke Kasir</span>
             </Button>
           </Link>
           <Link href="/katalog">
-            <Button variant="primary" size="sm" className="gap-2 shadow-hard-sm ml-2">
+            <Button variant="primary" size="sm" className="gap-2 shadow-hard-sm">
               <ShoppingBag className="h-4 w-4" />
               <span>Master Katalog</span>
             </Button>
           </Link>
-          <h1 className="font-display text-2xl font-black text-main">
+          <h1 className="font-display text-xl font-black text-main sm:text-2xl">
             Ringkasan Operasional <span className="text-sweet-strawberry">Owner</span>
           </h1>
         </div>
-        <div className="flex items-center gap-2 rounded-pill border-2 border-card-border bg-sweet-matcha px-4 py-1.5 font-sans text-xs font-bold text-main shadow-hard-sm">
-          <ShieldCheck className="h-4 w-4" />
+        <div className="flex items-center gap-2 self-start rounded-pill border-2 border-card-border bg-sweet-matcha px-4 py-1.5 font-sans text-xs font-bold text-main shadow-hard-sm sm:self-auto">
+          <ShieldCheck className="h-4 w-4 shrink-0" />
           <span>Tenant: {user?.name || "Memuat..."}</span>
         </div>
       </div>
@@ -157,8 +160,9 @@ export default function DashboardPage() {
           {/* Highlights Section */}
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card variant="milky" className="shadow-hard">
-              <h2 className="font-display text-lg font-bold text-main">
-                ☕ Top 5 Varian Terlaris Hari Ini
+              <h2 className="flex items-center gap-2 font-display text-lg font-bold text-main">
+                <TrendingUp className="h-5 w-5" aria-hidden="true" />
+                Top 5 Varian Terlaris Hari Ini
               </h2>
               <div className="mt-4 space-y-3 font-sans text-sm">
                 {!data?.top_products || data.top_products.length === 0 ? (

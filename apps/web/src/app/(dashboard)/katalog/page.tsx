@@ -40,7 +40,7 @@ export default function KatalogPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 pos-touch-target">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -57,14 +57,16 @@ export default function KatalogPage() {
         </Link>
       </div>
 
+      {/* h-11 (44px) pada input: sebelumnya cuma py-1 (~28px tinggi klik),
+         di bawah target sentuh minimum. */}
       <div className="mt-8 flex items-center gap-2 rounded-squircle border-2 border-card-border bg-white p-2 shadow-hard-sm max-w-md">
-        <Search className="ml-2 h-5 w-5 text-muted" />
+        <Search className="ml-2 h-5 w-5 shrink-0 text-muted" />
         <input
           type="text"
           placeholder="Cari nama produk atau varian..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-transparent px-2 py-1 text-sm font-semibold outline-none placeholder:text-muted/60"
+          className="h-11 flex-1 bg-transparent px-2 text-sm font-semibold outline-none placeholder:text-muted/60"
         />
       </div>
 
