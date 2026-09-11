@@ -1,8 +1,7 @@
 "use client";
 
-import type { CartLine } from "@/components/pos/cart";
 import { Button } from "@/components/ui/button";
-import { type MoneyItem, calculateCart } from "@/lib/money/calc";
+import type { MoneyTotal } from "@/lib/money/calc";
 import { Banknote, CreditCard, QrCode, X } from "lucide-react";
 import React, { useState } from "react";
 
@@ -16,7 +15,10 @@ export interface PaymentBreakdown {
 }
 
 interface PaymentModalProps {
-  cartItems: CartLine[];
+  /** Dihitung SEKALI di halaman kasir. Modal ini TIDAK boleh menghitung
+   * ulang: angka yang dilihat kasir di keranjang dan yang ditagihkan di
+   * sini wajib berasal dari perhitungan yang sama persis. */
+  totals: MoneyTotal;
   onClose: () => void;
   onPay: (
     method: string,
@@ -25,22 +27,10 @@ interface PaymentModalProps {
   ) => void | Promise<void>;
 }
 
-export function PaymentModal({ cartItems, onClose, onPay }: PaymentModalProps) {
+export function PaymentModal({ totals, onClose, onPay }: PaymentModalProps) {
   const [method, setMethod] = useState("cash");
   const [givenAmount, setGivenAmount] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-
-  const moneyItems: MoneyItem[] = cartItems.map((it) => ({
-    quantity: it.quantity,
-    unitPrice: it.unitPrice,
-    discount: it.discount || "0",
-  }));
-
-  const totals = calculateCart({
-    items: moneyItems,
-    discount: "0",
-    taxRate: "0.11",
-  });
 
   const grandTotal = Number(totals.grandTotal);
 

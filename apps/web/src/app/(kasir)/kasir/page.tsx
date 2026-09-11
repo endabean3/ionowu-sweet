@@ -3,9 +3,11 @@
 import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
+import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
+import { calculateCart } from "@/lib/money/calc";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Barcode, Layers, Search, Wallet } from "lucide-react";
@@ -26,6 +28,14 @@ export default function KasirPage() {
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const processingPaymentRef = useRef(false);
+
+  // Data katalog hidup di IndexedDB, yang tidak ada di server. Tanpa gerbang
+  // ini, server merender "Belum ada produk di katalog" sementara klien
+  // merender grid penuh: React membuang seluruh HTML server dan merender
+  // ulang dari nol (mahal di Android murah, tepat di jalur transaksi), DAN
+  // kasir sempat melihat pesan palsu bahwa katalognya kosong.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Ambil data dari Dexie
   const dbProducts = useLiveQuery(() => db.products.toArray(), []);
@@ -58,6 +68,27 @@ export default function KasirPage() {
 
   // Ekstrak kategori unik
   const categories = ["Semua"];
+
+  // SATU-SATUNYA perhitungan uang di layar kasir. Keranjang, bar ringkasan
+  // mobile, dan modal pembayaran semuanya memakai hasil ini — sebelumnya
+  // keranjang dan modal masing-masing memanggil calculateCart dengan tarif
+  // PPN yang sama-sama di-hardcode, jadi angka yang dilihat kasir dan angka
+  // yang ditagihkan hanya kebetulan sama.
+  const cartTotals = React.useMemo(
+    () =>
+      calculateCart({
+        items: cartItems.map((it) => ({
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          discount: it.discount || "0",
+        })),
+        discount: "0",
+        taxRate: "0.11", // PPN 11%
+      }),
+    [cartItems],
+  );
+
+  const totalItemCount = cartItems.reduce((acc, it) => acc + it.quantity, 0);
 
   // Auto-focus barcode
   useEffect(() => {
@@ -241,7 +272,7 @@ export default function KasirPage() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-base p-4 md:p-6">
+    <div className="flex min-h-[100dvh] flex-col bg-base p-4 pb-32 md:p-6 lg:pb-6">
       <POSHeader outletId={activeShift?.outlet_id} />
 
       <div className="mt-4 grid flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
@@ -292,9 +323,17 @@ export default function KasirPage() {
           </div>
 
           <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-            {filteredProducts.length === 0 ? (
+            {!mounted || !dbProducts || !dbVariants ? (
+              // Teks statis, bukan skeleton shimmer — pages/kasir.md melarang
+              // animasi dekoratif di layar ini.
+              <div className="col-span-full py-12 text-center font-bold text-muted">
+                Memuat katalog…
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="col-span-full py-12 text-center text-muted font-bold">
-                Belum ada produk di katalog.
+                {searchQuery
+                  ? `Tidak ada produk cocok dengan "${searchQuery}".`
+                  : "Belum ada produk di katalog."}
               </div>
             ) : (
               filteredProducts.map((p) => (
@@ -308,6 +347,7 @@ export default function KasirPage() {
         <div className="lg:col-span-5 xl:col-span-4">
           <POSCart
             items={cartItems}
+            totals={cartTotals}
             onUpdateQty={handleUpdateQty}
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
@@ -316,9 +356,39 @@ export default function KasirPage() {
         </div>
       </div>
 
+      {/* Bar ringkasan LENGKET — hanya di bawah lg. Di ponsel, keranjang
+         menumpuk di bawah katalog: tombol bayar tadinya berada di y=2747
+         pada layar setinggi 812px, jadi kasir harus menggulir ~2,4 layar
+         melewati seluruh produk hanya untuk menagih, dan total belanja tidak
+         pernah terlihat sambil memilih barang. Bar ini membuat angka dan
+         aksi utama selalu satu ketukan jauhnya. */}
+      {cartItems.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-sans text-xs font-bold text-muted">
+                {totalItemCount} item · sudah termasuk PPN
+              </p>
+              <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
+                Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
+              </p>
+            </div>
+            <Button
+              size="pos-lg"
+              variant="primary"
+              className="shrink-0 gap-2 shadow-hard"
+              onClick={() => setIsCheckingOut(true)}
+            >
+              <Wallet className="h-5 w-5" aria-hidden="true" />
+              Bayar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isCheckingOut && (
         <PaymentModal
-          cartItems={cartItems}
+          totals={cartTotals}
           onClose={() => setIsCheckingOut(false)}
           onPay={processPayment}
         />

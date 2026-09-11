@@ -2,7 +2,7 @@
 
 import { Button } from "@/lib/../components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
-import { type MoneyItem, calculateCart } from "@/lib/money/calc";
+import type { MoneyTotal } from "@/lib/money/calc";
 import { Minus, Plus, ShoppingBag, Trash2, Zap } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
@@ -18,6 +18,11 @@ export interface CartLine {
 
 interface POSCartProps {
   items: CartLine[];
+  /** Dihitung SEKALI di halaman kasir, bukan di sini. Sebelumnya cart dan
+   * payment-modal masing-masing memanggil calculateCart dengan tarif PPN
+   * yang sama-sama di-hardcode — dua sumber kebenaran untuk angka uang yang
+   * sama, dan satu-satunya yang menjaga keduanya sinkron adalah kebetulan. */
+  totals: MoneyTotal;
   onUpdateQty: (variantId: string, delta: number) => void;
   onRemoveItem: (variantId: string) => void;
   onClearCart: () => void;
@@ -26,24 +31,12 @@ interface POSCartProps {
 
 export function POSCart({
   items,
+  totals,
   onUpdateQty,
   onRemoveItem,
   onClearCart,
   onCheckout,
 }: POSCartProps) {
-  // Hitung total dengan library decimal.js (paritas penuh dengan Go)
-  const moneyItems: MoneyItem[] = items.map((it) => ({
-    quantity: it.quantity,
-    unitPrice: it.unitPrice,
-    discount: it.discount || "0",
-  }));
-
-  const totals = calculateCart({
-    items: moneyItems,
-    discount: "0",
-    taxRate: "0.11", // PPN 11%
-  });
-
   const handleCheckoutClick = () => {
     if (items.length === 0) {
       toast.error("Keranjang masih kosong!");
