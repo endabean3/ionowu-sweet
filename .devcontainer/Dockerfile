@@ -30,6 +30,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Pustaka sistem untuk Chromium (Playwright) ──────────────────────
+# Tanpa ini `make test-e2e` dan `make test-offline` GAGAL DILUNCURKAN sama
+# sekali: Playwright melempar "Host system is missing dependencies to run
+# browsers", dan perbaikannya (`npx playwright install-deps`) butuh root —
+# sementara container ini sengaja berjalan sebagai `dev` tanpa sudo. Akibatnya
+# kedua target itu tidak pernah bisa dijalankan siapa pun, dan uji offline —
+# pembeda utama produk — tidak pernah terverifikasi meski berkas ujinya ada.
+#
+# Daftarnya sengaja ditulis eksplisit, BUKAN `playwright install-deps`: perintah
+# itu menarik paket jauh lebih banyak (termasuk font & GTK untuk Firefox/WebKit)
+# padahal playwright.config.ts hanya memakai Chromium.
+#
+# Binernya sendiri TIDAK dibakukan ke image (~300 MB per browser). Ia mendarat
+# di /home/dev/.cache/ms-playwright, yang dipasang sebagai named volume di
+# docker-compose.dev.yml — pola yang sama dengan cache go-build dan pnpm.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libglib2.0-0 libnspr4 libnss3 libdbus-1-3 libatk1.0-0 \
+        libatk-bridge2.0-0 libcups2 libdrm2 libxcb1 libxkbcommon0 \
+        libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+        libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # ── Tool Go — BINER SIAP PAKAI, bukan dikompilasi ───────────────────
 # Mengompilasi sqlc menarik ~200 modul dan golangci-lint lebih banyak lagi.
 # Di jaringan yang putus-putus itu hampir pasti gagal (`unexpected EOF`
@@ -106,6 +128,7 @@ RUN install -d -o dev -g dev \
         /home/dev/.cache \
         /home/dev/.cache/go-build \
         /home/dev/.cache/node \
+        /home/dev/.cache/ms-playwright \
         /home/dev/.pnpm \
         /workspace/.pnpm-store \
         /home/dev/go/pkg/mod \

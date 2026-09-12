@@ -1,46 +1,50 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { bukaShiftBilaPerlu, loginViaUI, provisionTenant, type TenantFixture } from "./helpers";
 
+/**
+ * Transaksi offline tidak boleh cuma "diterima" — ia harus benar-benar sampai
+ * ke server saat koneksi pulih. Antrean yang tidak pernah terkirim sama saja
+ * dengan penjualan yang hilang, dan itu justru lebih buruk daripada menolak
+ * transaksi sejak awal karena pemilik tidak pernah tahu ada yang hilang.
+ */
 test.describe("Sync Recovery", () => {
-  test("Harus menyimpan antrean dan memulihkannya saat kembali online", async ({ page, context }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', "owner@kopi-senja.test");
-    await page.fill('input[type="password"]', "devpass");
-    await page.click('button:has-text("Masuk ke Kasir")');
-    await expect(page).toHaveURL(/\/dashboard|\/kasir/);
+  let fx: TenantFixture;
+
+  test.beforeEach(async () => {
+    fx = await provisionTenant();
+  });
+
+  test("Harus menyimpan antrean dan memulihkannya saat kembali online", async ({
+    page,
+    context,
+  }) => {
+    await loginViaUI(page, fx);
     await page.goto("/kasir");
 
-    // Simulasi offline
+    const kartuProduk = page.getByText(fx.productName).first();
+    await expect(kartuProduk).toBeVisible({ timeout: 20000 });
+    await bukaShiftBilaPerlu(page, "100000");
+
     await context.setOffline(true);
-    await expect(page.locator("text=Offline (Tersimpan Lokal)")).toBeVisible();
+    await expect(page.getByText("Offline (Tersimpan Lokal)")).toBeVisible();
 
-    // Buka shift jika perlu
-    const shiftButton = page.locator('button:has-text("Buka Shift Sekarang")');
-    if (await shiftButton.isVisible()) {
-      await page.fill('input[placeholder="100000"]', "100000");
-      await shiftButton.click();
-    }
-
-    // Klik produk
-    const productCard = page.locator(".flex.flex-col.justify-between.rounded-xl").first();
-    await expect(productCard).toBeVisible({ timeout: 5000 });
-    await productCard.click();
-
-    // Bayar
-    await page.keyboard.press("Enter");
+    await kartuProduk.click();
+    await page.locator('button:has-text("Bayar Sekarang")').first().click();
+    await expect(page.getByRole("heading", { name: "Pembayaran" })).toBeVisible();
     await page.click("text=Tunai");
-    await page.click('button:has-text("Selesaikan Pembayaran")');
+    await page.fill("#given_amount", "50000");
+    await page.locator('button:has-text("Selesaikan Pembayaran")').click();
 
-    // Pastikan ada queue offline
-    await expect(page.locator("text=antrean")).toBeVisible();
+    const badgeAntrean = page.getByText(/\d+ antrean/);
+    await expect(badgeAntrean).toBeVisible({ timeout: 10000 });
 
-    // Simulasi online
+    // Koneksi pulih.
     await context.setOffline(false);
-    await expect(page.locator("text=Online")).toBeVisible();
+    await expect(page.getByText("Online")).toBeVisible({ timeout: 15000 });
 
-    // Tekan Sync Now
     await page.click('button:has-text("Sync Now")');
-    
-    // Cek badge antrean hilang
-    await expect(page.locator("text=antrean")).not.toBeVisible();
+
+    // Antrean habis = transaksi benar-benar mendarat di server.
+    await expect(badgeAntrean).toBeHidden({ timeout: 20000 });
   });
 });

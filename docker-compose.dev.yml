@@ -21,6 +21,11 @@ services:
       # dan setiap `make seed`/`make test` mengunduh ulang seluruh dependensi.
       - go-mod:/home/dev/go/pkg/mod
       - go-build:/home/dev/.cache/go-build
+      # Browser Playwright (~300 MB) sengaja TIDAK dibakukan ke image; ia
+      # diunduh sekali oleh `npx playwright install chromium` lalu bertahan di
+      # volume ini. Pustaka SISTEM-nya tetap di image (.devcontainer/Dockerfile)
+      # karena pemasangannya butuh root, sedangkan container berjalan sebagai dev.
+      - playwright-browsers:/home/dev/.cache/ms-playwright
       # Dipasang TEPAT di jalur store bawaan pnpm, bukan jalur khusus container.
       # Bawaannya pnpm menaruh store di drive yang sama dengan proyek, yaitu
       # /workspace/.pnpm-store — di dalam bind mount: lambat di macOS dan
@@ -94,6 +99,7 @@ services:
 
 volumes:
   pgdata-dev:
+  playwright-browsers:
   node-modules-root:
   go-mod:
   go-build:

@@ -4,16 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/context";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
  * Halaman login kasir / owner.
  *
- * Field yang dibutuhkan:
- *   - Tenant ID  : ULID tenant yang didapat saat registrasi
- *   - Email      : email user
- *   - Password   : password argon2id
+ * Cukup email + password: `idx_users_email` UNIQUE global, jadi satu email
+ * hanya pernah menunjuk satu user dan tenant-nya diambil dari baris user itu.
+ * Sebelumnya layar ini meminta Tenant ID (ULID 26 karakter) — pemilik warung
+ * yang kehilangan string itu terkunci keluar dari datanya sendiri, tanpa jalur
+ * pemulihan apa pun.
  *
  * Setelah login sukses, redirect ke /kasir (kasir) atau /dashboard (owner/manager).
  */
@@ -21,7 +23,6 @@ export default function LoginPage() {
   const { login, isLoading } = useAuth();
   const router = useRouter();
 
-  const [tenantId, setTenantId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(tenantId.trim(), email.trim(), password);
+      await login(email.trim(), password);
       // Redirect sesuai role dilakukan oleh middleware/layout
       // Default: ke halaman kasir
       router.replace("/kasir");
@@ -84,16 +85,6 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Tenant ID"
-              type="text"
-              placeholder="01J8ZK9X3QR7VYVEHW8N4T9F5B"
-              value={tenantId}
-              onChange={(e) => setTenantId(e.target.value)}
-              required
-              autoComplete="off"
-              hint="ULID tenant yang diterima saat registrasi"
-            />
-            <Input
               label="Email"
               type="email"
               placeholder="kasir@toko.id"
@@ -123,10 +114,16 @@ export default function LoginPage() {
               variant="primary"
               size="pos"
               className="w-full"
-              disabled={submitting || !tenantId || !email || !password}
+              disabled={submitting || !email || !password}
             >
               {submitting ? "Masuk…" : "Masuk"}
             </Button>
+            <p className="text-center text-xs text-muted">
+              Belum punya akun?{" "}
+              <Link href="/daftar" className="text-main underline">
+                Daftarkan toko
+              </Link>
+            </p>
           </form>
         </div>
 

@@ -81,7 +81,10 @@ paths:
   /auth/login:
     post:
       tags: [auth]
-      summary: Login dengan email + password
+      summary: >-
+        Login dengan email + password. Tenant TIDAK perlu disebut: idx_users_email
+        UNIQUE global, jadi satu email hanya menunjuk satu user dan tenant-nya
+        diambil dari baris user itu — bukan dari kiriman klien.
       security: []
       requestBody:
         required: true
@@ -93,6 +96,12 @@ paths:
               properties:
                 email: { type: string, format: email }
                 password: { type: string }
+                tenant_id:
+                  type: string
+                  deprecated: true
+                  description: >-
+                    Masih diterima agar klien lama tidak pecah, tetapi diabaikan.
+                    Tenant selalu diambil dari baris user hasil lookup email.
       responses:
         "200":
           description: Berhasil login
@@ -354,10 +363,37 @@ paths:
           application/json:
             schema:
               type: object
-              required: [reason, amount]
+              required: [refund_type, reason, amount]
               properties:
+                refund_type:
+                  type: string
+                  enum: [full, partial]
+                  description: Wajib. Handler menolak nilai lain dengan VALIDATION_ERROR.
                 reason: { type: string, minLength: 1 }
                 amount: { type: number, format: decimal, exclusiveMinimum: 0 }
+                shift_id:
+                  { $ref: "#/components/schemas/ULID" }
+                restock:
+                  type: boolean
+                  default: false
+                  description: Bila true, stok varian yang direfund dikembalikan.
+                items:
+                  type: array
+                  description: Baris yang direfund. Dibutuhkan untuk restock per varian.
+                  items:
+                    type: object
+                    required: [variant_id, quantity]
+                    properties:
+                      variant_id: { $ref: "#/components/schemas/ULID" }
+                      quantity: { type: number, format: decimal, exclusiveMinimum: 0 }
+                approver_user_id:
+                  { $ref: "#/components/schemas/ULID" }
+                pin:
+                  type: string
+                  description: >-
+                    approver_user_id + pin WAJIB bila aktor berperan `cashier`
+                    (RBAC-MODEL §"Void transaksi"). Owner/manager yang sedang
+                    login boleh menyetujui sendiri; keduanya diabaikan.
       responses:
         "201":
           description: Refund tercatat

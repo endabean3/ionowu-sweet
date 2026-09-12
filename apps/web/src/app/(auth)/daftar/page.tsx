@@ -45,9 +45,10 @@ export default function DaftarPage() {
         owner_password: ownerPassword,
         business_type: businessType || undefined,
       });
-      // Tenant ID ditampilkan, bukan langsung diarahkan ke kasir: login
-      // memintanya sebagai ULID dan tidak ada cara lain melihatnya lagi
-      // setelah layar ini ditutup.
+      // Tidak langsung diarahkan ke kasir: pemilik baru perlu konfirmasi
+      // bahwa tokonya jadi. Tenant ID disembunyikan di balik <details> —
+      // login tidak membutuhkannya lagi, tapi tim dukungan masih memintanya
+      // saat menelusuri masalah.
       setTenantId(session.user.tenant_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Pendaftaran gagal");
@@ -83,13 +84,15 @@ export default function DaftarPage() {
             <div className="space-y-4">
               <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 space-y-2">
                 <p className="font-medium">Toko berhasil didaftarkan.</p>
-                <p className="text-xs">
-                  Simpan Tenant ID ini — dibutuhkan setiap kali login dan tidak ditampilkan lagi
-                  setelah halaman ini ditutup.
-                </p>
-                <code className="block bg-white/70 rounded-xl px-3 py-2 text-xs font-mono break-all text-main">
-                  {tenantId}
-                </code>
+                <p className="text-xs">Login cukup pakai email dan password yang barusan dibuat.</p>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-green-800">
+                    Lihat Tenant ID (untuk dukungan teknis)
+                  </summary>
+                  <code className="mt-2 block bg-white/70 rounded-xl px-3 py-2 text-xs font-mono break-all text-main">
+                    {tenantId}
+                  </code>
+                </details>
               </div>
               <Button
                 type="button"
