@@ -5,3 +5,19 @@ allowBuilds:
   '@biomejs/biome': true
   esbuild: true
   sharp: true
+
+# Naikkan dependensi TRANSITIF yang kena advisory high; keduanya masuk lewat
+# next dan @serwist/build, jadi tidak bisa diperbaiki dengan `pnpm add`.
+# Ditaruh di sini, bukan di package.json: sejak pnpm 11 field "pnpm" di
+# package.json diabaikan diam-diam (hanya muncul sebagai WARN).
+#
+# CATATAN: JANGAN menambahkan `storeDir` ke berkas ini — berkas ini ikut
+# ter-checkout di GitHub Actions, dan jalur container tidak ada di runner
+# (CLAUDE.md §4). `overrides` aman karena tidak terikat jalur.
+overrides:
+  # GHSA: pembacaan berkas sewenang-wenang & path traversal lewat
+  # sourceMappingURL pada komentar CSS.
+  postcss: '>=8.5.18'
+  # GHSA: pertumbuhan memori tanpa batas (OOM) & prototype write lewat
+  # browserslist-stats.json yang tidak tepercaya.
+  browserslist: '>=4.28.7'
