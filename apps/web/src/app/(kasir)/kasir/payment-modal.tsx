@@ -12,6 +12,11 @@ export interface PaymentBreakdown {
   subtotal: string;
   taxTotal: string;
   grandTotal: string;
+  /** Uang yang benar-benar diserahkan pembeli. Berbeda dari nominal yang
+   *  DIBEBANKAN ke tagihan (lihat catatan di tombol bayar): untuk tunai ia
+   *  bisa lebih besar, dan selisihnya adalah kembalian. Hanya dipakai untuk
+   *  struk — payload penjualan tetap memakai grandTotal. */
+  givenAmount: number;
 }
 
 interface PaymentModalProps {
@@ -167,6 +172,9 @@ export function PaymentModal({ totals, onClose, onPay }: PaymentModalProps) {
                   subtotal: totals.subtotal.toString(),
                   taxTotal: totals.taxTotal.toString(),
                   grandTotal: totals.grandTotal.toString(),
+                  // Non-tunai tidak punya kembalian: yang diserahkan persis
+                  // sebesar tagihan.
+                  givenAmount: method === "cash" ? givenNum : grandTotal,
                 });
               } finally {
                 setSubmitting(false);

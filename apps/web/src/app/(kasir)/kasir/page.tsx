@@ -3,6 +3,7 @@
 import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
+import { Receipt, type ReceiptData } from "@/components/pos/receipt";
 import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
@@ -26,6 +27,11 @@ export default function KasirPage() {
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
   const [showShiftModal, setShowShiftModal] = useState<boolean>(true); // Tampilkan shift modal di awal
 
+  // Struk transaksi terakhir. Disimpan SETELAH keranjang dikosongkan supaya
+  // kasir boleh langsung melayani pembeli berikutnya sambil struk sebelumnya
+  // masih bisa dicetak — "kasir tidak boleh menunggu" (CLAUDE.md §5).
+  const [lastReceipt, setLastReceipt] = useState<ReceiptData | null>(null);
+
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const processingPaymentRef = useRef(false);
 
@@ -41,6 +47,10 @@ export default function KasirPage() {
   const dbProducts = useLiveQuery(() => db.products.toArray(), []);
   const dbVariants = useLiveQuery(() => db.variants.toArray(), []);
   const activeShift = useLiveQuery(() => db.shifts.where("status").equals("open").first(), []);
+  const outlet = useLiveQuery(
+    () => (activeShift?.outlet_id ? db.outlets.get(activeShift.outlet_id) : undefined),
+    [activeShift?.outlet_id],
+  );
 
   // Tutup modal shift jika sudah ada shift aktif
   useEffect(() => {
@@ -248,9 +258,36 @@ export default function KasirPage() {
         },
       });
 
+      // Disusun dari keranjang SEBELUM dikosongkan, dan seluruhnya dari data
+      // lokal — struk harus tetap tercetak saat offline.
+      const struk: ReceiptData = {
+        transactionId: txId,
+        occurredAt: new Date().toISOString(),
+        outletName: outlet?.name ?? "Toko",
+        cashierName: user?.name ?? "Kasir",
+        lines: cartItems.map((it) => ({
+          name: it.name,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          discount: it.discount,
+        })),
+        subtotal: breakdown.subtotal,
+        taxTotal: breakdown.taxTotal,
+        grandTotal: breakdown.grandTotal,
+        method,
+        givenAmount: breakdown.givenAmount,
+        changeAmount: Math.max(0, breakdown.givenAmount - Number(breakdown.grandTotal)),
+        pending: true,
+      };
+      setLastReceipt(struk);
+
       playSuccessChord();
       toast.success(`Transaksi berhasil disimpan! (ULID: ${txId.slice(-6)})`, {
         description: "Tersimpan aman di IndexedDB & siap disinkronisasi.",
+        // Cetak ditawarkan, tidak dipaksakan: pembeli warung sering tidak
+        // meminta struk, dan modal wajib-tutup di tiap transaksi menambah satu
+        // ketukan pada jalur tersibuk kasir.
+        action: { label: "Cetak Struk", onClick: () => window.print() },
       });
 
       setCartItems([]);
@@ -395,6 +432,9 @@ export default function KasirPage() {
       )}
 
       {showShiftModal && !activeShift && <ShiftModal onClose={() => setShowShiftModal(false)} />}
+
+      {/* Tak terlihat di layar; hanya muncul di hasil cetak. */}
+      {lastReceipt && <Receipt data={lastReceipt} />}
     </div>
   );
 }
