@@ -82,3 +82,67 @@ body {
   min-height: 48px;
   min-width: 48px;
 }
+
+/* ── Struk termal ────────────────────────────────────────────────────
+   Struk hanya ada saat dicetak. Di layar ia disembunyikan total — bukan
+   dipindah ke luar viewport — supaya tidak pernah ikut ter-scroll atau
+   terbaca screen reader di layar kasir.
+
+   Lebarnya 58mm, ukuran gulungan termal paling umum di warung. Warnanya
+   sengaja hitam-putih polos: printer termal tidak punya tinta warna, dan
+   latar berwarna hanya membuang panas jadi abu-abu kotor. */
+#receipt-print-root {
+  display: none;
+}
+
+@media print {
+  /* Seluruh aplikasi disembunyikan, hanya struk yang tersisa. */
+  body > *:not(#receipt-print-root) {
+    display: none !important;
+  }
+
+  #receipt-print-root {
+    display: block;
+  }
+
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+
+  .receipt {
+    width: 58mm;
+    padding: 3mm;
+    box-sizing: border-box;
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #000;
+    background: #fff;
+  }
+
+  .receipt-center {
+    text-align: center;
+  }
+  .receipt-bold {
+    font-weight: 700;
+  }
+  .receipt-small {
+    font-size: 9px;
+  }
+
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .receipt-item {
+    margin-bottom: 2px;
+  }
+
+  .receipt-sep {
+    border-top: 1px dashed #000;
+    margin: 4px 0;
+  }
+}
