@@ -132,6 +132,19 @@ type Querier interface {
 	// Dipakai hanya oleh internal/httpapi/auth.go — bukan seeder.
 	// Lookup user berdasarkan email untuk login. Hanya user aktif.
 	GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) (GetUserByEmailRow, error)
+	// sqlc-vet-disable: wajib-tenant-scope
+	// Lookup user untuk login TANPA tenant_id. Dikecualikan dari aturan
+	// wajib-tenant-scope dengan alasan yang sama seperti RegisterTenantOwner:
+	// login adalah operasi SEBELUM tenant diketahui — memaksa pemanggil menyebut
+	// tenant_id berarti pemilik warung harus menghafal ULID 26 karakter, dan
+	// kehilangan string itu mengunci dia keluar dari datanya sendiri.
+	//
+	// Aman karena `idx_users_email` UNIQUE global (00001_foundation.sql:45): satu
+	// email hanya pernah menunjuk satu user, jadi tenant_id hasilnya deterministik
+	// dan tidak bisa ditebak-tebak oleh pemanggil. Setelah baris ini didapat,
+	// seluruh kueri berikutnya tetap memfilter tenant_id dari hasil di sini —
+	// bukan dari input klien, yang justru lebih ketat daripada sebelumnya.
+	GetUserByEmailGlobal(ctx context.Context, email string) (GetUserByEmailGlobalRow, error)
 	// Setelah login sukses, ambil info tenant untuk disertakan dalam JWT claims.
 	GetUserWithTenant(ctx context.Context, id string) (GetUserWithTenantRow, error)
 	GetVariantForCheckout(ctx context.Context, arg GetVariantForCheckoutParams) (GetVariantForCheckoutRow, error)

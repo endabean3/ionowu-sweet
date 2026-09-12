@@ -63,7 +63,6 @@ export function apiRegister(data: {
 
 /** Login dengan email + password */
 export function apiLogin(data: {
-  tenant_id: string;
   email: string;
   password: string;
 }): Promise<AuthSession> {

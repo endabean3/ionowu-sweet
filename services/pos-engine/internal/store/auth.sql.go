@@ -120,6 +120,52 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 	return i, err
 }
 
+const getUserByEmailGlobal = `-- name: GetUserByEmailGlobal :one
+SELECT id, tenant_id, name, email, password_hash, role, pin_hash, is_active
+FROM users
+WHERE email = $1 AND is_active = TRUE
+LIMIT 1
+`
+
+type GetUserByEmailGlobalRow struct {
+	ID           string  `db:"id" json:"id"`
+	TenantID     string  `db:"tenant_id" json:"tenant_id"`
+	Name         string  `db:"name" json:"name"`
+	Email        string  `db:"email" json:"email"`
+	PasswordHash string  `db:"password_hash" json:"password_hash"`
+	Role         string  `db:"role" json:"role"`
+	PinHash      *string `db:"pin_hash" json:"pin_hash"`
+	IsActive     bool    `db:"is_active" json:"is_active"`
+}
+
+// sqlc-vet-disable: wajib-tenant-scope
+// Lookup user untuk login TANPA tenant_id. Dikecualikan dari aturan
+// wajib-tenant-scope dengan alasan yang sama seperti RegisterTenantOwner:
+// login adalah operasi SEBELUM tenant diketahui — memaksa pemanggil menyebut
+// tenant_id berarti pemilik warung harus menghafal ULID 26 karakter, dan
+// kehilangan string itu mengunci dia keluar dari datanya sendiri.
+//
+// Aman karena `idx_users_email` UNIQUE global (00001_foundation.sql:45): satu
+// email hanya pernah menunjuk satu user, jadi tenant_id hasilnya deterministik
+// dan tidak bisa ditebak-tebak oleh pemanggil. Setelah baris ini didapat,
+// seluruh kueri berikutnya tetap memfilter tenant_id dari hasil di sini —
+// bukan dari input klien, yang justru lebih ketat daripada sebelumnya.
+func (q *Queries) GetUserByEmailGlobal(ctx context.Context, email string) (GetUserByEmailGlobalRow, error) {
+	row := q.db.QueryRow(ctx, getUserByEmailGlobal, email)
+	var i GetUserByEmailGlobalRow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.PinHash,
+		&i.IsActive,
+	)
+	return i, err
+}
+
 const getUserWithTenant = `-- name: GetUserWithTenant :one
 SELECT
     u.id         AS user_id,

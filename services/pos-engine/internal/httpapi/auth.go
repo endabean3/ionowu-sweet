@@ -263,6 +263,10 @@ func (h *AuthHandler) PostRegister(w http.ResponseWriter, r *http.Request) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type loginRequest struct {
+	// TenantID masih diterima supaya klien lama tidak pecah, tetapi TIDAK
+	// lagi dipakai: tenant diambil dari baris user hasil lookup email.
+	// Mempercayai tenant_id kiriman klien justru lebih longgar — sekarang
+	// tenant pada sesi selalu berasal dari database.
 	TenantID string `json:"tenant_id"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -275,19 +279,19 @@ func (h *AuthHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "Body JSON tidak valid")
 		return
 	}
-	if req.TenantID == "" || req.Email == "" || req.Password == "" {
+	if req.Email == "" || req.Password == "" {
 		RespondError(w, http.StatusBadRequest, "MISSING_REQUIRED_FIELD",
-			"tenant_id, email, dan password wajib diisi")
+			"email dan password wajib diisi")
 		return
 	}
 
 	ctx := r.Context()
 	q := store.New(h.pool)
 
-	u, err := q.GetUserByEmail(ctx, store.GetUserByEmailParams{
-		Email:    req.Email,
-		TenantID: req.TenantID,
-	})
+	// Dicari lintas-tenant: idx_users_email UNIQUE global, jadi satu email
+	// hanya pernah menunjuk satu user. Pemilik warung tidak perlu menghafal
+	// ULID tenant-nya untuk bisa masuk.
+	u, err := q.GetUserByEmailGlobal(ctx, req.Email)
 	if err != nil {
 		// User tidak ditemukan atau tidak aktif — pesan generik (security best practice)
 		RespondError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS",

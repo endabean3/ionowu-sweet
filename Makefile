@@ -15,9 +15,9 @@ RUN   := $(DC) exec -T workspace
 .PHONY: help up down dev reset logs shell tools-check migrate migrate-new \
         sqlc sqlc-vet seed test test-money test-offline lint clean test-e2e test-all
 
-test-e2e: ## Run Playwright E2E tests (requires Next.js and Go server running)
+test-e2e: ## Playwright E2E (butuh API + web menyala — pakai `make web-dev` & api di container)
 	@echo "$(YELLOW)Running Playwright E2E tests...$(NC)"
-	cd apps/web && CI=true npx playwright test
+	$(RUN) bash -c 'cd apps/web && npx playwright install chromium --with-deps=false > /dev/null 2>&1 || npx playwright install chromium; CI=true npx playwright test'
 
 test-all: test test-web test-e2e ## Run all tests (backend, frontend unit, frontend e2e)
 
@@ -89,8 +89,8 @@ test-money: ## Rumus uang — Go & TypeScript (100% paritas via fixture JSON)
 	$(RUN) bash -c 'cd services/pos-engine && go test ./internal/money/... -v'
 	$(RUN) bash -c 'pnpm --filter web test'
 
-test-offline: ## Playwright, skenario offline
-	@echo "  ⚠️  belum ada kode — lihat 60-quality/TESTING-STRATEGY.md §3C"
+test-offline: ## Playwright, skenario offline (checkout offline + pemulihan antrean)
+	$(RUN) bash -c 'cd apps/web && npx playwright install chromium --with-deps=false > /dev/null 2>&1 || npx playwright install chromium; CI=true npx playwright test offline-checkout sync-recovery'
 
 web-dev: ## Jalankan Next.js development server
 	$(RUN) bash -c 'pnpm --filter web dev'

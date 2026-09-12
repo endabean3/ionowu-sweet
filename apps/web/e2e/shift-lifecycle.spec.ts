@@ -1,25 +1,30 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { loginViaUI, provisionTenant, type TenantFixture } from "./helpers";
 
+/**
+ * Kasir tidak bisa berjualan sebelum shift dibuka — modal ini adalah gerbang
+ * pertama yang ditemui setiap pagi, jadi kalau ia macet, toko tidak buka.
+ */
 test.describe("Shift Lifecycle", () => {
-  test("Buka shift, lakukan transaksi, dan tutup shift (TBD)", async ({ page, context }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', "owner@kopi-senja.test");
-    await page.fill('input[type="password"]', "devpass");
-    await page.click('button:has-text("Masuk ke Kasir")');
-    await expect(page).toHaveURL(/\/dashboard|\/kasir/);
+  let fx: TenantFixture;
+
+  test.beforeEach(async () => {
+    fx = await provisionTenant();
+  });
+
+  test("Toko yang belum dibuka menampilkan modal, dan shift bisa dibuka", async ({ page }) => {
+    await loginViaUI(page, fx);
     await page.goto("/kasir");
 
-    // Pastikan shift modal muncul pertama kali
-    const modalTitle = page.locator("text=Toko Belum Dibuka");
-    await expect(modalTitle).toBeVisible();
+    const judulModal = page.getByText("Toko Belum Dibuka");
+    await expect(judulModal).toBeVisible({ timeout: 20000 });
 
-    await page.fill('input[type="number"]', "250000");
+    await page.fill('input[placeholder="100000"]', "250000");
     await page.click('button:has-text("Buka Shift Sekarang")');
 
-    // Modal hilang, masuk ke dashboard/kasir
-    await expect(modalTitle).not.toBeVisible();
-    
-    // Nanti ditambahkan flow untuk tutup shift jika UI header-nya diklik
-    // Tunggu Sprint lanjutan
+    await expect(judulModal).toBeHidden({ timeout: 15000 });
+
+    // Setelah shift terbuka, layar kasir benar-benar bisa dipakai.
+    await expect(page.getByText(fx.productName).first()).toBeVisible({ timeout: 20000 });
   });
 });
