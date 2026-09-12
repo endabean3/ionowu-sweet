@@ -177,28 +177,36 @@ jobs:
       # https://localhost adalah origin WebView APK Capacitor (ADR-0010),
       # bukan alamat server — ikut diuji supaya jalur APK tidak diam-diam
       # rusak oleh perubahan CORS.
-      - name: Nyalakan pos-engine
+      # `setsid nohup` WAJIB: proses latar yang dimulai dengan `&` saja ikut
+      # mati ketika langkah (shell) berakhir, sehingga langkah berikutnya
+      # menemukan port 3000/8080 kosong. Itu yang membuat percobaan pertama
+      # gagal "Failed to connect to localhost port 3000".
+      - name: Nyalakan pos-engine & web
         run: |
           cd services/pos-engine
-          IONOWU_SWEET_DATABASE_URL="$DB"           IONOWU_SWEET_CORS_ORIGINS="http://localhost:3000,https://localhost"           PORT=8080 go run ./cmd/api > /tmp/api.log 2>&1 &
-          for i in $(seq 1 45); do
-            curl -fsS http://localhost:8080/health/ready >/dev/null 2>&1 && exit 0
-            sleep 2
-          done
-          echo "pos-engine tidak pernah siap:"; cat /tmp/api.log; exit 1
+          IONOWU_SWEET_DATABASE_URL="$DB" IONOWU_SWEET_CORS_ORIGINS="http://localhost:3000,https://localhost" PORT=8080 setsid nohup go run ./cmd/api > /tmp/api.log 2>&1 &
+          cd "$GITHUB_WORKSPACE/apps/web"
+          setsid nohup pnpm dev > /tmp/web.log 2>&1 &
+          sleep 2
 
-      - name: Nyalakan web
+      - name: Tunggu keduanya benar-benar menjawab
         run: |
-          cd apps/web
-          pnpm dev > /tmp/web.log 2>&1 &
-          for i in $(seq 1 45); do
-            curl -fsS -o /dev/null http://localhost:3000/login && exit 0
-            sleep 2
+          ok_api=0; ok_web=0
+          for i in $(seq 1 60); do
+            if [ $ok_api -eq 0 ] && curl -fsS http://localhost:8080/health/ready >/dev/null 2>&1; then ok_api=1; fi
+            if [ $ok_web -eq 0 ] && curl -fsS -o /dev/null http://localhost:3000/login 2>/dev/null; then ok_web=1; fi
+            if [ $ok_api -eq 1 ] && [ $ok_web -eq 1 ]; then break; fi
+            sleep 3
           done
-          echo "web tidak pernah siap:"; cat /tmp/web.log; exit 1
+          if [ $ok_api -ne 1 ]; then echo "pos-engine tidak pernah siap:"; cat /tmp/api.log; exit 1; fi
+          if [ $ok_web -ne 1 ]; then echo "web tidak pernah siap:"; cat /tmp/web.log; exit 1; fi
+          echo "api & web siap"
 
+      # Dijalankan DARI apps/web supaya versi playwright sama dengan dependensi
+      # paket itu. `chromium` saja tidak cukup: Playwright modern meluncurkan
+      # chrome-headless-shell untuk mode headless, dan binernya paket terpisah.
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: cd apps/web && npx playwright install --with-deps chromium chromium-headless-shell
 
       - name: Jalankan Playwright
         run: cd apps/web && CI=true npx playwright test
