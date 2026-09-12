@@ -131,13 +131,78 @@ jobs:
   e2e:
     name: Playwright E2E Offline Checkout
     runs-on: ubuntu-latest
+    # Job ini SEBELUMNYA hanya memanggil `npx playwright test` tanpa menyalakan
+    # apa pun — tidak ada Postgres, pos-engine, maupun Next. Ujinya gagal
+    # "TypeError: fetch failed" sejak hari pertama, sehingga gerbang yang
+    # seharusnya menjaga janji utama produk (kasir tetap berjualan saat
+    # offline) nyatanya tidak pernah menguji apa pun.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 3s --health-retries 10
+        ports: ['5432:5432']
+    env:
+      DB: 'postgres://ci:ci@localhost:5432/ci?sslmode=disable'
+      NEXT_PUBLIC_API_URL: 'http://localhost:8080'
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ env.GO_VERSION }}' }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
+
+      - run: go install github.com/pressly/goose/v3/cmd/goose@v3.27.3
+      - name: Migrasi skema
+        run: goose -dir 30-data/migrations postgres "$DB" up
+
+      # Kunci Ed25519 sekali pakai, dibuat DI DALAM job. Sengaja tidak diambil
+      # dari repository secrets: kunci produksi tidak boleh pernah menyentuh
+      # runner CI. Format mengikuti config.go — base64 standar atas 32 byte
+      # publik dan 64 byte privat (seed||public).
+      - name: Kunci JWT sekali pakai
+        run: |
+          openssl genpkey -algorithm ed25519 -outform DER -out /tmp/k.der
+          pub=$(openssl pkey -inform DER -in /tmp/k.der -pubout -outform DER | tail -c 32 | base64 -w0)
+          priv=$( { tail -c 32 /tmp/k.der; openssl pkey -inform DER -in /tmp/k.der -pubout -outform DER | tail -c 32; } | base64 -w0 )
+          echo "IONOWU_SWEET_JWT_PUBLIC_KEY=$pub" >> "$GITHUB_ENV"
+          echo "IONOWU_SWEET_JWT_PRIVATE_KEY=$priv" >> "$GITHUB_ENV"
+
+      # https://localhost adalah origin WebView APK Capacitor (ADR-0010),
+      # bukan alamat server — ikut diuji supaya jalur APK tidak diam-diam
+      # rusak oleh perubahan CORS.
+      - name: Nyalakan pos-engine
+        run: |
+          cd services/pos-engine
+          IONOWU_SWEET_DATABASE_URL="$DB"           IONOWU_SWEET_CORS_ORIGINS="http://localhost:3000,https://localhost"           PORT=8080 go run ./cmd/api > /tmp/api.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl -fsS http://localhost:8080/health/ready >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "pos-engine tidak pernah siap:"; cat /tmp/api.log; exit 1
+
+      - name: Nyalakan web
+        run: |
+          cd apps/web
+          pnpm dev > /tmp/web.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl -fsS -o /dev/null http://localhost:3000/login && exit 0
+            sleep 2
+          done
+          echo "web tidak pernah siap:"; cat /tmp/web.log; exit 1
+
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
+
       - name: Jalankan Playwright
         run: cd apps/web && CI=true npx playwright test
+
+      - name: Log server bila gagal
+        if: failure()
+        run: tail -60 /tmp/api.log /tmp/web.log || true
