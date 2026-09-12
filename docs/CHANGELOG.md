@@ -4,6 +4,35 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.6.0] — 2026-09-12
+
+### Ditambahkan
+* **ADR-0010** — Capacitor membungkus PWA yang sama menjadi APK, menolak usulan
+  menulis ulang dengan React Native. Pengukuran pada kode nyata: RN membuang
+  ±92% frontend (2.860 baris komponen + Dexie/Serwist/sync engine), sementara
+  Capacitor memenuhi kedua kebutuhan client (Play Store + printer termal
+  Bluetooth) tanpa membuang satu baris pun.
+* **Target `make apk`** — satu perintah dari sumber sampai APK. `API_URL` wajib
+  diisi karena nilainya ter-*bake* saat build.
+
+### Diubah
+* **`next.config.ts`** — keluaran kini dipilih lewat `BUILD_TARGET`:
+  `export` untuk Capacitor, `standalone` untuk image Docker. Keduanya tidak
+  bisa aktif bersamaan.
+
+### Diperbaiki
+* **`next.config.ts` mem-*bake* `localhost:8080` ke SETIAP build.** Baris
+  `process.env.NEXT_PUBLIC_API_URL = "http://localhost:8080"` di dalam config
+  dieksekusi sebelum Next menyisipkan variabel `NEXT_PUBLIC_*`, sehingga
+  menimpa environment yang benar-benar diberikan. Dibuktikan dengan membangun
+  memakai URL lain lalu mencari string-nya: URL asli muncul **nol** kali,
+  localhost **12** kali. Dampaknya bukan hanya APK (ponsel menghubungi dirinya
+  sendiri) tetapi juga deployment VPS — browser pengguna akan menghubungi
+  dirinya sendiri. Tidak terlihat saat pengembangan karena di lokal localhost
+  memang kebetulan benar.
+
+---
+
 ## [1.5.0] — 2026-09-11
 
 ### Ditambahkan

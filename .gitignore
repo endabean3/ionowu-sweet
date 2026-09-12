@@ -125,3 +125,13 @@ desktop.ini
 # Log & sementara
 *.log
 tmp/
+
+# ── Android (Capacitor, ADR-0010) ───────────────────────────────────
+# Proyek `android/` HASIL GENERATE dan ikut dilacak, tetapi artefak build
+# serta jalur SDK khas mesin tidak.
+apps/web/android/app/build/
+apps/web/android/build/
+apps/web/android/.gradle/
+apps/web/android/local.properties
+apps/web/android/app/src/main/assets/public/
+apps/web/android/app/src/main/assets/capacitor.config.json

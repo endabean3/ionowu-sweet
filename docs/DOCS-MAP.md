@@ -73,6 +73,7 @@ RBAC), itu tanda dokumen harus dipecah.
 | Analitik & BI | `10-architecture/ANALYTICS-BI.md` | 🟡 Draft baru | Jalur OLAP agar BI tak ganggu kasir |
 | ADR-0006 CRM & BI | `10-architecture/adr/` | ✅ **Diterima** | Python aktif; CRM keluar Non-Goals |
 | ADR-0007 Kelas Principal | `10-architecture/adr/` | ✅ **Diterima** | 7 peran dalam 3 kelas |
+| ADR-0010 Capacitor, bukan React Native | `10-architecture/adr/` | ✅ **Diterima** | Play Store + printer Bluetooth tanpa menulis ulang frontend |
 | **Model RBAC** | `40-security/RBAC-MODEL.md` | 🟡 Draft · 🔴 **P0** | 18 peran, 3 kelas, model izin |
 | **Pipeline Keamanan** | `40-security/SECURITY-PIPELINE.md` | ✅ Terpasang | 10 kontrol otomatis di CI |
 | **Peta Modul ERP** | `00-product/ERP-MODULE-MAP.md` | 🟡 Draft baru | Urutan modul + peringatan ruang lingkup |

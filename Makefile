@@ -13,7 +13,7 @@ RUN   := $(DC) exec -T workspace
 
 .DEFAULT_GOAL := help
 .PHONY: help up down dev reset logs shell tools-check migrate migrate-new \
-        sqlc sqlc-vet seed test test-money test-offline lint clean test-e2e test-all
+        sqlc sqlc-vet seed test test-money test-offline lint clean test-e2e test-all apk
 
 test-e2e: ## Playwright E2E (butuh API + web menyala — pakai `make web-dev` & api di container)
 	@echo "$(YELLOW)Running Playwright E2E tests...$(NC)"
@@ -91,6 +91,26 @@ test-money: ## Rumus uang — Go & TypeScript (100% paritas via fixture JSON)
 
 test-offline: ## Playwright, skenario offline (checkout offline + pemulihan antrean)
 	$(RUN) bash -c 'cd apps/web && npx playwright install chromium --with-deps=false > /dev/null 2>&1 || npx playwright install chromium; CI=true npx playwright test offline-checkout sync-recovery'
+
+# ── APK (Capacitor, ADR-0010) ───────────────────────────────────────
+# Build APK TIDAK bisa sepenuhnya di dalam dev container: Android SDK berisi
+# biner Linux/macOS yang berbeda, dan SDK-nya hidup di host. Sementara itu
+# node_modules hidup sebagai named volume — hanya ada DI DALAM container.
+# Karena itu langkahnya terbelah, dan pustaka Android Capacitor (688 KB)
+# disalin keluar dengan `docker cp` supaya Gradle di host bisa membacanya.
+#
+# API_URL WAJIB diisi: nilainya ter-bake ke dalam bundle saat build, dan
+# "localhost" di dalam APK berarti ponsel menghubungi dirinya sendiri.
+CAP_PKG := .pnpm/@capacitor+android@8.5.1_@capacitor+core@8.5.1/node_modules/@capacitor/android
+
+apk: ## Build APK debug — make apk API_URL=https://api.contoh.id
+	@test -n "$(API_URL)" || (echo "  ✗ API_URL wajib diisi. Contoh: make apk API_URL=https://api.contoh.id"; exit 1)
+	$(RUN) bash -c 'cd apps/web && BUILD_TARGET=capacitor NEXT_PUBLIC_API_URL=$(API_URL) pnpm build && npx cap sync android'
+	@mkdir -p node_modules/$(CAP_PKG)
+	@docker cp "$$($(DC) ps -q workspace)":/workspace/node_modules/$(CAP_PKG)/. node_modules/$(CAP_PKG)/
+	cd apps/web/android && ./gradlew assembleDebug
+	@echo "  ✓ apps/web/android/app/build/outputs/apk/debug/app-debug.apk"
+
 
 web-dev: ## Jalankan Next.js development server
 	$(RUN) bash -c 'pnpm --filter web dev'
