@@ -160,7 +160,7 @@ yang tertinggal di sini hanyalah penanda basi.
 | Jendela rilis | ✅ Ditetapkan | [DEPLOYMENT](./DEPLOYMENT.md) §3 — bukan 11–13, 17–20 WIB, bukan Jumat sore |
 | Perilaku kasir offline saat deploy | ✅ Ditetapkan | [DEPLOYMENT](./DEPLOYMENT.md) §6 — tidak pernah memaksa reload saat transaksi berjalan |
 | Prosedur rollback | 🟡 Tertulis, **belum diuji** | [DEPLOYMENT](./DEPLOYMENT.md) §5 — rollback otomatis Dokploy saat probe gagal harus dibuktikan di staging |
-| Deploy otomatis dari `main` atau manual | ❌ **Masih terbuka** | Usulan: **manual** sampai rollback terbukti — daftar periksa [DEPLOYMENT](./DEPLOYMENT.md) §7 mensyaratkan orang berjaga, yang tidak cocok dengan auto-deploy |
+| Deploy otomatis dari `main` atau manual | ✅ Ditetapkan 2026-09-14 | **Manual.** Merge ke `main` hanya membangun image ke `ghcr.io` (`build.yml` tidak punya langkah deploy); rollout dipicu orang dari panel Dokploy. Daftar periksa [DEPLOYMENT](./DEPLOYMENT.md) §7 mensyaratkan orang berjaga, yang tidak cocok dengan auto-deploy. **Toggle Auto Deploy di panel Dokploy wajib mati** — itu satu-satunya jalur yang bisa melanggar keputusan ini tanpa terlihat di repo. Ditinjau ulang setelah rollback terbukti di staging |
 
 ---
 
