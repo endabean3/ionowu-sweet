@@ -51,7 +51,7 @@ Aturan ini akan makin ketat seiring bertambahnya tenant lintas zona waktu
 1. CI hijau: uji lulus, budget performa terpenuhi
 2. Backup database + verifikasi
 3. Migrasi (expand) — terpisah dari deploy kode
-4. Deploy kode via Dokploy
+4. Deploy kode via Dokploy — MANUAL, dipicu orang (DOKPLOY.md §6)
 5. Health check lulus → Traefik alihkan trafik
 6. Pantau 30 menit
 7. Rilis berikutnya: contract
