@@ -4,6 +4,20 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.6.4] — 2026-09-14
+
+### Ditambahkan
+* **`apk-debug.yml`** — APK debug menunjuk API produksi, dibangun di GitHub Actions dan dijalankan
+  **manual** dari `main`. `make apk` tidak bisa dipakai untuk rilis: Gradle berjalan di host yang
+  sengaja tidak punya JDK aktif, dan build di laptop ikut membawa branch yang sedang aktif —
+  saat itu working tree berada di branch PR #16 yang belum di-review. Tiga gerbang: hanya
+  `refs/heads/main`, URL API sama dengan build.yml, dan URL diverifikasi **di dalam APK yang
+  jadi** (domain produksi harus ada; `ionowu.example`/`localhost:8080` harus nol). Artefak
+  diberi nama per commit + SHA-256, disimpan 14 hari. `CI-PIPELINE.md` §3b; `GO-LIVE.md` §2.G.
+  Belum mencakup build release/Play Store — butuh keystore milik pemilik.
+
+---
+
 ## [1.6.3] — 2026-09-14
 
 ### Diperbaiki

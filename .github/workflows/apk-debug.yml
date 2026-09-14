@@ -1,0 +1,108 @@
+# Bangun APK debug yang menunjuk API produksi, untuk di-sideload ke HP kasir.
+# Dijalankan MANUAL (Actions → APK Debug → Run workflow), hanya dari `main`.
+#
+# Kenapa di CI, bukan `make apk` di Mac: build APK butuh JDK 21 + Android SDK,
+# dan host sengaja dibersihkan dari toolchain (CLAUDE.md §4). Runner GitHub
+# sudah membawa keduanya. Build dari commit `main` juga menjamin APK tidak
+# ikut membawa branch yang kebetulan sedang aktif di laptop.
+#
+# Ini APK DEBUG: tidak bisa diunggah ke Play Store. Build release butuh
+# keystore milik pemilik — sengaja belum ada di sini.
+# Rujukan: ADR-0010 · 15-development/CI-PIPELINE.md §3b
+
+name: APK Debug
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  apk:
+    name: APK debug → API produksi
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # workflow_dispatch boleh diarahkan ke branch mana pun dari UI. APK yang
+      # dipasang di toko tidak boleh berisi kode yang belum lolos review.
+      - name: Gerbang branch main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "❌ APK produksi hanya dari main, bukan $GITHUB_REF"; exit 1
+          fi
+
+      # Gerbang yang sama dengan image web di build.yml: URL API DIBAKAR ke
+      # bundle saat build. APK berisi domain contoh atau localhost terpasang
+      # normal, lalu gagal total saat kasir login.
+      - name: Gerbang URL API
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: |
+          case "$PUBLIC_API_URL" in
+            "")          echo "❌ repository variable PUBLIC_API_URL kosong"; exit 1 ;;
+            *example*)   echo "❌ PUBLIC_API_URL masih domain contoh: $PUBLIC_API_URL"; exit 1 ;;
+            *localhost*) echo "❌ PUBLIC_API_URL menunjuk localhost: $PUBLIC_API_URL"; exit 1 ;;
+            https://*)   echo "✓ APK dibangun dengan API $PUBLIC_API_URL" ;;
+            *)           echo "❌ PUBLIC_API_URL wajib https://: $PUBLIC_API_URL"; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+
+      # capacitor.build.gradle mengunci sourceCompatibility JavaVersion.VERSION_21.
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: '21', cache: gradle }
+
+      - name: Build web statis + cap sync
+        env:
+          BUILD_TARGET: capacitor
+          NEXT_PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: cd apps/web && pnpm build && npx cap sync android
+
+      - name: Gradle assembleDebug
+        run: cd apps/web/android && ./gradlew assembleDebug --no-daemon
+
+      # Diperiksa pada APK yang benar-benar jadi, bukan pada folder `out/`:
+      # yang dipasang di HP adalah isi APK. Pelajaran dari next.config.ts dan
+      # image web — keduanya lolos build sambil membawa URL yang salah.
+      - name: Verifikasi URL di dalam APK
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: |
+          apk=apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+          rm -rf /tmp/apk && mkdir /tmp/apk && unzip -q "$apk" -d /tmp/apk
+          host="${PUBLIC_API_URL#https://}"
+          benar=$(grep -rlF "$host" /tmp/apk/assets | wc -l)
+          contoh=$(grep -rlF "ionowu.example" /tmp/apk/assets | wc -l)
+          lokal=$(grep -rlF "localhost:8080" /tmp/apk/assets | wc -l)
+          echo "$host: $benar berkas · ionowu.example: $contoh · localhost:8080: $lokal"
+          [ "$benar" -gt 0 ] || { echo "❌ URL API tidak ada di dalam APK"; exit 1; }
+          [ "$contoh" -eq 0 ] && [ "$lokal" -eq 0 ] || { echo "❌ APK masih memuat URL contoh/localhost"; exit 1; }
+
+      - name: Beri nama + checksum
+        id: nama
+        run: |
+          nama="ionowu-sweet-debug-${GITHUB_SHA::7}.apk"
+          mkdir -p dist && cp apps/web/android/app/build/outputs/apk/debug/app-debug.apk "dist/$nama"
+          (cd dist && sha256sum "$nama" > "$nama.sha256")
+          echo "nama=$nama" >> "$GITHUB_OUTPUT"
+          {
+            echo "### APK debug siap"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- API: \`${{ vars.PUBLIC_API_URL }}\`"
+            echo "- SHA-256: \`$(cut -d' ' -f1 "dist/$nama.sha256")\`"
+            echo "- Ukuran: $(du -h "dist/$nama" | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.nama.outputs.nama }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

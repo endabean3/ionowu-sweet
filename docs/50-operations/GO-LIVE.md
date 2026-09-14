@@ -81,8 +81,10 @@ jalur rilis benar-benar dicoba. Masing-masing cukup untuk menggagalkan hari-H.
       bukan alamat server. Tanpanya APK terpasang normal lalu gagal login tanpa
       sebab terlihat. Uji dengan preflight dari origin itu: harus membalas
       `Access-Control-Allow-Origin: https://localhost`.
-- [ ] **APK dibangun ulang menunjuk API produksi:** `make apk API_URL=https://api-produksi`
+- [ ] **APK dibangun ulang menunjuk API produksi** lewat workflow `apk-debug.yml` dari `main`
+      ([CI-PIPELINE](../15-development/CI-PIPELINE.md) §3b), bukan `make apk` di laptop
       — APK yang dibangun untuk demo LAN berisi IP laptop dan tidak akan berfungsi di toko.
+      Cocokkan SHA-256 berkas yang dipasang dengan ringkasan run.
 - [ ] Gerbang **Kerentanan dependensi** hijau — nol *high/critical* (`pnpm audit --audit-level high`)
 
 ---

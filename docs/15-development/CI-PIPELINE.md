@@ -161,6 +161,31 @@ jobs:
 
 ---
 
+## 3b. `apk-debug.yml` — APK Debug, Manual
+
+Dijalankan dari **Actions → APK Debug → Run workflow**, atau:
+
+```bash
+gh workflow run apk-debug.yml --ref main
+```
+
+| Gerbang | Menolak bila |
+|---|---|
+| Branch | `GITHUB_REF` bukan `refs/heads/main` |
+| URL API | `vars.PUBLIC_API_URL` kosong, berisi `example`/`localhost`, atau bukan `https://` |
+| Isi APK | domain produksi tidak ada di `assets/`, atau `ionowu.example`/`localhost:8080` masih ada |
+
+Hasilnya artefak `ionowu-sweet-debug-<sha7>.apk` + `.sha256`, disimpan 14 hari.
+
+**Kenapa bukan `make apk`:** Gradle butuh JDK 21 + Android SDK di host, yang sengaja tidak
+disiapkan (CLAUDE.md §4), dan build lokal membawa branch apa pun yang sedang aktif. `make apk`
+tetap berguna untuk uji cepat di HP pengembang.
+
+**Bukan untuk Play Store.** APK debug ditandatangani kunci debug. Build release butuh keystore
+milik pemilik di GitHub Secrets — belum ada.
+
+---
+
 ## 4. `docker-compose.prod.yml` — Dipakai Dokploy
 
 Tanpa `build:`, tanpa `ports:`, tanpa rahasia literal.
