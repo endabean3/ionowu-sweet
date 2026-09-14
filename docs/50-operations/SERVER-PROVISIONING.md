@@ -143,8 +143,8 @@ ss -tulpn | grep -v '127.0.0.1'
 
 | Record | Nilai |
 |---|---|
-| `api.ionowu.com` | A → IP VPS |
-| `app.ionowu.com` | A → IP VPS |
+| `api.sweet.ionowu.com` | A → 76.13.16.85 |
+| `sweet.ionowu.com` | A → 76.13.16.85 |
 | `staging.ionowu.com` | A → IP VPS |
 
 **Jangan** buat record untuk UI Dokploy.
@@ -202,7 +202,7 @@ Jangan lanjut ke staging sebelum seluruhnya ✅:
 - [ ] `ufw status` aktif; `fail2ban` berjalan
 - [ ] Docker & Dokploy berjalan
 - [ ] DNS teresolusi
-- [ ] Sertifikat TLS terbit (uji `https://api.ionowu.com`)
+- [ ] Sertifikat TLS terbit (uji `https://api.sweet.ionowu.com` dan `https://sweet.ionowu.com`)
 - [ ] `docker login ghcr.io` berhasil
 - [ ] Seluruh rahasia ada di Dokploy **dan** tersalin di luar VPS
 - [ ] Backup manual pertama terverifikasi ada di R2

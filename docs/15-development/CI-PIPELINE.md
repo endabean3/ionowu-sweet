@@ -185,7 +185,7 @@ services:
     image: ghcr.io/OWNER/REPO/web:${IMAGE_TAG}
     environment:
       - POS_API_INTERNAL_URL=http://pos-engine:8080
-      - NEXT_PUBLIC_POS_API_URL=https://api.ionowu.com
+      - NEXT_PUBLIC_POS_API_URL=https://api.sweet.ionowu.com
       - DATABASE_URL=${DATABASE_URL_READONLY}
     depends_on: [pos-engine]
     restart: unless-stopped

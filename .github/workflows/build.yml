@@ -49,6 +49,27 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # NEXT_PUBLIC_API_URL DIBAKAR ke bundle klien saat build; mengisi
+      # PUBLIC_API_URL di panel Dokploy tidak mengubah image yang sudah jadi.
+      # Sebelum gerbang ini, build.yml tidak pernah meneruskan nilainya sama
+      # sekali, sehingga image web di ghcr.io (hingga 08210e5) memuat default
+      # Dockerfile `https://api.ionowu.example` — domain yang tidak ada. Image
+      # itu lolos semua cek karena menyala normal; ia baru gagal saat kasir
+      # memanggil API. Gerbang ini memastikan kegagalan terjadi di CI, bukan
+      # di toko.
+      - name: Gerbang URL API web
+        if: steps.cek.outputs.ada == 'true' && matrix.name == 'web'
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: |
+          case "$PUBLIC_API_URL" in
+            "")          echo "❌ repository variable PUBLIC_API_URL kosong"; exit 1 ;;
+            *example*)   echo "❌ PUBLIC_API_URL masih domain contoh: $PUBLIC_API_URL"; exit 1 ;;
+            *localhost*) echo "❌ PUBLIC_API_URL menunjuk localhost: $PUBLIC_API_URL"; exit 1 ;;
+            https://*)   echo "✓ web dibangun dengan API $PUBLIC_API_URL" ;;
+            *)           echo "❌ PUBLIC_API_URL wajib https://: $PUBLIC_API_URL"; exit 1 ;;
+          esac
+
       - uses: docker/build-push-action@v7
         id: build
         if: steps.cek.outputs.ada == 'true'
@@ -77,6 +98,7 @@ jobs:
             VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
             CREATED=${{ github.event.repository.updated_at }}
+            NEXT_PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}
           # IMG-12 — SBOM + provenance. Penandatanganan cosign belum aktif
           # (butuh keputusan identitas OIDC penandatangan) — lihat ADR-0008.
           sbom: true

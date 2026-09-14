@@ -61,7 +61,7 @@ services:
       # scheme https), BUKAN alamat server. Tanpa origin ini, seluruh
       # panggilan API dari APK ditolak CORS dengan gejala yang sama persis
       # ("Failed to fetch"), padahal aplikasinya terlihat terpasang normal.
-      IONOWU_SWEET_CORS_ORIGINS: ${PUBLIC_APP_URL:?wajib, contoh https://app.ionowu.com},https://localhost
+      IONOWU_SWEET_CORS_ORIGINS: ${PUBLIC_APP_URL:?wajib, contoh https://sweet.ionowu.com},https://localhost
       PORT: "8080"
     # RUN-07/RUN-08 — TIDAK ada HEALTHCHECK Docker di sini (ADR-0008 §2):
     # image distroless tidak punya shell. Dikonfigurasi di panel Dokploy
