@@ -4,6 +4,26 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.6.1] — 2026-09-14
+
+### Diperbaiki
+* **`DOKPLOY.md` §6 basi.** Berisi lima pertanyaan "masih harus ditetapkan" dan
+  diagram yang menggambar build **di VPS** — padahal §7 berkas yang sama sudah
+  menutupnya lewat ADR-0004. Empat dari lima pertanyaan ternyata sudah dijawab di
+  `DEPLOYMENT.md` dan `MIGRATIONS.md`, termasuk yang ditandai P0 (urutan migrasi
+  terhadap deploy). Kini diganti tabel status yang menunjuk jawabannya; satu yang
+  benar-benar masih terbuka (deploy otomatis vs manual) ditandai jujur, dan rollback
+  ditandai "tertulis, belum diuji".
+
+### Ditambahkan
+* **`GO-LIVE.md` §2.G — gerbang build & klien.** Tiga cacat yang pernah lolos semua
+  pemeriksaan lain: URL API ter-*bake* `localhost`, CORS tanpa origin APK, dan APK
+  demo yang menunjuk IP laptop. Masing-masing disertai cara memeriksanya pada
+  artefak nyata, bukan pada konfigurasi. Urutan hari-H kini mewajibkan login dari
+  **APK sungguhan**, karena CORS untuk origin APK tidak teruji oleh browser mana pun.
+
+---
+
 ## [1.6.0] — 2026-09-12
 
 ### Ditambahkan

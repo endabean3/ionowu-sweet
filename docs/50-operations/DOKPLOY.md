@@ -131,29 +131,36 @@ sebagian kebutuhan `BACKUP-DR.md`, tetapi **tidak seluruhnya**:
 ## 6. Alur Deploy
 
 ```
-git push (branch main)
+merge ke main
         │
         ▼
-Dokploy menerima webhook / polling
+GitHub Actions build → ghcr.io        (ADR-0004 — BUKAN di VPS)
         │
         ▼
-Build image  ──────────────► ⚠️ berjalan DI VPS produksi
-        │                      Build Next.js dapat menghabiskan RAM
-        │                      selagi kasir sedang bertransaksi
+Backup DB → migrasi (expand) → verifikasi skema
+        │
         ▼
-Health check
+Dokploy tarik image @digest
+        │
+        ▼
+Probe /health/ready
         │
         ├─ lulus ──► Traefik mengalihkan trafik ke kontainer baru
-        └─ gagal ──► ⚠️ perilaku rollback perlu diverifikasi & didokumentasikan
+        └─ gagal ──► kontainer lama dipertahankan (⚠️ belum diuji, lihat bawah)
 ```
 
-**Yang masih harus ditetapkan** (masuk ke `DEPLOYMENT.md`):
+Bagian ini sebelumnya berisi lima pertanyaan terbuka dan diagram yang masih
+menggambar build **di VPS** — padahal §7 berkas yang sama sudah menutupnya lewat
+ADR-0004. Empat dari lima pertanyaan itu ternyata sudah dijawab di dokumen lain;
+yang tertinggal di sini hanyalah penanda basi.
 
-- [ ] Apakah deploy otomatis dari `main`, atau manual dengan persetujuan?
-- [ ] Jendela rilis — **jangan deploy saat jam sibuk toko** (11.00–13.00 & 17.00–20.00 WIB)
-- [ ] Prosedur rollback yang sudah diuji, bukan diasumsikan
-- [ ] Bagaimana migrasi DB dijalankan relatif terhadap deploy (lihat `30-data/MIGRATIONS.md`, **P0**)
-- [ ] Perilaku kasir offline saat deploy berlangsung — idealnya tidak terasa sama sekali
+| Pertanyaan | Status | Jawaban |
+|---|---|---|
+| Migrasi relatif terhadap deploy (**P0**) | ✅ Ditetapkan | [MIGRATIONS](../30-data/MIGRATIONS.md) §7 · [DEPLOYMENT](./DEPLOYMENT.md) §4 — migrasi *expand* **terpisah dan lebih dulu**; gagal = berhenti, kode lama tetap jalan |
+| Jendela rilis | ✅ Ditetapkan | [DEPLOYMENT](./DEPLOYMENT.md) §3 — bukan 11–13, 17–20 WIB, bukan Jumat sore |
+| Perilaku kasir offline saat deploy | ✅ Ditetapkan | [DEPLOYMENT](./DEPLOYMENT.md) §6 — tidak pernah memaksa reload saat transaksi berjalan |
+| Prosedur rollback | 🟡 Tertulis, **belum diuji** | [DEPLOYMENT](./DEPLOYMENT.md) §5 — rollback otomatis Dokploy saat probe gagal harus dibuktikan di staging |
+| Deploy otomatis dari `main` atau manual | ❌ **Masih terbuka** | Usulan: **manual** sampai rollback terbukti — daftar periksa [DEPLOYMENT](./DEPLOYMENT.md) §7 mensyaratkan orang berjaga, yang tidak cocok dengan auto-deploy |
 
 ---
 

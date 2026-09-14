@@ -66,6 +66,25 @@ pertama kali di produksi — dengan uang pelanggan sungguhan di dalamnya.
 > Poin terakhir bukan tanda pesimisme, melainkan syarat agar toko percontohan bersedia
 > mencoba. Menghilangkan risiko bagi mereka adalah bagian dari kesepakatan.
 
+### G. Build & Klien (ditambahkan 2026-09-14)
+
+Tiga cacat berikut pernah lolos semua pemeriksaan lain dan baru ketahuan saat
+jalur rilis benar-benar dicoba. Masing-masing cukup untuk menggagalkan hari-H.
+
+- [ ] **URL API yang ter-*bake* adalah URL produksi, bukan `localhost`.**
+      `NEXT_PUBLIC_API_URL` disisipkan saat build; `next.config.ts` pernah
+      menimpanya menjadi `localhost:8080` di setiap build. Periksa bundle nyata:
+      `grep -rho "https://api\.[^\"]*\|localhost:8080" apps/web/.next/static | sort | uniq -c`
+      — hasil yang benar hanya berisi domain API produksi.
+- [ ] **`IONOWU_SWEET_CORS_ORIGINS` memuat origin web DAN `https://localhost`.**
+      Yang kedua adalah origin WebView APK Capacitor ([ADR-0010](../10-architecture/adr/0010-capacitor-untuk-play-store-dan-printer-bluetooth.md)),
+      bukan alamat server. Tanpanya APK terpasang normal lalu gagal login tanpa
+      sebab terlihat. Uji dengan preflight dari origin itu: harus membalas
+      `Access-Control-Allow-Origin: https://localhost`.
+- [ ] **APK dibangun ulang menunjuk API produksi:** `make apk API_URL=https://api-produksi`
+      — APK yang dibangun untuk demo LAN berisi IP laptop dan tidak akan berfungsi di toko.
+- [ ] Gerbang **Kerentanan dependensi** hijau — nol *high/critical* (`pnpm audit --audit-level high`)
+
 ---
 
 ## 3. Urutan Hari Go-Live
@@ -82,8 +101,10 @@ Hari-H, 05.00 WIB  (sebelum toko buka)
   2. Jalankan migrasi awal        → verifikasi skema
   3. Dokploy tarik image :<sha>   → verifikasi health check
   4. Uji asap (§4)
-  5. Buat akun tenant percontohan
-  6. Verifikasi PWA terpasang di perangkat kasir
+  5. Buat akun tenant percontohan   (login cukup email + password)
+  6. Verifikasi PWA/APK terpasang di perangkat kasir
+     → login dari APK sungguhan, bukan hanya dari browser: CORS
+       untuk origin APK tidak teruji oleh browser mana pun
 
 08.00  Toko buka · dampingi langsung
        Pantau: latensi checkout, antrean sync, error
