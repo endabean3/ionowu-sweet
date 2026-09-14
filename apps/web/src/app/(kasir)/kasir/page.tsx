@@ -3,12 +3,20 @@
 import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
+import { PrinterPicker } from "@/components/pos/printer-picker";
 import { Receipt, type ReceiptData } from "@/components/pos/receipt";
 import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { calculateCart } from "@/lib/money/calc";
+import {
+  type SavedPrinter,
+  isBluetoothPrintingAvailable,
+  loadSavedPrinter,
+  printReceiptBluetooth,
+  printerErrorMessage,
+} from "@/lib/printer/bluetooth";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Barcode, Layers, Search, Wallet } from "lucide-react";
@@ -31,6 +39,7 @@ export default function KasirPage() {
   // kasir boleh langsung melayani pembeli berikutnya sambil struk sebelumnya
   // masih bisa dicetak — "kasir tidak boleh menunggu" (CLAUDE.md §5).
   const [lastReceipt, setLastReceipt] = useState<ReceiptData | null>(null);
+  const [printerPickerOpen, setPrinterPickerOpen] = useState(false);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const processingPaymentRef = useRef(false);
@@ -201,6 +210,32 @@ export default function KasirPage() {
     });
   };
 
+  // Satu pintu untuk "Cetak Struk". Di APK: ESC/POS ke printer Bluetooth
+  // (WebView Android mengabaikan window.print). Di browser/PWA: dialog cetak
+  // sistem lewat <Receipt>. Kegagalan cetak tidak pernah menyentuh transaksi —
+  // penjualannya sudah tersimpan sebelum tombol ini bisa ditekan.
+  const cetakStruk = async (
+    data: ReceiptData,
+    printer: SavedPrinter | null = loadSavedPrinter(),
+  ) => {
+    if (!isBluetoothPrintingAvailable()) {
+      window.print();
+      return;
+    }
+    if (!printer) {
+      setPrinterPickerOpen(true);
+      return;
+    }
+    try {
+      await printReceiptBluetooth(printer, data);
+    } catch (err) {
+      toast.error(`Struk gagal dicetak ke ${printer.name}`, {
+        description: printerErrorMessage(err),
+        action: { label: "Ganti printer", onClick: () => setPrinterPickerOpen(true) },
+      });
+    }
+  };
+
   const processPayment = async (
     method: string,
     appliedAmount: number,
@@ -287,7 +322,7 @@ export default function KasirPage() {
         // Cetak ditawarkan, tidak dipaksakan: pembeli warung sering tidak
         // meminta struk, dan modal wajib-tutup di tiap transaksi menambah satu
         // ketukan pada jalur tersibuk kasir.
-        action: { label: "Cetak Struk", onClick: () => window.print() },
+        action: { label: "Cetak Struk", onClick: () => void cetakStruk(struk) },
       });
 
       setCartItems([]);
@@ -435,6 +470,16 @@ export default function KasirPage() {
 
       {/* Tak terlihat di layar; hanya muncul di hasil cetak. */}
       {lastReceipt && <Receipt data={lastReceipt} />}
+
+      {printerPickerOpen && (
+        <PrinterPicker
+          onClose={() => setPrinterPickerOpen(false)}
+          onSelected={(printer) => {
+            setPrinterPickerOpen(false);
+            if (lastReceipt) void cetakStruk(lastReceipt, printer);
+          }}
+        />
+      )}
     </div>
   );
 }
