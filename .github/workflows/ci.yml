@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version: '${{ env.GO_VERSION }}' }
       - run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
       # Gerbang terpenting: menolak kueri tanpa tenant_id, SELECT *,
@@ -51,7 +51,7 @@ jobs:
         ports: ['5432:5432']
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version: '${{ env.GO_VERSION }}' }
       - run: go install github.com/pressly/goose/v3/cmd/goose@v3.27.3
       - name: goose up
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version: '${{ env.GO_VERSION }}' }
       - name: golangci-lint
         run: |
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version: '${{ env.GO_VERSION }}' }
       - run: |
           [ -f go.mod ] || { echo "⏭️  kode Go belum ada"; exit 0; }
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version: '${{ env.GO_VERSION }}' }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -151,7 +151,7 @@ jobs:
       NEXT_PUBLIC_API_URL: 'http://localhost:8080'
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version: '${{ env.GO_VERSION }}' }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
