@@ -101,6 +101,9 @@ test-offline: ## Playwright, skenario offline (checkout offline + pemulihan antr
 #
 # API_URL WAJIB diisi: nilainya ter-bake ke dalam bundle saat build, dan
 # "localhost" di dalam APK berarti ponsel menghubungi dirinya sendiri.
+#
+# Target ini untuk uji cepat di HP pengembang. APK untuk toko dibangun oleh
+# workflow apk-debug.yml dari main (CI-PIPELINE.md §3b).
 CAP_PKG := .pnpm/@capacitor+android@8.5.1_@capacitor+core@8.5.1/node_modules/@capacitor/android
 
 apk: ## Build APK debug — make apk API_URL=https://api.contoh.id
