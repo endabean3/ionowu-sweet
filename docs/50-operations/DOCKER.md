@@ -138,12 +138,19 @@ Jalur resmi tetap CI. Bila image terpaksa dibangun di Mac (uji lokal, darurat), 
 sebutkan platform server:
 
 ```bash
-docker buildx build --platform linux/amd64 -f apps/web/Dockerfile -t web:uji .
+docker buildx build --platform linux/amd64 \
+  --build-arg NEXT_PUBLIC_API_URL=https://api-produksi.contoh \
+  -f apps/web/Dockerfile -t web:uji .
 ```
 
 Tanpa `--platform`, Docker di Mac menghasilkan image **arm64**. Image itu berjalan normal di
 Mac — sehingga uji lokal lolos — lalu gagal di server dengan `exec format error`. Image
 arm64 hasil uji lokal **tidak boleh** di-push ke `ghcr.io`.
+
+`NEXT_PUBLIC_API_URL` **wajib** dan tidak punya nilai default: nilainya dibakar ke bundle klien
+saat build, sehingga image yang dibangun tanpanya menyala normal tetapi memanggil domain yang
+salah. Di CI nilainya berasal dari repository variable `PUBLIC_API_URL`, dan build web ditolak
+bila kosong, masih berisi `example`, menunjuk `localhost`, atau bukan `https://`.
 
 ---
 
@@ -191,7 +198,7 @@ services:
       - "3000:3000"
     environment:
       - POS_API_INTERNAL_URL=http://pos-engine:8080
-      - NEXT_PUBLIC_POS_API_URL=https://api.ionowu.com
+      - NEXT_PUBLIC_POS_API_URL=https://api.sweet.ionowu.com
       - WHATSAPP_API_TOKEN=your_wa_gateway_token
     depends_on:
       - pos-engine

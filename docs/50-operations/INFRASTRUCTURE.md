@@ -16,7 +16,7 @@ siapa yang boleh menyentuhnya dari luar.
                             │
                             ▼
                  ┌─────────────────────┐
-                 │   DNS (A record)    │   api.ionowu.com, app.ionowu.com
+                 │   DNS (A record)    │   api.sweet.ionowu.com, sweet.ionowu.com
                  └──────────┬──────────┘   dokploy.ionowu.com (dibatasi)
                             │
         ══════════ BATAS FIREWALL (UFW) ══════════

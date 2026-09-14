@@ -4,6 +4,31 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.6.3] — 2026-09-14
+
+### Diperbaiki
+* **Image web di `ghcr.io` memanggil domain yang tidak ada.** `NEXT_PUBLIC_API_URL` dibakar
+  ke bundle klien saat build, tetapi `build.yml` tidak pernah meneruskannya — `build-args` hanya
+  berisi `VERSION`/`COMMIT`/`CREATED`. Setiap image web (termasuk `08210e5`) memuat default
+  Dockerfile `https://api.ionowu.example`. Image itu menyala normal dan lolos semua cek; ia baru
+  gagal saat kasir memanggil API. Mengisi `PUBLIC_API_URL` di panel Dokploy tidak menolong karena
+  nilainya tidak dibaca saat runtime. Ditemukan saat memeriksa gerbang GO-LIVE §2.G sebelum
+  menyerahkan digest untuk deploy.
+  * `build.yml` meneruskan repository variable `PUBLIC_API_URL`, dan langkah **Gerbang URL API web**
+    menolak build bila nilainya kosong, berisi `example`, menunjuk `localhost`, atau bukan `https://`.
+  * `apps/web/Dockerfile` tidak lagi punya default; build tanpa `--build-arg` gagal di tempat.
+  * `DOCKER.md` §5 — contoh build manual ikut membawa `--build-arg`.
+
+### Diubah
+* **Skema domain produksi** (ditetapkan pemilik 2026-09-14) — satu subdomain per aplikasi Ionowu:
+  web **`sweet.ionowu.com`**, API **`api.sweet.ionowu.com`**, menggantikan `app.ionowu.com` /
+  `api.ionowu.com` di `DOKPLOY.md` §4, `SERVER-PROVISIONING.md`, `INFRASTRUCTURE.md`, dan contoh di
+  `docker-compose.prod.yml`. Repository variable `PUBLIC_API_URL` diisi `https://api.sweet.ionowu.com`.
+  Saat ditetapkan, `ionowu.com` sudah menunjuk VPS (76.13.16.85) tetapi kedua subdomain **belum
+  punya record DNS**.
+
+---
+
 ## [1.6.2] — 2026-09-14
 
 ### Ditambahkan

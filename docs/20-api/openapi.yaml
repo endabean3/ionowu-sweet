@@ -12,7 +12,7 @@ info:
     name: ionowu.com
 
 servers:
-  - url: https://api.ionowu.com/v1
+  - url: https://api.sweet.ionowu.com/v1
     description: Produksi
   - url: http://localhost:8080/v1
     description: Lokal (Docker Compose)

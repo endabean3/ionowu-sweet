@@ -68,7 +68,7 @@ func Load() (Config, error) {
 
 	// CORS — WAJIB, bukan default ke "*". apps/web (Next.js) dan pos-engine
 	// SELALU berbeda origin: beda port saat dev (3000/3005 vs 8080), beda
-	// domain saat produksi (app.ionowu.com vs api.ionowu.com — DOKPLOY.md
+	// domain saat produksi (sweet.ionowu.com vs api.sweet.ionowu.com — DOKPLOY.md
 	// §4). Tanpa header Access-Control-Allow-Origin yang benar, SETIAP
 	// permintaan browser ke API — login, checkout, sync, semuanya — gagal
 	// "Failed to fetch" sebelum sempat menyentuh handler. Ditemukan lewat

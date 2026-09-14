@@ -14,7 +14,7 @@ Satu tenant → masalah konfigurasi merchant. Semua → masalah gateway atau end
 
 ## 2. Endpoint kita hidup?
 ```bash
-curl -I https://api.ionowu.com/v1/webhooks/qris     # harap bukan 404/502
+curl -I https://api.sweet.ionowu.com/v1/webhooks/qris     # harap bukan 404/502
 docker logs --tail 200 pos-engine | grep -i webhook
 ```
 

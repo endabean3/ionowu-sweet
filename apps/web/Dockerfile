@@ -24,13 +24,18 @@ RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
-# API URL publik dibakar ke bundle client SAAT build (batasan NEXT_PUBLIC_*
-# Next.js — bukan dibaca ulang saat container start). Nilai default di sini
-# HANYA untuk build lokal/CI smoke test; deploy nyata WAJIB meneruskan
-# --build-arg dari CI, bukan mengandalkan docker-compose.prod.yml env:
-# NEXT_PUBLIC_POS_API_URL di sana TIDAK berpengaruh terhadap bundle yang
-# sudah dibangun. Lihat catatan follow-up di CHANGELOG/task terpisah.
-ARG NEXT_PUBLIC_API_URL=https://api.ionowu.example
+# API URL publik DIBAKAR ke bundle klien SAAT build (batasan NEXT_PUBLIC_*
+# Next.js — tidak dibaca ulang saat container start, jadi env di
+# docker-compose.prod.yml tidak mengubah bundle yang sudah jadi).
+#
+# SENGAJA tanpa nilai default. Default lama `https://api.ionowu.example`
+# membuat build.yml — yang tidak pernah meneruskan build-arg ini — diam-diam
+# menghasilkan image yang menyala normal tetapi memanggil domain yang tidak
+# ada. Lebih baik build gagal di sini daripada kasir gagal di toko.
+# CI mengisinya dari repository variable PUBLIC_API_URL (build.yml).
+ARG NEXT_PUBLIC_API_URL
+RUN test -n "$NEXT_PUBLIC_API_URL" || { \
+      echo "❌ NEXT_PUBLIC_API_URL wajib: --build-arg NEXT_PUBLIC_API_URL=https://api-produksi"; exit 1; }
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter web build
 

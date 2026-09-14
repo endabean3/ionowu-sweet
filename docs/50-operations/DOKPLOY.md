@@ -44,7 +44,7 @@ Project: ionowu-sweet
 │
 └── ionowu-sweet          tipe: Application     (docker-compose.prod.yml — REFERENSI, bukan
     ├── api  (pos-engine) replicas 2             yang dijalankan `docker compose up`)
-    └── web                replicas 2             → api.ionowu.com, app.ionowu.com
+    └── web                replicas 2             → api.sweet.ionowu.com, sweet.ionowu.com
 ```
 
 `intelligence-worker` (Python, ADR-0006) belum ada di sini — belum punya Dockerfile.
@@ -94,10 +94,13 @@ Untuk perlakuan lengkap soal rahasia, lihat [CONFIGURATION.md](./CONFIGURATION.m
 
 ## 4. Domain & TLS
 
+✅ **Ditetapkan 2026-09-14** — satu subdomain per aplikasi Ionowu (`ionowu.com` sudah menunjuk VPS
+76.13.16.85). Menggantikan skema awal `api.ionowu.com` / `app.ionowu.com`.
+
 | Domain | Menunjuk ke | Catatan |
 |---|---|---|
-| `api.ionowu.com` | `pos-engine:8080` | Dipakai PWA kasir; harus paling stabil |
-| `app.ionowu.com` | `web-app:3000` | Dashboard owner & PWA |
+| `api.sweet.ionowu.com` | `pos-engine:8080` | Dipakai PWA kasir & APK; harus paling stabil. **Dibakar** ke image web lewat repository variable `PUBLIC_API_URL` |
+| `sweet.ionowu.com` | `web-app:3000` | Dashboard owner & PWA. Nilai `PUBLIC_APP_URL` (masuk CORS pos-engine) |
 | `dokploy.ionowu.com` | UI Dokploy | **Batasi IP** atau jangan diberi domain sama sekali |
 
 Sertifikat diterbitkan otomatis via Let's Encrypt oleh Traefik. Dua hal yang perlu diingat:
