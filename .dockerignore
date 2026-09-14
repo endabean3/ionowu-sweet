@@ -23,4 +23,11 @@ apps/web/public/sw.js.map
 .pnpm-store/
 
 services/pos-engine/
+# Kecuali SATU berkas ini: katalog jenis usaha adalah sumber tunggal yang
+# di-embed Go DAN diimpor apps/web/src/lib/business-type/catalog.ts. Tanpa
+# pengecualian ini `next build` di dalam image gagal "Module not found" —
+# lolos di laptop dan CI PR karena di sana repo utuh, dan baru ketahuan saat
+# build.yml membangun image setelah merge ke main. Hanya JSON-nya yang
+# dibuka; kode Go tetap tidak masuk konteks image web.
+!services/pos-engine/internal/businesstype/catalog.json
 30-data/migrations/
