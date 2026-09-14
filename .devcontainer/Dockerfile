@@ -10,7 +10,7 @@
 #   2. `go install` tanpa cache mount menyimpan cache modul di dalam image.
 #      Solusi: --mount=type=cache, cache tinggal di BuildKit, bukan di image.
 
-FROM golang:1.26-bookworm
+FROM golang:1.27-bookworm
 
 ARG NODE_MAJOR=24
 ARG PNPM_VERSION=11.22.0
