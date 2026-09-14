@@ -4,6 +4,24 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.6.2] — 2026-09-14
+
+### Ditambahkan
+* **ADR-0011** — image hanya `linux/amd64`; arm64 dihentikan. Build `web` untuk arm64 berjalan
+  lewat QEMU di runner x86 dan terbukti **macet tanpa log**: 358,8 menit pada `997aab8`
+  (dibatalkan timeout 6 jam) dan 30,8 menit pada `f3fa10f`, sementara amd64 di run yang sama
+  selesai dalam hitungan menit. Server produksi dikonfirmasi pemilik x86_64. Butir WAJIB
+  `IMG-10` (amd64) tetap dipenuhi; yang dihentikan hanya bagian SEBAIKNYA (arm64).
+
+### Diubah
+* **`build.yml`** — `platforms: linux/amd64`; `setup-qemu-action` dihapus.
+* **`SERVER-PROVISIONING.md` §1** — baris **Arsitektur** baru. Sebelumnya dokumen hanya
+  menyebut jumlah vCPU, sehingga tidak ada yang tahu image arm64 tidak pernah dipakai.
+* **`DOCKER.md` §5** — panduan build manual di Mac Apple Silicon (`--platform linux/amd64`):
+  tanpa itu image arm64 lolos uji lokal lalu gagal di server dengan `exec format error`.
+
+---
+
 ## [1.6.1] — 2026-09-14
 
 ### Diperbaiki

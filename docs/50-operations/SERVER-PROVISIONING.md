@@ -13,6 +13,7 @@
 | Region | **Singapura** (atau terdekat Indonesia) | Latensi kasir |
 | RAM | ⚠️ **Minimum 8 GB** | Budget runtime ~3 GB (termasuk worker Python & agregasi BI) + OS + Dokploy + Traefik + lonjakan |
 | vCPU | Minimum 2 | Postgres + Go + Node |
+| **Arsitektur** | **x86_64 (amd64)** — terkonfirmasi 2026-09-14 pada `srv1882569.hstgr.cloud` (2 vCPU · RAM 7,8 GiB) | CI membangun image **hanya** `linux/amd64`. Image dari `docker build` biasa di Mac Apple Silicon adalah **arm64** dan gagal di server dengan `exec format error` — build manual wajib `--platform linux/amd64` ([DOCKER](./DOCKER.md) §5). Baris ini sebelumnya tidak ada, sehingga CI terus membangun arm64 lewat QEMU yang terbukti macet |
 | Disk | Minimum 50 GB SSD | DB + volume; **build tidak lagi di sini** ([ADR-0004](../10-architecture/adr/0004-ci-build-and-registry.md)) |
 | OS | **Ubuntu LTS** | |
 | IPv4 | Publik statis | DNS |
