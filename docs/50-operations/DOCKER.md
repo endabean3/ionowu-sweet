@@ -127,9 +127,23 @@ Angka-angka ini harus diperiksa di CI, bukan sekadar dicita-citakan — lihat
 | Registry | **GitHub Container Registry (`ghcr.io`)** |
 | Tag image | **SHA commit**, bukan `latest` |
 | Peran Dokploy | Hanya **menarik** image, tidak membangun |
+| Arsitektur | **`linux/amd64` saja** — server produksi x86_64 ([ADR-0011](../10-architecture/adr/0011-image-hanya-amd64.md)) |
 
 Dua manfaat utama: beban build lepas dari VPS produksi, dan **rollback menjadi deterministik**
 — tarik tag SHA lama, bukan build ulang dari commit lama yang tidak dijamin identik.
+
+### Build manual di Mac Apple Silicon
+
+Jalur resmi tetap CI. Bila image terpaksa dibangun di Mac (uji lokal, darurat), **selalu**
+sebutkan platform server:
+
+```bash
+docker buildx build --platform linux/amd64 -f apps/web/Dockerfile -t web:uji .
+```
+
+Tanpa `--platform`, Docker di Mac menghasilkan image **arm64**. Image itu berjalan normal di
+Mac — sehingga uji lokal lolos — lalu gagal di server dengan `exec format error`. Image
+arm64 hasil uji lokal **tidak boleh** di-push ke `ghcr.io`.
 
 ---
 

@@ -2,7 +2,8 @@
 #
 # pos-engine — jalur uang. Mengikuti templat fondasi-server-ionowu §4.1.
 # Memenuhi: IMG-01 (multi-stage), IMG-02 (digest), IMG-08 (label OCI),
-#           IMG-10 (multi-arch), RUN-01 (UID 65532).
+#           RUN-01 (UID 65532). IMG-10 (multi-arch) DISIMPANGI — hanya amd64,
+#           lihat docs/10-architecture/adr/0011-*.md.
 #
 # PENYIMPANGAN IMG-03 — lihat docs/10-architecture/adr/0008-*.md:
 # §3.1 mewajibkan stage build `golang:1.23-alpine`, tetapi go.mod modul ini
@@ -20,7 +21,9 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
-# TARGETOS/TARGETARCH diisi buildx saat build multi-arch (IMG-10).
+# TARGETOS/TARGETARCH diisi buildx dari --platform (CI: linux/amd64 saja, ADR-0011).
+# Tetap dipakai, bukan di-hardcode: build manual di Mac Apple Silicon tanpa
+# --platform linux/amd64 akan menghasilkan arm64 yang gagal di server.
 ARG TARGETOS TARGETARCH VERSION=dev COMMIT=unknown
 # CGO_ENABLED=0: biner statis, wajib untuk distroless (tidak ada libc di sana).
 RUN --mount=type=cache,target=/go/pkg/mod \
