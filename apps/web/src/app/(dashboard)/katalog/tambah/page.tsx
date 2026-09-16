@@ -20,6 +20,11 @@ export default function TambahProdukPage() {
 
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("pcs");
+  // 0 = dijual utuh (pcs, botol). > 0 = curah/timbang: parfum per ml, bahan
+  // kue per gram — dua pelanggan pasti kita (CLAUDE.md §2). Nilai inilah yang
+  // menentukan apakah kasir bisa memasukkan "30 ml"; tanpa itu varian ml pun
+  // hanya bisa dijual satu-satu.
+  const [uomPrecision, setUomPrecision] = useState(0);
   const [variants, setVariants] = useState([{ name: "Regular", price: "", cost: "" }]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -59,6 +64,7 @@ export default function TambahProdukPage() {
           price: v.price || "0",
           costPrice: v.cost || "0",
           uom: unit,
+          uomPrecision,
         })),
       });
 
@@ -113,9 +119,38 @@ export default function TambahProdukPage() {
               label="Satuan Dasar (UoM)"
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              placeholder="pcs, cup, porsi..."
+              placeholder="pcs, ml, gram, kg..."
               required
             />
+
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="text-sm font-medium text-main">Cara dijual</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { nilai: 0, judul: "Utuh", contoh: "1 botol, 2 pcs" },
+                  { nilai: 3, judul: "Pecahan (curah/timbang)", contoh: "30 ml, 0,5 kg" },
+                ].map((opsi) => (
+                  <button
+                    key={opsi.nilai}
+                    type="button"
+                    onClick={() => setUomPrecision(opsi.nilai)}
+                    aria-pressed={uomPrecision === opsi.nilai}
+                    className={`pos-touch-target rounded-2xl border-2 px-4 py-2 text-left font-sans transition-all ${
+                      uomPrecision === opsi.nilai
+                        ? "border-card-border bg-sweet-custard text-main shadow-hard-sm"
+                        : "border-card-border bg-surface text-muted"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold">{opsi.judul}</span>
+                    <span className="block font-mono text-xs">{opsi.contoh}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted">
+                Pilih <b>Pecahan</b> bila pembeli boleh membeli sebagian, misalnya parfum per ml
+                atau bahan kue per gram. Kasir akan diminta mengisi jumlahnya saat menjual.
+              </p>
+            </fieldset>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-card-border/50">

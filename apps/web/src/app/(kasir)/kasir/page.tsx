@@ -3,16 +3,19 @@
 import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
+import { QtyKeypad } from "@/components/pos/qty-keypad";
 import { Receipt, type ReceiptData } from "@/components/pos/receipt";
 import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
+import { isCurah } from "@/lib/catalog/quantity";
 import { db } from "@/lib/db";
 import { calculateCart } from "@/lib/money/calc";
 import { barBawah } from "@/lib/motion/tokens";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
+import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
-import { AnimatePresence, m } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowLeft, Barcode, Layers, Search, Wallet } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
@@ -34,6 +37,13 @@ export default function KasirPage() {
   // masih bisa dicetak — "kasir tidak boleh menunggu" (CLAUDE.md §5).
   const [lastReceipt, setLastReceipt] = useState<ReceiptData | null>(null);
 
+  // Dialog jumlah untuk barang curah (parfum per ml, bahan kue per gram).
+  // `line` terisi hanya saat mengubah baris yang sudah ada di keranjang.
+  const [qtyTarget, setQtyTarget] = useState<{
+    product: MacaronProduct;
+    line?: CartLine;
+  } | null>(null);
+
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const processingPaymentRef = useRef(false);
 
@@ -48,7 +58,25 @@ export default function KasirPage() {
   // Ambil data dari Dexie
   const dbProducts = useLiveQuery(() => db.products.toArray(), []);
   const dbVariants = useLiveQuery(() => db.variants.toArray(), []);
-  const activeShift = useLiveQuery(() => db.shifts.where("status").equals("open").first(), []);
+  // Argumen ketiga `null` adalah NILAI AWAL selagi kueri berjalan — dan ia
+  // wajib ada. Tanpa itu useLiveQuery mengembalikan `undefined` baik saat
+  // MASIH MEMUAT maupun saat memang TIDAK ADA shift, sehingga modal "Toko
+  // Belum Dibuka" ikut ter-mount sepersekian detik di setiap muat halaman,
+  // lalu langsung di-unmount begitu Dexie menjawab.
+  //
+  // Akibatnya bukan sekadar kedipan: mount→unmount secepat itu terjadi
+  // SEBELUM animasi masuk sempat berjalan, dan AnimatePresence meninggalkan
+  // node-nya di DOM pada opacity 0 dengan pointer-events aktif — lapisan tak
+  // terlihat yang menelan SELURUH ketukan kasir. Layar tampak normal tetapi
+  // tidak ada satu tombol pun yang bisa ditekan. Ditemukan lewat
+  // getComputedStyle pada dialog yang tersangkut, bukan dari membaca kode.
+  const activeShift = useLiveQuery(
+    () => db.shifts.where("status").equals("open").first(),
+    [],
+    null,
+  );
+  /** null = kueri Dexie belum menjawab. undefined = sudah, dan tidak ada. */
+  const shiftBelumDiketahui = activeShift === null;
   const outlet = useLiveQuery(
     () => (activeShift?.outlet_id ? db.outlets.get(activeShift.outlet_id) : undefined),
     [activeShift?.outlet_id],
@@ -74,6 +102,9 @@ export default function KasirPage() {
         price: v.price,
         stock: v.stock_quantity,
         minStockAlert: v.min_stock_alert,
+        // Dari server lewat /sync/pull, bukan ditebak dari nama satuan.
+        uom: v.uom ?? "pcs",
+        uomPrecision: v.uom_precision ?? 0,
       };
     });
   }, [dbProducts, dbVariants]);
@@ -100,7 +131,9 @@ export default function KasirPage() {
     [cartItems],
   );
 
-  const totalItemCount = cartItems.reduce((acc, it) => acc + it.quantity, 0);
+  // Jumlah BARIS, bukan penjumlahan kuantitas: menjumlahkan 30 ml dengan
+  // 2 botol menghasilkan "32 item" yang tidak berarti apa-apa.
+  const totalItemCount = cartItems.length;
 
   // Auto-focus barcode
   useEffect(() => {
@@ -136,14 +169,47 @@ export default function KasirPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cartItems, isCheckingOut, showShiftModal]);
 
+  /** Menaruh kuantitas PERSIS ke keranjang (menimpa, bukan menambah). */
+  const setQuantity = (product: MacaronProduct, quantity: string) => {
+    setCartItems((prev) => {
+      const idx = prev.findIndex((item) => item.variantId === product.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], quantity };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          id: `cart_${Date.now()}_${product.id}`,
+          variantId: product.id,
+          name: product.name,
+          unitPrice: product.price,
+          quantity,
+          discount: "0",
+          uom: product.uom,
+          uomPrecision: product.uomPrecision,
+        },
+      ];
+    });
+  };
+
   const handleAddToCart = (product: MacaronProduct) => {
+    // Barang curah TIDAK bisa ditambah satu-satu: tidak ada yang menjual
+    // parfum dengan mengetuk 30 kali. Ketukannya membuka dialog jumlah.
+    // Barang satuan tetap seperti semula — satu ketuk, satu item, tanpa
+    // langkah tambahan (CLAUDE.md §5 "kasir tidak boleh menunggu").
+    if (isCurah(product.uomPrecision)) {
+      setQtyTarget({ product });
+      return;
+    }
     setCartItems((prev) => {
       const existingIndex = prev.findIndex((item) => item.variantId === product.id);
       if (existingIndex >= 0) {
         const next = [...prev];
         next[existingIndex] = {
           ...next[existingIndex],
-          quantity: next[existingIndex].quantity + 1,
+          quantity: new Decimal(next[existingIndex].quantity).plus(1).toString(),
         };
         return next;
       }
@@ -154,25 +220,34 @@ export default function KasirPage() {
           variantId: product.id,
           name: product.name,
           unitPrice: product.price,
-          quantity: 1,
+          quantity: "1",
           discount: "0",
+          uom: product.uom,
+          uomPrecision: product.uomPrecision,
         },
       ];
     });
   };
 
+  // Hanya dipakai barang satuan; baris curah memakai dialog jumlah.
   const handleUpdateQty = (variantId: string, delta: number) => {
     setCartItems((prev) => {
       return prev
         .map((item) => {
           if (item.variantId === variantId) {
-            const nextQty = item.quantity + delta;
-            return nextQty > 0 ? { ...item, quantity: nextQty } : null;
+            const nextQty = new Decimal(item.quantity).plus(delta);
+            return nextQty.gt(0) ? { ...item, quantity: nextQty.toString() } : null;
           }
           return item;
         })
         .filter(Boolean) as CartLine[];
     });
+  };
+
+  const handleEditQty = (line: CartLine) => {
+    const product = products.find((p) => p.id === line.variantId);
+    if (!product) return;
+    setQtyTarget({ product, line });
   };
 
   // Hapus baris DENGAN undo (pages/kasir.md: "Delete: Hapus baris terpilih
@@ -238,7 +313,8 @@ export default function KasirPage() {
           shift_id: activeShift.id,
           items: cartItems.map((it) => ({
             variant_id: it.variantId,
-            qty: it.quantity.toString(),
+            // Sudah string desimal sejak dari keranjang — "30", "0.5".
+            qty: it.quantity,
             unit_price: it.unitPrice,
             discount: it.discount,
           })),
@@ -272,6 +348,7 @@ export default function KasirPage() {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           discount: it.discount,
+          uom: it.uom,
         })),
         subtotal: breakdown.subtotal,
         taxTotal: breakdown.taxTotal,
@@ -393,6 +470,7 @@ export default function KasirPage() {
             items={cartItems}
             totals={cartTotals}
             onUpdateQty={handleUpdateQty}
+            onEditQty={handleEditQty}
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
             onCheckout={() => setIsCheckingOut(true)}
@@ -406,55 +484,76 @@ export default function KasirPage() {
          melewati seluruh produk hanya untuk menagih, dan total belanja tidak
          pernah terlihat sambil memilih barang. Bar ini membuat angka dan
          aksi utama selalu satu ketukan jauhnya. */}
-      <AnimatePresence>
-        {cartItems.length > 0 && (
-          <m.div
-            key="bar-ringkasan"
-            variants={barBawah}
-            initial="sembunyi"
-            animate="tampil"
-            exit="pergi"
-            className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden"
-          >
-            <div className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="font-sans text-xs font-bold text-muted">
-                  {totalItemCount} item · sudah termasuk PPN
-                </p>
-                <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
-                  Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
-                </p>
-              </div>
-              <Button
-                size="pos-lg"
-                variant="primary"
-                className="shrink-0 gap-2 shadow-hard"
-                onClick={() => setIsCheckingOut(true)}
-              >
-                <Wallet className="h-5 w-5" aria-hidden="true" />
-                Bayar
-              </Button>
+      {/* TANPA AnimatePresence — disengaja, dan mahal dipelajari.
+         AnimatePresence yang membungkus SATU anak bersyarat meninggalkan
+         node-nya di DOM setelah keluar: opacity 0, tetapi `fixed inset-0`
+         dengan pointer-events aktif. Hasilnya lapisan tak terlihat yang
+         menelan setiap ketukan — layar kasir tampak normal tetapi tombol
+         Bayar tidak bisa ditekan sama sekali. Terbukti pada modal jumlah,
+         modal shift, dan bar ini; daftar baris keranjang (anak berkunci
+         di dalam map) TIDAK terkena.
+         Animasi KELUAR dikorbankan; yang masuk tetap ada. Di mesin kasir,
+         layar yang tidak bisa disentuh jauh lebih mahal daripada transisi
+         yang hilang. */}
+      {cartItems.length > 0 && (
+        <m.div
+          key="bar-ringkasan"
+          variants={barBawah}
+          initial="sembunyi"
+          animate="tampil"
+          className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden"
+        >
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-sans text-xs font-bold text-muted">
+                {totalItemCount} item · sudah termasuk PPN
+              </p>
+              <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
+                Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
+              </p>
             </div>
-          </m.div>
-        )}
-      </AnimatePresence>
+            <Button
+              size="pos-lg"
+              variant="primary"
+              className="shrink-0 gap-2 shadow-hard"
+              onClick={() => setIsCheckingOut(true)}
+            >
+              <Wallet className="h-5 w-5" aria-hidden="true" />
+              Bayar
+            </Button>
+          </div>
+        </m.div>
+      )}
 
-      <AnimatePresence>
-        {isCheckingOut && (
-          <PaymentModal
-            key="modal-bayar"
-            totals={cartTotals}
-            onClose={() => setIsCheckingOut(false)}
-            onPay={processPayment}
-          />
-        )}
-      </AnimatePresence>
+      {qtyTarget && (
+        <QtyKeypad
+          key="modal-jumlah"
+          namaProduk={qtyTarget.product.name}
+          uom={qtyTarget.product.uom}
+          uomPrecision={qtyTarget.product.uomPrecision}
+          hargaSatuan={qtyTarget.product.price}
+          nilaiAwal={qtyTarget.line?.quantity}
+          onClose={() => setQtyTarget(null)}
+          onConfirm={(quantity) => {
+            setQuantity(qtyTarget.product, quantity);
+            setQtyTarget(null);
+            barcodeInputRef.current?.focus();
+          }}
+        />
+      )}
 
-      <AnimatePresence>
-        {showShiftModal && !activeShift && (
-          <ShiftModal key="modal-shift" onClose={() => setShowShiftModal(false)} />
-        )}
-      </AnimatePresence>
+      {isCheckingOut && (
+        <PaymentModal
+          key="modal-bayar"
+          totals={cartTotals}
+          onClose={() => setIsCheckingOut(false)}
+          onPay={processPayment}
+        />
+      )}
+
+      {showShiftModal && !shiftBelumDiketahui && !activeShift && (
+        <ShiftModal key="modal-shift" onClose={() => setShowShiftModal(false)} />
+      )}
 
       {/* Tak terlihat di layar; hanya muncul di hasil cetak. */}
       {lastReceipt && <Receipt data={lastReceipt} />}

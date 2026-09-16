@@ -132,10 +132,24 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 			minStock = "0"
 		}
 
+		// Kosong WAJIB jadi NULL, bukan string kosong.
+		//
+		// idx_variants_barcode UNIK pada (tenant_id, barcode) WHERE barcode IS
+		// NOT NULL (migrasi 00003 §77). String kosong bukan NULL, jadi ia ikut
+		// terindeks: tenant hanya bisa punya SATU varian tanpa barcode, dan
+		// produk kedua yang dibuat lewat form gagal 500 "Gagal menyimpan
+		// varian". Ditemukan saat membuat produk kedua di aplikasi nyata —
+		// bukan dari membaca kode, karena produk PERTAMA selalu berhasil.
+		//
+		// SKU diperlakukan sama demi konsistensi: kolomnya nullable, dan ""
+		// bukan "tidak punya SKU".
+		sku := kosongJadiNull(v.SKU)
+		barcode := kosongJadiNull(v.Barcode)
+
 		_, err = tx.Exec(ctx, `
 			INSERT INTO variants (id, tenant_id, product_id, name, price, cost_price, sku, barcode, item_type, uom, uom_precision, stock_quantity, min_stock_alert, is_active)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
-		`, varID, tenantID, productID, v.Name, v.Price, v.CostPrice, v.SKU, v.Barcode, itemType, uom, v.UomPrecision, stockQty, minStock)
+		`, varID, tenantID, productID, v.Name, v.Price, v.CostPrice, sku, barcode, itemType, uom, v.UomPrecision, stockQty, minStock)
 		if err != nil {
 			http.Error(w, `{"error": "Gagal menyimpan varian"}`, http.StatusInternalServerError)
 			return
@@ -227,4 +241,13 @@ func (h *CatalogHandler) PatchVariant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	RespondJSON(w, http.StatusOK, map[string]any{"message": "Varian diupdate"})
+}
+
+// kosongJadiNull mengubah "" menjadi NULL untuk kolom nullable yang ikut
+// indeks unik parsial. Lihat catatan di PostProduct.
+func kosongJadiNull(nilai string) *string {
+	if nilai == "" {
+		return nil
+	}
+	return &nilai
 }
