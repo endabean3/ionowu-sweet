@@ -54,6 +54,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
   // invarian #2 (CLAUDE.md §6) menjamin "kasir tetap bisa berjualan meski
   // internet mati". Kegagalan jaringan jatuh ke cache terakhir sebelum
   // menyerah.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: memuatUlang sengaja dipakai sebagai pemicu tombol "Coba lagi"
   useEffect(() => {
     let cancelled = false;
     (async () => {
