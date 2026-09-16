@@ -21,6 +21,15 @@
 | Traefik hidup | `curl -sI http://api.sweet.ionowu.com/` → `404` dari Traefik | ✅ (404 = normal sebelum ada aplikasi terdaftar) |
 | Rahasia siap | lihat §2 dan §4 | ❌ belum |
 | `PUBLIC_API_URL` | `gh variable list` → `https://api.sweet.ionowu.com` | ✅ |
+| Image di ghcr.io **publik** | `curl` anonim ke manifest → `200` | ✅ — Dokploy tidak butuh kredensial registry |
+| Repo **publik** | `gh repo view --json visibility` | ✅ — Dokploy bisa clone tanpa akses GitHub |
+| Memori | `free -m` → tersedia ±5 GB | ✅ — batas maksimum ionowu-sweet ±1,7 GB (data 896 MB + app 768 MB) |
+
+> ⚠️ **Server ini DIPAKAI BERSAMA**, tidak seperti asumsi di header `docker-compose.data.yml`
+> ("VPS khusus aplikasi ini"). Per 2026-09-16 ia juga menjalankan jalintani, warungwangi
+> (katalog online), ionowu-web, stack data bersama `ionowu-*`, dan stack pemantauan — 2 vCPU
+> untuk semuanya. Ambil **snapshot VPS di panel Hostinger** sebelum deploy pertama: kesalahan
+> di sini ikut mengenai proyek lain.
 
 **Rahasia yang harus sudah ada sebelum mulai** (disimpan di panel Environment Dokploy, tidak
 pernah di repo — [CONFIGURATION](../CONFIGURATION.md)):
@@ -83,7 +92,27 @@ Nol hasil = **berhenti**. Image itu memuat URL yang salah dan tidak boleh dirili
 Isi `docker-compose.data.yml`. Tipe **Compose**, bukan Application — Postgres/PgBouncer butuh
 `depends_on` yang benar-benar dihormati, dan itu hanya ada di Compose asli (ADR-0009).
 
-1. Buat project → tipe Compose → arahkan ke `docker-compose.data.yml`.
+**Sebelumnya, buat jaringannya** (SSH, sekali saja). `docker-compose.data.yml` menandai
+`sweet-internal` sebagai `external: true` — ia tidak dibuat otomatis, dan deploy gagal bila
+belum ada:
+
+```bash
+docker network create --driver overlay --attachable sweet-internal
+docker network inspect sweet-internal --format '{{.Driver}} attachable={{.Attachable}}'
+# harus: overlay attachable=true
+```
+
+**Harus `overlay` + `attachable`.** Layanan `api` di §4 berjalan di Swarm, dan layanan Swarm
+hanya bisa bergabung ke jaringan overlay; kontainer Compose di proyek ini baru bisa ikut
+bergabung bila jaringannya `attachable`. Pola yang sama sudah dipakai `ionowu-data` di server
+ini dan terbukti jalan. Jaringan `bridge` biasa akan membuat `api` tidak pernah bisa
+menjangkau PgBouncer.
+
+1. Buat project → tipe Compose → sumber **Git**:
+   `https://github.com/endabean3/ionowu-sweet.git`, branch `main`, compose path
+   `docker-compose.data.yml`. Sumber **harus Git**, bukan YAML yang ditempel: berkas ini
+   me-mount `./infra/initdb` (pembuat role `sweet_app` dan database `ionowu_sweet`), dan
+   folder itu hanya ada bila repo di-clone.
 2. Isi environment: `POSTGRES_SUPERUSER_PASSWORD`, `SWEET_APP_PASSWORD`, `REDIS_PASSWORD`.
 3. Deploy.
 
@@ -94,7 +123,8 @@ docker ps --filter name=sweet- --format '{{.Names}}\t{{.Status}}'
 docker exec sweet-pgbouncer psql "postgres://sweet_app:$SWEET_APP_PASSWORD@localhost:5432/ionowu_sweet" -c 'select 1;'
 ```
 
-Ketiganya harus `healthy`, dan query lewat PgBouncer harus menjawab `1`. Kalau autentikasi
+Ketiganya harus `healthy`, dan query lewat PgBouncer harus menjawab `1` (image PgBouncer
+memang membawa `psql` — diverifikasi 2026-09-16). Kalau autentikasi
 gagal dengan "wrong password type", periksa `AUTH_TYPE: scram-sha-256` — Postgres 16 tidak
 memakai md5.
 
@@ -107,23 +137,31 @@ Urutannya wajib: migrasi dulu, kode belakangan ([DEPLOYMENT](../DEPLOYMENT.md) �
 
 **Backup dulu** — lihat [BACKUP-DR](../BACKUP-DR.md).
 
-> ⚠️ **Sambung LANGSUNG ke `postgres:5432`, bukan lewat PgBouncer.** PgBouncer berjalan
+> ⚠️ **Sambung LANGSUNG ke `sweet-postgres:5432`, bukan lewat PgBouncer.** PgBouncer berjalan
 > `POOL_MODE: transaction`, sementara goose memegang *session advisory lock* selama migrasi.
 > Lewat transaction pooling, lock itu bisa jatuh ke koneksi backend yang berbeda dan migrasi
 > gagal dengan cara yang membingungkan. Ini pengecualian khusus pemeliharaan terhadap DAT-09
 > ("aplikasi selalu lewat PgBouncer") — **aplikasi** tetap wajib lewat PgBouncer.
 
-Di VPS, dengan salinan repo (atau hanya folder `30-data/migrations/`):
+Di VPS. Repo publik, jadi berkas migrasinya diambil langsung — dikunci ke commit yang sama
+dengan image yang akan dirilis:
 
 ```bash
-export SWEET_APP_PASSWORD='...'    # jangan ketik inline; ambil dari pengelola kata sandi
+git clone https://github.com/endabean3/ionowu-sweet.git /opt/ionowu-sweet-src
+git -C /opt/ionowu-sweet-src checkout <SHA_RILIS>
+
+read -rsp "SWEET_APP_PASSWORD: " SWEET_APP_PASSWORD; echo   # tidak tercatat di history shell
 docker run --rm --network sweet-internal \
-  -v "$PWD/30-data/migrations:/migrations:ro" \
+  -v /opt/ionowu-sweet-src/30-data/migrations:/migrations:ro \
   -e GOOSE_DRIVER=postgres \
-  -e GOOSE_DBSTRING="postgres://sweet_app:$SWEET_APP_PASSWORD@postgres:5432/ionowu_sweet?sslmode=disable" \
+  -e GOOSE_DBSTRING="postgres://sweet_app:$SWEET_APP_PASSWORD@sweet-postgres:5432/ionowu_sweet?sslmode=disable" \
   golang:1.26-alpine \
   sh -c 'go install github.com/pressly/goose/v3/cmd/goose@v3.27.3 && goose -dir /migrations up'
 ```
+
+Nama host-nya `sweet-postgres` — `container_name` di `docker-compose.data.yml`. Bentuk perintah
+ini (goose v3.27.3 lewat `GOOSE_DRIVER`/`GOOSE_DBSTRING`) diuji terhadap database lokal pada
+2026-09-16.
 
 `sslmode=disable` aman di sini karena jaringan `sweet-internal` tidak pernah keluar dari host;
 Postgres memang tidak mem-publish port apa pun.
@@ -154,8 +192,7 @@ Buat dua layanan:
 | Domain | `api.sweet.ionowu.com` | `sweet.ionowu.com` |
 | Replicas | 2 | 2 |
 | Jaringan | `sweet-internal` + `dokploy-network` | `dokploy-network` saja |
-| Probe kesiapan | `GET /health/ready` | `GET /` |
-| Probe hidup | `GET /health/live` | — |
+| Health check | **bawaan image** (`/api healthcheck` → `/health/ready`) — jangan ditimpa di panel | **bawaan image** (`wget /`) |
 
 Environment `api`:
 
@@ -173,6 +210,23 @@ PORT                        = 8080
 > mengujinya.
 
 `web` tidak butuh environment runtime: `NEXT_PUBLIC_API_URL` sudah dibakar saat build.
+
+**`api` wajib bergabung ke jaringan `sweet-internal`** (Advanced → Swarm Settings → Network),
+di samping `dokploy-network`. Tanpa itu `api` tidak bisa menjangkau `sweet-pgbouncer`, dan
+`/health/ready` tidak akan pernah 200. Pastikan dari SSH:
+
+```bash
+docker service inspect <nama-layanan-api> \
+  --format '{{range .Spec.TaskTemplate.Networks}}{{.Target}} {{end}}'
+# harus memuat ID jaringan sweet-internal:
+docker network inspect sweet-internal --format '{{.Id}}'
+```
+
+**Health check sudah dibawa image** sejak 2026-09-16 (ADR-0008 §2): Swarm tidak mengalihkan
+trafik ke replika baru sampai `/health/ready` menjawab 200, dan versi yang tidak bisa
+menjangkau database otomatis ditolak. Jangan menimpanya dengan health check di panel —
+image distroless tidak punya `curl`, sehingga perintah apa pun selain `/api healthcheck`
+selalu gagal.
 
 **Wajib:** matikan toggle **Auto Deploy**. Deploy produksi ditetapkan manual
 ([DOKPLOY](../DOKPLOY.md) §6) — toggle itu satu-satunya jalur yang bisa melanggarnya tanpa

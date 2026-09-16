@@ -4,6 +4,39 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.14.0] — 2026-09-16
+
+Ditemukan saat menyiapkan deploy pertama ke VPS sungguhan — setiap nilai di runbook kini
+diverifikasi terhadap server, image, atau database nyata.
+
+### Diperbaiki
+* **Rollback otomatis `DEP-07` tidak akan pernah terpicu.** `pos-engine` distroless tidak punya
+  `HEALTHCHECK`, dan ADR-0008 mengandalkan "probe HTTP di panel Dokploy" — padahal health check
+  aplikasi Swarm di Dokploy dijalankan di dalam kontainer, tempat tidak ada shell maupun `curl`.
+  Swarm akan menganggap versi dengan `DATABASE_URL` salah sebagai sehat. Kini biner punya
+  subperintah `healthcheck` (→ `/health/ready`) dan Dockerfile memakai `HEALTHCHECK CMD
+  ["/api", "healthcheck"]`, tanpa menambahkan shell. 4 uji Go; diverifikasi pada image distroless
+  nyata: `healthy` → Postgres dimatikan → `unhealthy` (503) → Postgres hidup → pulih.
+* **Runbook deploy tidak akan jalan apa adanya.**
+  * Jaringan `sweet-internal` bertanda `external: true` tetapi tidak pernah dibuat — kini ada
+    langkahnya, dan wajib `overlay` + `attachable` supaya layanan Swarm `api` bisa menjangkau
+    PgBouncer (pola yang sama dengan `ionowu-data` yang sudah jalan di server).
+  * Migrasi menunjuk host `postgres`; nama kontainernya `sweet-postgres`.
+  * Proyek data wajib bersumber **Git**, bukan YAML tempel — ia me-mount `./infra/initdb`.
+  * Kata sandi migrasi dibaca dengan `read -s`, tidak tercatat di history shell.
+* **Header `docker-compose.data.yml` mengasumsikan VPS khusus aplikasi ini.** Server nyata
+  dipakai bersama empat proyek lain; runbook kini memperingatkannya dan meminta snapshot VPS
+  sebelum deploy pertama.
+
+### Terverifikasi
+* Image `pos-engine` dan `web` publik di ghcr.io; repo publik — Dokploy tidak butuh kredensial.
+* Image `web` memuat `https://api.sweet.ionowu.com` (15×), nol `localhost`/domain contoh.
+* Pembuat kunci JWT menghasilkan 32/64 byte; pembuat kata sandi hanya alfanumerik (aman di URL).
+* Image PgBouncer membawa `psql` (perintah verifikasi runbook valid).
+* Memori server: tersedia ±5 GB, batas maksimum ionowu-sweet ±1,7 GB.
+
+---
+
 ## [1.13.0] — 2026-09-16
 
 Ditemukan saat menyiapkan impor inventaris nyata Warung Wangi (171 entri, stock opname

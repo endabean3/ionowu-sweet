@@ -44,15 +44,24 @@ LABEL org.opencontainers.image.source="https://github.com/endabean3/ionowu-sweet
 
 COPY --from=builder /out/api /api
 
-# CATATAN HEALTHCHECK (RUN-07): distroless tidak punya shell maupun wget,
-# jadi `HEALTHCHECK CMD` tidak dapat dieksekusi di sini. Kesiapan diperiksa
-# lewat probe HTTP platform ke /health/ready (RUN-08) yang dikonfigurasi di
-# panel Dokploy — bukan lewat Docker HEALTHCHECK. Ini penyimpangan yang
-# didokumentasikan, bukan diam-diam dilewati.
+# HEALTHCHECK (RUN-07) — diperbarui 2026-09-16, lihat ADR-0008 §2.
+# Distroless tidak punya shell, wget, maupun curl, jadi pemeriksanya adalah
+# biner ini sendiri (`/api healthcheck` → GET /health/ready). Bentuk exec
+# (tanpa shell) jalan di distroless.
+#
+# Sebelumnya dokumen mengandalkan "probe HTTP di panel Dokploy" — tetapi
+# health check aplikasi Swarm di Dokploy dijalankan DI DALAM kontainer,
+# sehingga rencana itu tidak pernah bisa diterapkan dan rollback otomatis
+# (DEP-07) tidak akan pernah terpicu.
+#
+# --retries 3 × 15s: kedipan database singkat tidak langsung membuat Swarm
+# memulai ulang seluruh replika.
 
 # RUN-01 — UID/GID standar Ionowu. Tag `nonroot` distroless memang sudah
 # 65532, tetapi ditulis eksplisit agar terbaca linter dan tidak berubah
 # diam-diam bila tag base bergeser.
 USER 65532:65532
 EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=4s --start-period=10s --retries=3 \
+  CMD ["/api", "healthcheck"]
 ENTRYPOINT ["/api"]

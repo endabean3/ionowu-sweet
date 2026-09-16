@@ -46,6 +46,19 @@ runtime sama sekali (`IMG-01`).
 
 **2. `RUN-07` — `pos-engine` tidak memiliki `HEALTHCHECK` di Dockerfile.**
 
+> ✅ **Diperbarui 2026-09-16 — penyimpangan ini ditutup.** Asumsi di bawah ("probe HTTP di panel
+> Dokploy") ternyata tidak bisa diterapkan: health check aplikasi Swarm di Dokploy dijalankan
+> **di dalam** kontainer, sama seperti `HEALTHCHECK` Docker — dan di image distroless tidak ada
+> apa pun untuk menjalankannya. Akibatnya Swarm menganggap replika baru sehat begitu prosesnya
+> hidup, dan rollback otomatis `DEP-07` tidak akan pernah terpicu.
+>
+> Solusinya **tidak** menambahkan shell (alternatif yang tetap ditolak di atas): biner `pos-engine`
+> sendiri kini punya subperintah `healthcheck` yang memanggil `/health/ready`, dan Dockerfile
+> memakainya dalam bentuk exec `HEALTHCHECK CMD ["/api", "healthcheck"]`. Diverifikasi pada image
+> distroless sungguhan: `healthy` saat Postgres hidup, `unhealthy` (status 503) ±50 detik setelah
+> Postgres dimatikan, pulih ±20 detik setelah dinyalakan. Teks asli dipertahankan di bawah
+> sebagai riwayat.
+
 Image distroless tidak memuat shell maupun `wget`/`curl`, sehingga `HEALTHCHECK CMD` tidak
 dapat dieksekusi. Kesiapan diperiksa lewat probe HTTP yang dikonfigurasi di panel Dokploy
 ke `/health/ready` — yang **benar-benar** menguji dependensi (mem-ping Postgres), sesuai
@@ -75,8 +88,8 @@ kepatuhan, bukan keamanan.
 
 * Versi Go pada stage build berbeda dari tabel §3.1, sehingga audit otomatis terhadap
   daftar base image akan menandainya dan menuntut pengecualian eksplisit.
-* Tanpa `HEALTHCHECK` Docker, `docker ps` tidak menampilkan status sehat `pos-engine`;
-  kesehatannya hanya terlihat dari Dokploy dan dari probe HTTP langsung.
+* ~~Tanpa `HEALTHCHECK` Docker, `docker ps` tidak menampilkan status sehat `pos-engine`~~ —
+  ditutup 2026-09-16, lihat §2.
 * Image belum bertanda tangan, sehingga verifikasi rantai pasok belum dapat ditegakkan di
   sisi deploy.
 
