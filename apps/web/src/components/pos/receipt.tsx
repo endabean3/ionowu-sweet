@@ -1,5 +1,7 @@
 "use client";
 
+import { formatQuantity } from "@/lib/catalog/quantity";
+import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -21,9 +23,12 @@ import { createPortal } from "react-dom";
 
 export interface ReceiptLine {
   name: string;
-  quantity: number;
+  /** String desimal — barang curah dijual 30 ml, 0,5 kg (lihat cart.tsx). */
+  quantity: string;
   unitPrice: string;
   discount: string;
+  /** Satuan jual; dicetak di struk supaya "30" tidak ambigu. */
+  uom?: string;
 }
 
 export interface ReceiptData {
@@ -81,16 +86,17 @@ export function Receipt({ data }: { data: ReceiptData }) {
         <div className="receipt-sep" />
 
         {data.lines.map((l) => {
-          const bruto = Number(l.unitPrice) * l.quantity;
+          // Decimal, bukan float: 0,1 × 3 harus 0,3 di struk pembeli.
+          const bruto = new Decimal(l.unitPrice).times(l.quantity || 0);
           const diskon = Number(l.discount || "0");
           return (
             <div key={`${l.name}-${l.unitPrice}-${l.quantity}`} className="receipt-item">
               <div>{l.name}</div>
               <div className="receipt-row receipt-small">
                 <span>
-                  {l.quantity} × {rupiah(l.unitPrice)}
+                  {l.uom ? formatQuantity(l.quantity, l.uom) : l.quantity} × {rupiah(l.unitPrice)}
                 </span>
-                <span>{rupiah(bruto)}</span>
+                <span>{rupiah(bruto.toNumber())}</span>
               </div>
               {diskon > 0 && (
                 <div className="receipt-row receipt-small">

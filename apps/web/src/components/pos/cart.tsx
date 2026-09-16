@@ -2,10 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
+import { formatQuantity, isCurah } from "@/lib/catalog/quantity";
 import type { MoneyTotal } from "@/lib/money/calc";
 import { naikMasukTegas } from "@/lib/motion/tokens";
+import Decimal from "decimal.js";
 import { AnimatePresence, m } from "framer-motion";
-import { Minus, Plus, ShoppingBag, Trash2, Zap } from "lucide-react";
+import { Minus, Pencil, Plus, ShoppingBag, Trash2, Zap } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
 
@@ -14,8 +16,15 @@ export interface CartLine {
   variantId: string;
   name: string;
   unitPrice: string;
-  quantity: number;
+  /**
+   * String desimal, BUKAN number: Warung Wangi menjual 30 ml dan Media Boga
+   * 250 g, dan nilainya diteruskan apa adanya ke calculateCart lalu ke payload
+   * sync sebagai `qty` — tidak pernah melewati float (CLAUDE.md §6.3).
+   */
+  quantity: string;
   discount: string;
+  uom: string;
+  uomPrecision: number;
 }
 
 interface POSCartProps {
@@ -26,6 +35,8 @@ interface POSCartProps {
    * sama, dan satu-satunya yang menjaga keduanya sinkron adalah kebetulan. */
   totals: MoneyTotal;
   onUpdateQty: (variantId: string, delta: number) => void;
+  /** Mengganti jumlah baris curah dengan nilai persis (buka dialog jumlah). */
+  onEditQty: (line: CartLine) => void;
   onRemoveItem: (variantId: string) => void;
   onClearCart: () => void;
   onCheckout: () => void;
@@ -35,6 +46,7 @@ export function POSCart({
   items,
   totals,
   onUpdateQty,
+  onEditQty,
   onRemoveItem,
   onClearCart,
   onCheckout,
@@ -57,7 +69,7 @@ export function POSCart({
             <ShoppingBag className="h-5 w-5 text-sweet-strawberry" />
             <span>Keranjang Belanja</span>
             <span className="rounded-pill border border-card-border bg-sweet-custard px-2 py-0.5 font-mono text-xs">
-              {items.reduce((acc, it) => acc + it.quantity, 0)} item
+              {items.length} item
             </span>
           </div>
           {items.length > 0 && (
@@ -91,7 +103,12 @@ export function POSCart({
           ) : (
             <AnimatePresence initial={false}>
               {items.map((it) => {
-                const lineTotal = (Number(it.unitPrice) * it.quantity).toLocaleString("id-ID");
+                const lineTotal = new Decimal(it.unitPrice)
+                  .times(it.quantity || 0)
+                  .toDecimalPlaces(0)
+                  .toNumber()
+                  .toLocaleString("id-ID");
+                const curah = isCurah(it.uomPrecision);
                 return (
                   <m.div
                     key={it.variantId}
@@ -116,33 +133,51 @@ export function POSCart({
                        touch-target-size): kasir sering mengetuk cepat berulang
                        kali sambil terburu-buru, target 28px sebelumnya
                        menyebabkan salah pencet baris tetangga. */}
-                      <div className="flex items-center rounded-pill border border-card-border bg-base p-0.5">
+                      {curah ? (
+                        // Barang curah: +/- satu-satu tak berguna — tidak ada
+                        // kasir yang menaikkan 1 ml sebanyak 30 kali. Angkanya
+                        // sendiri jadi tombol yang membuka dialog jumlah.
                         <button
                           type="button"
-                          aria-label={`Kurangi qty ${it.name}`}
+                          aria-label={`Ubah jumlah ${it.name}, sekarang ${formatQuantity(it.quantity, it.uom)}`}
                           onClick={() => {
                             playPop();
-                            onUpdateQty(it.variantId, -1);
+                            onEditQty(it);
                           }}
-                          className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
+                          className="pos-touch-target flex items-center gap-1.5 rounded-pill border border-card-border bg-base px-3 font-mono text-sm font-bold tabular-nums text-main hover:bg-sweet-custard/40"
                         >
-                          <Minus className="h-4 w-4" aria-hidden="true" />
+                          {formatQuantity(it.quantity, it.uom)}
+                          <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         </button>
-                        <span className="w-7 text-center font-mono text-sm font-bold tabular-nums">
-                          {it.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Tambah qty ${it.name}`}
-                          onClick={() => {
-                            playPop();
-                            onUpdateQty(it.variantId, 1);
-                          }}
-                          className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
-                        >
-                          <Plus className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center rounded-pill border border-card-border bg-base p-0.5">
+                          <button
+                            type="button"
+                            aria-label={`Kurangi qty ${it.name}`}
+                            onClick={() => {
+                              playPop();
+                              onUpdateQty(it.variantId, -1);
+                            }}
+                            className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
+                          >
+                            <Minus className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          <span className="w-7 text-center font-mono text-sm font-bold tabular-nums">
+                            {it.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Tambah qty ${it.name}`}
+                            onClick={() => {
+                              playPop();
+                              onUpdateQty(it.variantId, 1);
+                            }}
+                            className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
+                          >
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      )}
 
                       {/* Line Total */}
                       <span className="w-20 text-right font-mono text-sm font-bold tabular-nums">
