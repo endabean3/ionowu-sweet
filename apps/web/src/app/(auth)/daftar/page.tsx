@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { apiRegister } from "@/lib/auth/api";
 import { groupedByArchetype, phaseNote } from "@/lib/business-type/catalog";
+import { naikMasuk } from "@/lib/motion/tokens";
+import { m } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,14 +60,19 @@ export default function DaftarPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-base p-4">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-base p-4">
       {/* Ambient orb — rgba() literal, bukan token+opacity (lihat login/page.tsx) */}
       <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
         <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[rgba(255,164,182,0.2)] blur-[80px]" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[rgba(162,232,206,0.2)] blur-[80px]" />
       </div>
 
-      <div className="relative w-full max-w-sm">
+      <m.div
+        variants={naikMasuk}
+        initial="sembunyi"
+        animate="tampil"
+        className="relative w-full max-w-sm"
+      >
         <div className="milky-glass rounded-[32px] p-8 space-y-6">
           <div className="text-center space-y-1">
             <Image
@@ -82,18 +89,18 @@ export default function DaftarPage() {
 
           {tenantId ? (
             <div className="space-y-4">
-              <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 space-y-2">
+              <output className="block rounded-2xl bg-green-50 border border-green-300 px-4 py-3 text-sm text-green-800 space-y-2">
                 <p className="font-medium">Toko berhasil didaftarkan.</p>
                 <p className="text-xs">Login cukup pakai email dan password yang barusan dibuat.</p>
                 <details className="text-xs">
                   <summary className="cursor-pointer text-green-800">
                     Lihat Tenant ID (untuk dukungan teknis)
                   </summary>
-                  <code className="mt-2 block bg-white/70 rounded-xl px-3 py-2 text-xs font-mono break-all text-main">
+                  <code className="mt-2 block bg-surface/70 rounded-xl px-3 py-2 text-xs font-mono break-all text-main">
                     {tenantId}
                   </code>
                 </details>
-              </div>
+              </output>
               <Button
                 type="button"
                 variant="primary"
@@ -182,7 +189,10 @@ export default function DaftarPage() {
               />
 
               {error && (
-                <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+                <div
+                  role="alert"
+                  className="rounded-2xl bg-red-50 border border-red-300 px-4 py-3 text-sm font-semibold text-red-700"
+                >
                   {error}
                 </div>
               )}
@@ -214,7 +224,7 @@ export default function DaftarPage() {
         </div>
 
         <p className="text-center text-xs text-muted mt-4">ionowu sweet v0.1 · Fase 0</p>
-      </div>
+      </m.div>
     </div>
   );
 }

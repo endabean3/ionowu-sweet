@@ -32,7 +32,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           id={selectId}
           className={clsx(
             "w-full px-4 py-3 rounded-[22px] text-base outline-none transition-all",
-            "bg-white/60 backdrop-blur-sm border border-white/40",
+            "bg-surface/60 backdrop-blur-sm border border-surface/40",
             "shadow-[0_1px_3px_rgba(45,35,30,0.08)]",
             "focus:border-[#A2E8CE] focus:ring-2 focus:ring-[rgba(162,232,206,0.3)]",
             error && "border-red-400 focus:border-red-500 focus:ring-red-200",

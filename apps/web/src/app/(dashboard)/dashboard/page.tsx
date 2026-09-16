@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth/context";
+import { daftarBertahap, naikMasuk } from "@/lib/motion/tokens";
+import { m } from "framer-motion";
 import {
   Activity,
   ArrowLeft,
@@ -65,7 +67,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-base p-4 md:p-8">
+    <div className="min-h-[100dvh] bg-base p-4 md:p-8">
       {/* Top Header. Sebelumnya satu baris flex tanpa wrap: dua tombol + judul
          "Ringkasan Operasional Owner" + badge tenant dipaksa muat di satu
          baris, meluber ~123px di layar 375px (scroll horizontal — dilarang)
@@ -96,66 +98,77 @@ export default function DashboardPage() {
 
       {loading ? (
         <div className="mt-8 flex h-64 items-center justify-center">
-          <p className="font-sans font-bold text-muted animate-pulse">
-            Mengambil data intelijen dari server...
-          </p>
+          <p className="font-sans font-bold text-main">Mengambil data dari server…</p>
         </div>
       ) : (
         <>
           {/* Metric Cards Grid */}
-          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <Card variant="milky" className="space-y-2 shadow-hard">
-              <div className="flex items-center justify-between text-muted">
-                <span className="font-sans text-xs font-bold uppercase tracking-wider">
-                  Penjualan Hari Ini
-                </span>
-                <DollarSign className="h-5 w-5 text-sweet-strawberry" />
-              </div>
-              <p className="font-mono text-3xl font-black tabular-nums text-main">
-                {formatRp(data?.summary?.net_sales || 0)}
-              </p>
-              <p className="font-sans text-xs font-semibold text-muted">Real-time terkini</p>
-            </Card>
+          <m.div
+            variants={daftarBertahap}
+            initial="sembunyi"
+            animate="tampil"
+            className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <m.div variants={naikMasuk} className="flex">
+              <Card variant="milky" className="flex-1 space-y-2 shadow-hard">
+                <div className="flex items-center justify-between text-muted">
+                  <span className="font-sans text-xs font-bold uppercase tracking-wider">
+                    Penjualan Hari Ini
+                  </span>
+                  <DollarSign className="h-5 w-5 text-sweet-strawberry" />
+                </div>
+                <p className="font-mono text-3xl font-black tabular-nums text-main">
+                  {formatRp(data?.summary?.net_sales || 0)}
+                </p>
+                <p className="font-sans text-xs font-semibold text-muted">Real-time terkini</p>
+              </Card>
+            </m.div>
 
-            <Card variant="milky" className="space-y-2 shadow-hard">
-              <div className="flex items-center justify-between text-muted">
-                <span className="font-sans text-xs font-bold uppercase tracking-wider">
-                  Total Transaksi
-                </span>
-                <ShoppingBag className="h-5 w-5 text-sweet-sky" />
-              </div>
-              <p className="font-mono text-3xl font-black tabular-nums text-main">
-                {data?.summary?.transaction_count || 0} Struk
-              </p>
-              <p className="font-sans text-xs font-semibold text-muted">Hari ini</p>
-            </Card>
+            <m.div variants={naikMasuk} className="flex">
+              <Card variant="milky" className="flex-1 space-y-2 shadow-hard">
+                <div className="flex items-center justify-between text-muted">
+                  <span className="font-sans text-xs font-bold uppercase tracking-wider">
+                    Total Transaksi
+                  </span>
+                  <ShoppingBag className="h-5 w-5 text-sweet-sky" />
+                </div>
+                <p className="font-mono text-3xl font-black tabular-nums text-main">
+                  {data?.summary?.transaction_count || 0} Struk
+                </p>
+                <p className="font-sans text-xs font-semibold text-muted">Hari ini</p>
+              </Card>
+            </m.div>
 
-            <Card variant="milky" className="space-y-2 shadow-hard">
-              <div className="flex items-center justify-between text-muted">
-                <span className="font-sans text-xs font-bold uppercase tracking-wider">
-                  Diskon Diberikan
-                </span>
-                <TrendingUp className="h-5 w-5 text-sweet-matcha" />
-              </div>
-              <p className="font-mono text-3xl font-black tabular-nums text-main">
-                {formatRp(data?.summary?.discount_total || 0)}
-              </p>
-              <p className="font-sans text-xs font-semibold text-muted">
-                Dipotong dari gross sales
-              </p>
-            </Card>
+            <m.div variants={naikMasuk} className="flex">
+              <Card variant="milky" className="flex-1 space-y-2 shadow-hard">
+                <div className="flex items-center justify-between text-muted">
+                  <span className="font-sans text-xs font-bold uppercase tracking-wider">
+                    Diskon Diberikan
+                  </span>
+                  <TrendingUp className="h-5 w-5 text-sweet-matcha" />
+                </div>
+                <p className="font-mono text-3xl font-black tabular-nums text-main">
+                  {formatRp(data?.summary?.discount_total || 0)}
+                </p>
+                <p className="font-sans text-xs font-semibold text-muted">
+                  Dipotong dari gross sales
+                </p>
+              </Card>
+            </m.div>
 
-            <Card variant="milky" className="space-y-2 shadow-hard">
-              <div className="flex items-center justify-between text-muted">
-                <span className="font-sans text-xs font-bold uppercase tracking-wider">
-                  Outlet Aktif
-                </span>
-                <Store className="h-5 w-5 text-sweet-taro" />
-              </div>
-              <p className="font-mono text-3xl font-black tabular-nums text-main">1 / 1</p>
-              <p className="font-sans text-xs font-semibold text-muted">Pusat (Shift Open)</p>
-            </Card>
-          </div>
+            <m.div variants={naikMasuk} className="flex">
+              <Card variant="milky" className="flex-1 space-y-2 shadow-hard">
+                <div className="flex items-center justify-between text-muted">
+                  <span className="font-sans text-xs font-bold uppercase tracking-wider">
+                    Outlet Aktif
+                  </span>
+                  <Store className="h-5 w-5 text-sweet-taro" />
+                </div>
+                <p className="font-mono text-3xl font-black tabular-nums text-main">1 / 1</p>
+                <p className="font-sans text-xs font-semibold text-muted">Pusat (Shift Open)</p>
+              </Card>
+            </m.div>
+          </m.div>
 
           {/* Highlights Section */}
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">

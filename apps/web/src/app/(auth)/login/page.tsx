@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/context";
+import { naikMasuk } from "@/lib/motion/tokens";
+import { m } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -46,14 +48,14 @@ export default function LoginPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-base">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-base">
         <div className="text-muted text-sm">Memuat sesi…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-base p-4">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-base p-4">
       {/* Ambient orb — rgba() literal, bukan token/opacity: Tailwind tidak
          bisa menerapkan modifier opacity pada warna yang didefinisikan
          sebagai string var(--x) di tailwind.config.ts (butuh nilai resolved
@@ -65,7 +67,12 @@ export default function LoginPage() {
         <div className="absolute bottom-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[rgba(162,232,206,0.2)] blur-[80px]" />
       </div>
 
-      <div className="relative w-full max-w-sm">
+      <m.div
+        variants={naikMasuk}
+        initial="sembunyi"
+        animate="tampil"
+        className="relative w-full max-w-sm"
+      >
         {/* Card */}
         <div className="milky-glass rounded-[32px] p-8 space-y-6">
           {/* Logo / brand */}
@@ -104,7 +111,10 @@ export default function LoginPage() {
             />
 
             {error && (
-              <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+              <div
+                role="alert"
+                className="rounded-2xl bg-red-50 border border-red-300 px-4 py-3 text-sm font-semibold text-red-700"
+              >
                 {error}
               </div>
             )}
@@ -128,7 +138,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted mt-4">ionowu sweet v0.1 · Fase 0</p>
-      </div>
+      </m.div>
     </div>
   );
 }

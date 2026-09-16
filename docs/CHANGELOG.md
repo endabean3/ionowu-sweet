@@ -4,6 +4,58 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.8.0] — 2026-09-16
+
+### Ditambahkan
+* **framer-motion di seluruh aplikasi** (keputusan pemilik 2026-09-16) — dipasang lewat
+  `LazyMotion features={domAnimation} strict` + `MotionConfig reducedMotion="user"`, dengan token
+  gerak tunggal di `src/lib/motion/tokens.ts` yang diturunkan dari Mochi Spring Physics
+  (fondasi-UI §A). `strict` memaksa komponen `m.*`: satu `motion.*` yang lolos akan menarik
+  seluruh pustaka ke bundle tanpa error dan tanpa ada yang menyadarinya.
+* **`components/ui/modal.tsx`** — dialog bersama untuk modal bayar, shift, dan printer.
+* **Token `--surface`** — permukaan padat yang sadar tema.
+
+### Diubah
+* **`pages/kasir.md` §Zona gerak: `none` → `fungsional`.** Aturan "nol animasi, impor pustaka
+  gerak diblokir dari `/kasir`" dicabut atas keputusan pemilik. Penggantinya bukan pelonggaran
+  bebas: daftar gerak yang boleh beserta alasannya, larangan stagger di grid produk (jalur
+  scan-to-cart < 100 ms), larangan animasi layout, dan kewajiban `prefers-reduced-motion`.
+
+### Diperbaiki
+* **Escape saat dialog terbuka MENGHAPUS isi keranjang.** Layar kasir punya pendengar Escape
+  global yang mengosongkan keranjang; menutup dialog printer/bayar dengan Escape ikut menghapus
+  belanjaan pembeli yang sedang dilayani. `Modal` kini menangkap Escape di fase capture lalu
+  menghentikan penyebarannya. Diverifikasi lewat interaksi nyata di browser: dialog tertutup,
+  keranjang tetap berisi.
+* **Zoom dimatikan di seluruh aplikasi** (`maximumScale: 1`, `userScalable: false`) — melanggar
+  WCAG 1.4.4, memukul pemilik warung berusia 50+ dan kasir yang memeriksa ULID kecil. Diganti
+  `touch-action: manipulation`, yang mematikan double-tap-zoom TANPA mematikan cubit-zoom.
+* **`prefers-reduced-motion` tidak didukung sama sekali** — kini ditangani di CSS dan MotionConfig.
+* **19 permukaan `bg-white` ter-hardcode** menjadi putih di mode gelap sementara teksnya ikut
+  krem; tombol "Sync Now" harfiah putih di atas putih. Semua dipindah ke token `--surface`.
+* **Dialog tanpa semantik** — kini `role="dialog"` + `aria-modal` + nama, perangkap fokus,
+  pengembalian fokus ke pemicu, dan kunci gulir latar.
+* **Kontrol di bawah ambang sentuh 44px** — tombol sync (30px) dan tombol tema (36px) di header.
+* **Tautan tanpa nama di ponsel** — tautan "Dasbor" di layar kasir hanya berisi ikon setelah
+  labelnya disembunyikan `hidden sm:inline`; tombol kembali di katalog dan tambah produk sama.
+* **Baris keranjang terpotong di 375px** — nama produk tinggal satu-dua huruf karena dipaksa
+  satu baris dengan kontrol qty, total, dan tombol hapus. Kini bertingkat di bawah `sm`.
+* **`id` input kembar** — `Input` menurunkan id dari teks label, sehingga dua field berlabel sama
+  (mis. "Harga Jual" di tiap baris varian) berbagi id dan `<label htmlFor>` menunjuk field yang
+  salah. Kini `useId()`, plus `aria-invalid`/`aria-describedby` dan `role="alert"` pada error.
+* **Tema tidak tersimpan** — mode gelap kembali terang setiap muat ulang.
+* **`min-h-screen` (100vh) di lima layar** — di Chrome Android menyisakan konten di bawah bilah
+  alamat; diganti `100dvh`.
+* **Hover menempel di layar sentuh** — `.mochi-button:hover` kini di balik `@media (hover: hover)`.
+
+### Diketahui, belum selesai
+* **Rute `/kasir` 213 kB First Load JS, di atas anggaran 150 KB** (PERFORMANCE-BUDGET §4).
+  Sudah 193 kB sebelum perubahan ini; framer-motion menambah 20 kB. Angka anggaran sengaja tidak
+  dinaikkan, dan gerbang CI yang disebut dokumen itu memang belum pernah ada.
+* Gerak belum diuji di perangkat Android nyata maupun di dalam APK — baru di Chrome 375×812.
+
+---
+
 ## [1.7.0] — 2026-09-14
 
 ### Ditambahkan
