@@ -25,6 +25,12 @@ def ksAlias = propsKeystore.getProperty("keyAlias")      ?: System.getenv("ANDRO
 def ksKeyPass = propsKeystore.getProperty("keyPassword") ?: System.getenv("ANDROID_KEY_PASSWORD")
 def adaKeystore = ksFile != null && ksPass != null && ksAlias != null && ksKeyPass != null
 
+// Play Store menolak unggahan dengan versionCode yang sudah dipakai, jadi
+// nilainya harus bisa dinaikkan dari luar (CI) tanpa mengedit berkas ini di
+// setiap rilis.
+def kodeVersi = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+def namaVersi = System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
+
 android {
     namespace = "id.ionowu.sweet"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -32,11 +38,14 @@ android {
         applicationId "id.ionowu.sweet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Play Store menolak unggahan dengan versionCode yang sudah dipakai,
-        // jadi nilainya harus bisa dinaikkan dari luar (CI) tanpa mengedit
-        // berkas ini di setiap rilis.
-        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
-        versionName (System.getenv("ANDROID_VERSION_NAME") ?: "1.0")
+        // Dihitung di luar blok ini (lihat kodeVersi/namaVersi di atas).
+        // Menulisnya inline sebagai `versionCode (X ?: "1").toInteger()`
+        // TIDAK bekerja: Groovy mengurainya sebagai `versionCode(X)` lebih
+        // dulu, lalu menerapkan sisanya pada hasil panggilan itu — sehingga
+        // versionCode menerima null dan Gradle gagal "Value is null".
+        // Ditemukan oleh gerbang android-build.yml, bukan setelah rilis.
+        versionCode kodeVersi
+        versionName namaVersi
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
