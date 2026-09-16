@@ -54,7 +54,13 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 ### Diketahui, belum selesai
 * **Rute `/kasir` di atas anggaran 150 KB** (PERFORMANCE-BUDGET §4). Sudah melewatinya sebelum
   perubahan ini; framer-motion menambah ~20 kB di atas utang yang sudah ada. Angka anggaran
-  sengaja tidak dinaikkan, dan gerbang CI yang disebut dokumen itu memang belum pernah ada.
+  sengaja tidak dinaikkan agar utangnya tetap terlihat.
+* **Gerbang "Anggaran performa" hijau tanpa menguji apa pun.** `scripts/check-bundle-size.sh`
+  memeriksa `apps/web/.next/static`, tetapi job CI-nya checkout bersih **tanpa build** — direktori
+  itu tidak pernah ada, skrip keluar "dilewati" berstatus 0. Dijalankan pada build nyata ia
+  melaporkan 3501 KB karena menjumlahkan seluruh chunk statis, bukan JS awal per rute yang
+  dianggarkan. Belum diperbaiki di PR ini: memperbaikinya membuat gerbang itu merah sampai utang
+  bundle diselesaikan, dan itu keputusan tersendiri.
 * Gerak belum diuji di perangkat Android nyata maupun di dalam APK — baru di Chrome 375×812.
 
 ## [1.6.4] — 2026-09-14

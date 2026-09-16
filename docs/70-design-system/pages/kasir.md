@@ -104,8 +104,15 @@ baru di jalur `/kasir` harus dibenarkan di PR-nya.
 > Rute ini sudah 193 kB sebelum framer-motion, jadi pelanggarannya **bukan**
 > disebabkan oleh gerak; framer-motion menambah 20 kB di atas utang yang sudah
 > ada. Angka anggaran sengaja TIDAK dinaikkan agar utangnya tetap terlihat.
-> Belum ada gerbang CI yang menegakkannya (PERFORMANCE-BUDGET §4 menyebut
-> "gerbang CI", dan gerbang itu belum ada).
+> **Gerbang CI-nya ada tetapi tidak menguji apa pun.** Job "Anggaran performa"
+> (`ci.yml` → `scripts/check-bundle-size.sh`) melakukan checkout bersih **tanpa
+> langkah build**, sehingga `apps/web/.next/static` tidak pernah ada dan skrip
+> itu keluar dengan "⏭️ dilewati" berstatus 0 — hijau di setiap PR sejak hari
+> pertama. Cacatnya dua lapis: dijalankan pada build nyata (2026-09-16) ia
+> melaporkan **3501 KB**, karena menjumlahkan SELURUH chunk statis alih-alih
+> JS awal per rute yang dianggarkan §4. Memperbaikinya butuh dua hal —
+> membangun dulu di job itu, dan mengukur per rute — dan begitu ia benar,
+> gerbang itu akan MERAH sampai utang bundle di atas diselesaikan.
 
 ## Uji sebelum kirim
 
