@@ -80,92 +80,72 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 
 	productMap := make(map[string]string) // product_name -> product_id
 	totalImported := 0
+	dilewati := []BarisDilewati{}
 
 	for i, row := range records {
 		if i == 0 {
 			continue // Skip header
 		}
-		if len(row) < 7 {
-			continue // Skip baris tidak lengkap
+		nomorBaris := i + 1 // nomor baris di berkas; header = baris 1
+
+		b, alasan := parseBarisImpor(row)
+		if alasan != "" {
+			dilewati = append(dilewati, BarisDilewati{Baris: nomorBaris, Alasan: alasan})
+			continue
 		}
 
-		productName := strings.TrimSpace(row[0])
-		variantName := strings.TrimSpace(row[1])
-		sku := strings.TrimSpace(row[2])
-		barcode := strings.TrimSpace(row[3])
-
-		priceStr := strings.TrimSpace(row[4])
-		costStr := strings.TrimSpace(row[5])
-		uom := strings.TrimSpace(row[6])
-
-		price, _ := decimal.NewFromString(priceStr)
-		cost, _ := decimal.NewFromString(costStr)
-
-		if uom == "" {
-			uom = "pcs"
+		// SAVEPOINT per baris. Di Postgres, satu statement yang gagal
+		// membatalkan SELURUH transaksi: setiap INSERT sesudahnya ditolak
+		// "current transaction is aborted", lalu Commit berubah jadi
+		// rollback. Tanpa savepoint, komentar lama "lewati baris rusak"
+		// tidak pernah benar — satu baris bermasalah menggagalkan seluruh
+		// impor. pgx memetakan tx.Begin di dalam transaksi ke SAVEPOINT.
+		sp, err := tx.Begin(ctx)
+		if err != nil {
+			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal membuat savepoint impor")
+			return
 		}
 
-		uomPrecision := 0
-		if len(row) > 7 && strings.TrimSpace(row[7]) != "" {
-			if p, err := strconv.Atoi(strings.TrimSpace(row[7])); err == nil && p >= 0 && p <= 3 {
-				uomPrecision = p
-			}
-		}
-
-		stockQty := decimal.Zero
-		if len(row) > 8 && strings.TrimSpace(row[8]) != "" {
-			if q, err := decimal.NewFromString(strings.TrimSpace(row[8])); err == nil {
-				stockQty = q
-			}
-		}
-
-		itemType := "stock"
-		if len(row) > 9 && strings.TrimSpace(row[9]) != "" {
-			candidate := strings.TrimSpace(row[9])
-			if !validImportItemTypes[candidate] {
-				continue // item_type tidak dikenal — lewati baris, bukan gagalkan seluruh impor
-			}
-			itemType = candidate
-		}
-
-		productID, exists := productMap[productName]
+		productID, exists := productMap[b.productName]
 		if !exists {
 			// ULID MURNI — products.id/variants.id adalah VARCHAR(26)
 			// (migrations/00003); prefiks membuatnya 29+ karakter dan
 			// INSERT gagal "value too long".
 			productID = ulid.Make().String()
-			_, err = tx.Exec(ctx, `
-				INSERT INTO products (id, tenant_id, name, is_active) 
+			if _, err = sp.Exec(ctx, `
+				INSERT INTO products (id, tenant_id, name, is_active)
 				VALUES ($1, $2, $3, true)
-			`, productID, tenantID, productName)
-			if err != nil {
+			`, productID, tenantID, b.productName); err != nil {
+				_ = sp.Rollback(ctx)
+				dilewati = append(dilewati, BarisDilewati{Baris: nomorBaris, Alasan: "produk gagal disimpan"})
 				continue
 			}
-			productMap[productName] = productID
 		}
 
 		variantID := ulid.Make().String()
-
-		var skuPtr, barcodePtr *string
-		if sku != "" {
-			skuPtr = &sku
-		}
-		if barcode != "" {
-			barcodePtr = &barcode
-		}
 
 		// Kolom sebenarnya adalah cost_price/uom (bukan cost/unit) —
 		// migrations/00003. INSERT dengan nama kolom yang salah sebelumnya
 		// membuat SETIAP baris impor gagal "column does not exist", ditemukan
 		// baru sekarang karena fitur ini belum pernah benar-benar dicoba.
-		_, err = tx.Exec(ctx, `
+		if _, err = sp.Exec(ctx, `
 			INSERT INTO variants (id, tenant_id, product_id, name, sku, barcode, price, cost_price, uom, uom_precision, item_type, stock_quantity, min_stock_alert, is_active)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 0, true)
-		`, variantID, tenantID, productID, variantName, skuPtr, barcodePtr, price, cost, uom, uomPrecision, itemType, stockQty)
-
-		if err == nil {
-			totalImported++
+		`, variantID, tenantID, productID, b.variantName, b.sku, b.barcode, b.price, b.cost, b.uom, b.uomPrecision, b.itemType, b.stockQty); err != nil {
+			_ = sp.Rollback(ctx)
+			dilewati = append(dilewati, BarisDilewati{Baris: nomorBaris, Alasan: "varian gagal disimpan (barcode/SKU ganda?)"})
+			continue
 		}
+
+		if err = sp.Commit(ctx); err != nil {
+			dilewati = append(dilewati, BarisDilewati{Baris: nomorBaris, Alasan: "baris gagal dikonfirmasi"})
+			continue
+		}
+		// Dicatat SETELAH savepoint lolos. Kalau dicatat lebih awal, produk
+		// yang ikut ter-rollback akan tetap dirujuk baris berikutnya — dan
+		// varian-variannya menunjuk ke products.id yang tidak pernah ada.
+		productMap[b.productName] = productID
+		totalImported++
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -176,5 +156,118 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 	RespondJSON(w, http.StatusCreated, map[string]any{
 		"message":       "Impor selesai",
 		"total_records": totalImported,
+		// Baris yang dilewati DILAPORKAN, bukan hilang diam-diam. Pemilik
+		// yang mengimpor 150 barang harus tahu persis mana yang tidak masuk.
+		"dilewati": dilewati,
 	})
+}
+
+// BarisDilewati melaporkan baris CSV yang tidak diimpor beserta alasannya.
+type BarisDilewati struct {
+	Baris  int    `json:"baris"`
+	Alasan string `json:"alasan"`
+}
+
+type barisImpor struct {
+	productName, variantName string
+	sku, barcode             *string
+	price, cost              decimal.Decimal
+	uom                      string
+	uomPrecision             int
+	stockQty                 decimal.Decimal
+	itemType                 string
+}
+
+// parseBarisImpor memvalidasi satu baris CSV. Fungsi murni — tanpa database —
+// supaya aturannya bisa diuji langsung.
+//
+// Mengembalikan alasan penolakan (string kosong = sah). Setiap aturan di sini
+// dulunya "diam-diam": nilai rusak diubah jadi nol lalu tetap diimpor.
+func parseBarisImpor(row []string) (barisImpor, string) {
+	if len(row) < 7 {
+		return barisImpor{}, "kolom kurang dari 7"
+	}
+	kol := func(i int) string {
+		if i < len(row) {
+			return strings.TrimSpace(row[i])
+		}
+		return ""
+	}
+
+	b := barisImpor{
+		productName: kol(0),
+		variantName: kol(1),
+		uom:         kol(6),
+		itemType:    "stock",
+	}
+	if b.productName == "" {
+		return barisImpor{}, "nama produk kosong"
+	}
+	if b.variantName == "" {
+		b.variantName = "Reguler"
+	}
+	if sku := kol(2); sku != "" {
+		b.sku = &sku
+	}
+	// Barcode kosong WAJIB jadi NULL — idx_variants_barcode unik pada
+	// (tenant_id, barcode) untuk yang bukan NULL; string kosong ikut terindeks.
+	if barcode := kol(3); barcode != "" {
+		b.barcode = &barcode
+	}
+
+	// Harga WAJIB ada. Sebelumnya harga kosong/rusak diabaikan errornya dan
+	// menjadi Rp 0 — barangnya masuk kasir dan bisa terjual GRATIS.
+	price, err := decimal.NewFromString(kol(4))
+	if err != nil {
+		return barisImpor{}, "harga kosong atau bukan angka"
+	}
+	if price.IsNegative() {
+		return barisImpor{}, "harga negatif"
+	}
+	b.price = price
+
+	// Harga modal boleh kosong (HPP sering belum dicatat), tetapi bila diisi
+	// harus sah.
+	if c := kol(5); c != "" {
+		cost, err := decimal.NewFromString(c)
+		if err != nil || cost.IsNegative() {
+			return barisImpor{}, "harga modal tidak valid"
+		}
+		b.cost = cost
+	}
+
+	if b.uom == "" {
+		b.uom = "pcs"
+	}
+
+	if p := kol(7); p != "" {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 || n > 3 {
+			return barisImpor{}, "presisi satuan harus 0-3"
+		}
+		b.uomPrecision = n
+	}
+
+	// Stok boleh kosong (= 0) dan boleh NEGATIF: transaksi offline yang sudah
+	// terjadi tidak pernah ditolak (CLAUDE.md §6.4). Yang ditolak hanya
+	// isian yang bukan angka.
+	if q := kol(8); q != "" {
+		qty, err := decimal.NewFromString(q)
+		if err != nil {
+			return barisImpor{}, "stok bukan angka"
+		}
+		if -qty.Exponent() > int32(b.uomPrecision) && !qty.Equal(qty.Truncate(int32(b.uomPrecision))) {
+			return barisImpor{}, "stok punya desimal melebihi presisi satuan"
+		}
+		b.stockQty = qty
+	}
+
+	if t := kol(9); t != "" {
+		if !validImportItemTypes[t] {
+			return barisImpor{}, "jenis barang tidak dikenal"
+		}
+		b.itemType = t
+	}
+
+	return b, ""
 }

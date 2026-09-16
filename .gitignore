@@ -137,3 +137,9 @@ apps/web/android/.gradle/
 apps/web/android/local.properties
 apps/web/android/app/src/main/assets/public/
 apps/web/android/app/src/main/assets/capacitor.config.json
+
+# Unduhan artefak APK dari GitHub Actions (`gh run download`). Pernah ikut
+# ter-commit lewat `git add -A` dan meninggalkan beberapa APK ±5 MB di riwayat
+# main. Artefak build hidup di Actions (14 hari), bukan di repo.
+dist-apk/
+*.apk

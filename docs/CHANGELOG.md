@@ -4,6 +4,32 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.13.0] — 2026-09-16
+
+Ditemukan saat menyiapkan impor inventaris nyata Warung Wangi (171 entri, stock opname
+11–12 Sep 2026) — importer ini, menurut komentarnya sendiri, "belum pernah benar-benar dicoba".
+
+### Diperbaiki
+* **Harga kosong diimpor sebagai Rp 0.** `decimal.NewFromString("")` gagal, errornya diabaikan,
+  dan barangnya masuk kasir dengan harga nol — bisa terjual gratis. Inventaris Warung Wangi punya
+  8 barang tanpa harga. Kini baris tanpa harga ditolak; `"0"` yang ditulis eksplisit tetap diterima.
+* **Satu baris rusak menggagalkan SELURUH impor.** Komentar kode menjanjikan "lewati baris rusak",
+  tetapi di Postgres satu statement gagal membatalkan seluruh transaksi (`current transaction is
+  aborted`) dan Commit berubah jadi rollback. Kini setiap baris diproses dalam SAVEPOINT sendiri.
+  Terbukti: berkas dengan barcode ganda di tengah tetap memasukkan baris sesudahnya.
+* **Baris yang dilewati hilang diam-diam.** Respons kini memuat `dilewati: [{baris, alasan}]`.
+* **Nilai rusak lain ikut diam-diam jadi nol** — presisi satuan di luar 0–3, stok bukan angka,
+  harga modal rusak, jenis barang asing. Semuanya kini ditolak dengan alasan.
+* **Kontrak `openapi.yaml` tidak sesuai kenyataan** — menjanjikan `202` asinkron dengan `job_id`,
+  padahal implementasinya selalu sinkron `201`. Kontrak disamakan.
+
+### Terverifikasi
+* 6 uji Go baru untuk `parseBarisImpor` (fungsi murni, tanpa database).
+* Impor nyata 150 barang Warung Wangi ke tenant uji lokal: 150 masuk, 0 dilewati; 80 barang per ml
+  (presisi 1), 71 per biji, 1 per pack; stok desimal tersimpan utuh.
+
+---
+
 ## [1.12.0] — 2026-09-16
 
 Semua temuan di bawah muncul saat APK dipasang di **Redmi 9A sungguhan** (Android 10, RAM

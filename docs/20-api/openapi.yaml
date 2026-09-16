@@ -216,6 +216,17 @@ paths:
     post:
       tags: [products]
       summary: Import produk massal via CSV (FR-14)
+      description: |
+        **Sinkron.** Sebelumnya kontrak ini menjanjikan `202` + `job_id` (asinkron), padahal
+        implementasinya selalu sinkron dan mengembalikan `201`. Kontrak disamakan dengan
+        kenyataan pada 2026-09-16.
+
+        Kolom CSV (baris pertama header, dilewati):
+        `ProductName, VariantName, SKU, Barcode, Price, CostPrice, Uom, UomPrecision, StockQuantity, ItemType`
+
+        Setiap baris diproses dalam SAVEPOINT sendiri: baris yang gagal dilewati dan
+        **dilaporkan** di `dilewati`, baris lain tetap masuk. `Price` wajib diisi — harga
+        kosong ditolak, bukan dianggap Rp 0.
       requestBody:
         required: true
         content:
@@ -226,15 +237,31 @@ paths:
               properties:
                 file: { type: string, format: binary }
       responses:
-        "202":
-          description: Import diterima, diproses async
+        "201":
+          description: Impor selesai
           content:
             application/json:
               schema:
                 type: object
+                required: [message, total_records, dilewati]
                 properties:
-                  job_id: { $ref: "#/components/schemas/ULID" }
-                  rows_received: { type: integer }
+                  message: { type: string, example: Impor selesai }
+                  total_records:
+                    type: integer
+                    description: Jumlah baris yang BERHASIL masuk
+                  dilewati:
+                    type: array
+                    description: Baris yang tidak diimpor beserta alasannya
+                    items:
+                      type: object
+                      required: [baris, alasan]
+                      properties:
+                        baris:
+                          type: integer
+                          description: Nomor baris di berkas (header = 1)
+                        alasan: { type: string, example: harga kosong atau bukan angka }
+        "400":
+          description: Berkas tidak ada, bukan CSV, atau hanya berisi header
 
   # ═══════════════════════════════════════════════════════════════
   # VARIANTS — FR-11..12
