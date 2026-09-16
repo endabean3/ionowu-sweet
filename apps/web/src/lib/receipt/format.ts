@@ -9,9 +9,16 @@ import Decimal from "decimal.js";
 
 export interface ReceiptLine {
   name: string;
-  quantity: number;
+  /**
+   * String desimal, BUKAN number: barang curah dijual 30 ml atau 0,5 kg
+   * (lib/catalog/quantity.ts). `lineGross` di bawah menerimanya apa adanya
+   * lewat Decimal, jadi tidak pernah melewati float.
+   */
+  quantity: string;
   unitPrice: string;
   discount: string;
+  /** Satuan jual; dicetak di struk supaya "30" tidak ambigu. */
+  uom?: string;
 }
 
 export interface ReceiptData {

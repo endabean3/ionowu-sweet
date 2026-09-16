@@ -26,6 +26,15 @@ kasir, ia dekoratif dan tidak boleh ada di sini.
 | Dialog (bayar, shift, printer) | Kaitan ruang antara tombol pemicu dan panel yang terbuka |
 | Badge antrean sync | Perubahan status yang datang sendiri, bukan dari aksi kasir |
 
+**Wajib, dan mahal dipelajari:**
+
+- **`AnimatePresence` TIDAK BOLEH membungkus satu anak bersyarat** (`{kondisi && <X/>}`).
+  Node-nya tertinggal di DOM setelah keluar — `opacity: 0` tetapi `fixed inset-0`
+  dengan pointer-events aktif — dan menelan SETIAP ketukan kasir. Layar tampak
+  normal, tombol Bayar tidak bisa ditekan. Dialog dan bar ringkasan karena itu
+  hanya punya animasi MASUK. Daftar berkunci di dalam `map` tidak terkena dan
+  boleh memakainya.
+
 **Yang tetap dilarang:**
 
 - **Stagger pada grid produk.** Grid dirender ulang setiap huruf yang diketik

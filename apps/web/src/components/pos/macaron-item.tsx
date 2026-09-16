@@ -1,6 +1,7 @@
 "use client";
 
 import { playPop } from "@/lib/audio/haptics";
+import { isCurah } from "@/lib/catalog/quantity";
 import { AlertTriangle, Package, PackageX } from "lucide-react";
 import React from "react";
 
@@ -11,6 +12,10 @@ export interface MacaronProduct {
   price: string;
   stock: string;
   minStockAlert: string;
+  /** Satuan jual varian: pcs, ml, g, kg… (migrasi 00003). */
+  uom: string;
+  /** 0 = dijual utuh; > 0 = curah/timbang dan butuh input jumlah. */
+  uomPrecision: number;
 }
 
 interface MacaronItemProps {
@@ -43,11 +48,17 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
 
   const formattedPrice = Number(product.price).toLocaleString("id-ID");
   const level = stockLevel(product.stock, product.minStockAlert);
+  const curah = isCurah(product.uomPrecision);
 
   return (
     <button
       type="button"
       onClick={handleClick}
+      aria-label={
+        curah
+          ? `${product.name}, isi jumlah dalam ${product.uom}`
+          : `Tambah ${product.name} ke keranjang`
+      }
       className="mochi-button flex flex-col justify-between rounded-squircle-sm border-2 border-card-border bg-card p-4 text-left shadow-hard transition-all hover:bg-sweet-custard/30 pos-touch-target"
     >
       <div className="flex items-start justify-between">
@@ -66,6 +77,9 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
         <h3 className="font-sans text-sm font-bold text-main line-clamp-1">{product.name}</h3>
         <p className="mt-1 font-mono text-base font-extrabold tabular-nums text-main">
           Rp {formattedPrice}
+          {curah && (
+            <span className="font-sans text-xs font-bold text-muted"> / {product.uom}</span>
+          )}
         </p>
       </div>
     </button>

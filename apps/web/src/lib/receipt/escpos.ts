@@ -136,7 +136,11 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
 
   for (const l of data.lines) {
     out.lines(wrap(t(l.name), w));
-    out.lines(row(`${l.quantity} x ${rupiah(l.unitPrice)}`, rupiah(lineGross(l)), w));
+    // Satuan ikut dicetak untuk barang curah: "30 ml x Rp 500". Tanpa itu
+    // struk parfum refill hanya berbunyi "30 x Rp 500" dan pembeli tidak
+    // bisa memastikan ia ditagih untuk 30 ml, bukan 30 botol.
+    const satuan = l.uom ? ` ${t(l.uom)}` : "";
+    out.lines(row(`${l.quantity}${satuan} x ${rupiah(l.unitPrice)}`, rupiah(lineGross(l)), w));
     const diskon = lineDiscount(l);
     if (diskon.gt(0)) out.lines(row("Diskon", `-${rupiah(diskon)}`, w));
   }

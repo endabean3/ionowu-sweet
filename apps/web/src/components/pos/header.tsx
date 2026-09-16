@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { naikMasukTegas } from "@/lib/motion/tokens";
 import { useSync } from "@/lib/sync/provider";
 import { useLiveQuery } from "dexie-react-hooks";
-import { AnimatePresence, m } from "framer-motion";
+import { m } from "framer-motion";
 import { Moon, RefreshCw, Sun, Wifi, WifiOff } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
@@ -178,25 +178,24 @@ export function POSHeader({ outletId }: HeaderProps) {
         </div>
 
         {/* Sync Queue Badge */}
-        <AnimatePresence>
-          {pendingCount > 0 && (
-            <m.div
-              key="antrean"
-              variants={naikMasukTegas}
-              initial="sembunyi"
-              animate="tampil"
-              exit="pergi"
-              aria-live="polite"
-              className="flex items-center gap-1.5 rounded-pill border-2 border-card-border bg-sweet-custard px-3 py-1.5 font-mono text-xs font-bold text-main shadow-hard-sm"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
-                aria-hidden="true"
-              />
-              <span>{pendingCount} antrean menunggu kirim</span>
-            </m.div>
-          )}
-        </AnimatePresence>
+        {/* Tanpa AnimatePresence — alasannya di kasir/page.tsx: anak tunggal
+           bersyarat meninggalkan node tersangkut yang menelan ketukan. */}
+        {pendingCount > 0 && (
+          <m.div
+            key="antrean"
+            variants={naikMasukTegas}
+            initial="sembunyi"
+            animate="tampil"
+            aria-live="polite"
+            className="flex items-center gap-1.5 rounded-pill border-2 border-card-border bg-sweet-custard px-3 py-1.5 font-mono text-xs font-bold text-main shadow-hard-sm"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
+            <span>{pendingCount} antrean menunggu kirim</span>
+          </m.div>
+        )}
 
         {/* Dark/Light Toggle */}
         <button

@@ -18,6 +18,13 @@ export interface CreateProductPayload {
     price: string;
     costPrice: string;
     uom: string;
+    /**
+     * Angka desimal yang diizinkan untuk kuantitas jual (0–3, migrasi 00003).
+     * 0 = dijual utuh. > 0 = curah/timbang, dan HANYA nilai ini yang membuat
+     * layar kasir menampilkan dialog jumlah — tanpa dikirim, varian "ml"
+     * tetap tersimpan berpresisi 0 dan parfum refill tidak bisa dijual 30 ml.
+     */
+    uomPrecision: number;
   }[];
 }
 
@@ -38,6 +45,7 @@ export async function createProduct(accessToken: string, payload: CreateProductP
         price: v.price,
         cost_price: v.costPrice,
         uom: v.uom,
+        uom_precision: v.uomPrecision,
       })),
     }),
   });

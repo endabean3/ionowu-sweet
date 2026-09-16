@@ -1,5 +1,6 @@
 "use client";
 
+import { formatQuantity } from "@/lib/catalog/quantity";
 import {
   METHOD_LABEL,
   type ReceiptData,
@@ -57,7 +58,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
               <div>{l.name}</div>
               <div className="receipt-row receipt-small">
                 <span>
-                  {l.quantity} × {rupiah(l.unitPrice)}
+                  {l.uom ? formatQuantity(l.quantity, l.uom) : l.quantity} × {rupiah(l.unitPrice)}
                 </span>
                 <span>{rupiah(lineGross(l))}</span>
               </div>

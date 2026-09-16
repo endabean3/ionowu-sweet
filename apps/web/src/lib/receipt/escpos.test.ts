@@ -49,24 +49,25 @@ const contoh: ReceiptData = {
   lines: [
     {
       name: "Parfum Refill Aroma Vanilla Bourbon Édition Spesial",
-      quantity: 2,
-      unitPrice: "5000.00",
+      quantity: "30",
+      unitPrice: "500.00",
       discount: "0",
+      uom: "ml",
     },
-    { name: "Botol Spray 30ml", quantity: 1, unitPrice: "3500.00", discount: "500.00" },
+    { name: "Botol Spray 30ml", quantity: "1", unitPrice: "3500.00", discount: "500.00" },
   ],
-  subtotal: "13000.00",
-  taxTotal: "1430.00",
-  grandTotal: "14430.00",
+  subtotal: "18500.00",
+  taxTotal: "2035.00",
+  grandTotal: "20035.00",
   method: "cash",
-  givenAmount: 20000,
-  changeAmount: 5570,
+  givenAmount: 25000,
+  changeAmount: 4965,
   pending: true,
 };
 
 describe("rupiah", () => {
   it("memisah ribuan dengan titik dan membulatkan half-up", () => {
-    expect(rupiah("14430.00")).toBe("Rp 14.430");
+    expect(rupiah("20035.00")).toBe("Rp 20.035");
     expect(rupiah("1234567.49")).toBe("Rp 1.234.567");
     expect(rupiah("0.50")).toBe("Rp 1");
     expect(rupiah(0)).toBe("Rp 0");
@@ -109,12 +110,13 @@ describe("encodeReceipt", () => {
     const { lines } = decode(encodeReceipt(contoh, 58));
     expect(lines).toContain("Warung Wangi Dongko");
     expect(lines).toContain("Kasir: Siti");
-    expect(lines).toContain(row("2 x Rp 5.000", "Rp 10.000", 32)[0]);
+    // Barang curah: satuan wajib ikut tercetak.
+    expect(lines).toContain(row("30 ml x Rp 500", "Rp 15.000", 32)[0]);
     expect(lines).toContain(row("Diskon", "-Rp 500", 32)[0]);
-    expect(lines).toContain(row("PPN", "Rp 1.430", 32)[0]);
-    expect(lines).toContain(row("TOTAL", "Rp 14.430", 32)[0]);
-    expect(lines).toContain(row("Tunai", "Rp 20.000", 32)[0]);
-    expect(lines).toContain(row("Kembali", "Rp 5.570", 32)[0]);
+    expect(lines).toContain(row("PPN", "Rp 2.035", 32)[0]);
+    expect(lines).toContain(row("TOTAL", "Rp 20.035", 32)[0]);
+    expect(lines).toContain(row("Tunai", "Rp 25.000", 32)[0]);
+    expect(lines).toContain(row("Kembali", "Rp 4.965", 32)[0]);
     expect(lines).toContain(`No. ${contoh.transactionId}`);
     expect(lines).toContain("(belum tersinkronisasi)");
   });

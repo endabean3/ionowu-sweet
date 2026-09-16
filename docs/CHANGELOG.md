@@ -4,6 +4,46 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.10.0] — 2026-09-16
+
+### Ditambahkan
+* **Kasir bisa menjual per ml dan per gram** — kebutuhan inti arketipe B, yaitu KEDUA pelanggan
+  yang sudah pasti (CLAUDE.md §2). Sebelumnya `CartLine.quantity` bertipe `number` bulat dan
+  satu-satunya cara mengubahnya adalah tombol +/- yang melangkah satu-satu: Warung Wangi tidak
+  punya cara memasukkan "30 ml" sama sekali, dan Media Boga tidak bisa menimbang 250 g.
+  Database, API, dan `calculateCart` sudah mendukungnya sejak awal — hanya layar kasir yang
+  mengabaikan `uom_precision`.
+  * `src/lib/catalog/quantity.ts` — logika murni (11 uji): menerima koma maupun titik, menolak
+    nol/negatif, dan **menolak** desimal yang melebihi presisi satuan alih-alih membulatkannya
+    diam-diam. Membulatkan berarti menagih pembeli untuk jumlah yang tidak ia minta.
+  * `qty-keypad.tsx` — dialog jumlah keyboard-first dengan pratinjau harga; muncul HANYA untuk
+    varian berpresisi > 0. Barang `pcs` tetap satu ketuk tanpa langkah tambahan.
+  * Kuantitas mengalir sebagai **string desimal** dari keranjang → `calculateCart` → payload sync
+    (`qty`), tidak pernah lewat float (CLAUDE.md §6.3). Terverifikasi pada transaksi nyata:
+    payload berisi `qty: "30"`, struk mencetak `30 ml × Rp 500`.
+  * Form Tambah Produk kini punya pilihan **Utuh / Pecahan**; sebelumnya `uom_precision` tidak
+    pernah dikirim, sehingga varian "ml" pun tersimpan berpresisi 0 dan fitur ini tidak akan
+    pernah terjangkau dari UI.
+
+### Diperbaiki
+* **Lapisan tak terlihat menelan seluruh ketukan kasir — regresi dari 1.8.0.** `AnimatePresence`
+  yang membungkus SATU anak bersyarat meninggalkan node-nya di DOM setelah keluar: `opacity: 0`
+  tetapi `fixed inset-0` dengan pointer-events aktif. Layar tampak normal, tetapi tombol Bayar
+  tidak bisa ditekan sama sekali. Terbukti pada modal shift, dialog jumlah, dan bar ringkasan
+  bawah; daftar baris keranjang (anak berkunci di dalam map) tidak terkena. Animasi KELUAR untuk
+  keempatnya dihapus — di mesin kasir, layar yang tidak bisa disentuh jauh lebih mahal daripada
+  transisi yang hilang. Ditemukan lewat `getComputedStyle` + `elementFromPoint` pada dialog yang
+  tersangkut, bukan dari membaca kode.
+* **Modal shift berkedip di setiap muat halaman.** `useLiveQuery` mengembalikan `undefined` baik
+  saat masih memuat maupun saat memang tidak ada shift, sehingga modal ter-mount lalu langsung
+  di-unmount — dan mount→unmount secepat itulah yang memicu node tersangkut di atas. Kini
+  memakai nilai awal `null` untuk membedakan "belum tahu" dari "tidak ada".
+* **Tenant hanya bisa punya SATU produk tanpa barcode.** `PostProduct` menyimpan string kosong,
+  bukan NULL, sedangkan `idx_variants_barcode` UNIK pada `(tenant_id, barcode)` untuk barcode
+  bukan-NULL. Produk pertama berhasil, produk KEDUA selalu gagal 500 "Gagal menyimpan varian".
+  Ditemukan saat menambah produk kedua di aplikasi nyata — cacat ini tidak terlihat dari membaca
+  kode karena produk pertama selalu berhasil.
+
 ## [1.9.0] — 2026-09-16
 
 > Nomor 1.7.0 ada di bawah (PR #16, cetak struk Bluetooth) — dirilis lebih dulu menurut tanggal,
