@@ -11,6 +11,7 @@ orang yang panik**. Karena itu: langkah bernomor, perintah siap salin, tanpa pro
 | [database-full.md](./database-full.md) | Disk penuh; Postgres menolak tulis |
 | [tenant-data-missing.md](./tenant-data-missing.md) | Tenant melapor transaksinya hilang |
 | [suspected-data-bleed.md](./suspected-data-bleed.md) | 🔴 Dugaan kebocoran antar-tenant |
+| [deploy-pertama.md](./deploy-pertama.md) | Deploy produksi pertama — dari DNS sampai login dari APK |
 
 ## Aturan Umum
 
