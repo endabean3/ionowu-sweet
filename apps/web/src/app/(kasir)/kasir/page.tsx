@@ -9,6 +9,7 @@ import { Receipt, type ReceiptData } from "@/components/pos/receipt";
 import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
+import { profilTerakhir } from "@/lib/auth/profile";
 import { isCurah } from "@/lib/catalog/quantity";
 import { db } from "@/lib/db";
 import { calculateCart } from "@/lib/money/calc";
@@ -34,6 +35,9 @@ import { ShiftModal } from "./shift-modal";
 
 export default function KasirPage() {
   const { user } = useAuth();
+  /** Sesi hidup bila ada; kalau tidak, identitas terakhir di perangkat ini
+   *  (lib/auth/profile.ts) — kasir offline tetap punya tenant yang benar. */
+  const identitas = user ?? profilTerakhir();
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cartItems, setCartItems] = useState<CartLine[]>([]);
@@ -335,7 +339,7 @@ export default function KasirPage() {
         // masih benar secara mekanis (ULID tetap unik), tapi
         // SyncQueueEntry.tenant_id jadi tidak berarti apa-apa untuk query
         // lokal yang memfilternya (db/index.ts). Diambil dari sesi login.
-        tenantId: user?.tenant_id ?? "",
+        tenantId: identitas?.tenant_id ?? "",
         outletId: activeShift.outlet_id,
         type: "sale",
         payload: {
@@ -377,7 +381,7 @@ export default function KasirPage() {
         transactionId: txId,
         occurredAt: new Date().toISOString(),
         outletName: outlet?.name ?? "Toko",
-        cashierName: user?.name ?? "Kasir",
+        cashierName: identitas?.name ?? "Kasir",
         lines: cartItems.map((it) => ({
           name: it.name,
           quantity: it.quantity,

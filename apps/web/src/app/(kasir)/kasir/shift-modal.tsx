@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/lib/auth/context";
+import { profilTerakhir } from "@/lib/auth/profile";
 import { db } from "@/lib/db";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { Clock, Coffee, Lock, Store } from "lucide-react";
@@ -20,10 +21,26 @@ interface OutletRow {
 export function ShiftModal({ onClose }: { onClose: () => void }) {
   const [openingCash, setOpeningCash] = useState("");
   const { user, accessToken } = useAuth();
+  /**
+   * Sesi hidup bila ada; kalau tidak, identitas terakhir di perangkat ini.
+   * Kasir yang membuka aplikasi saat toko offline punya `user === null` —
+   * tanpa cadangan ini, cache outlet tak terbaca dan shift-nya dibuat dengan
+   * tenant tebakan.
+   */
+  const identitas = user ?? profilTerakhir();
   const [submitting, setSubmitting] = useState(false);
   const openingRef = useRef(false);
   const [outlets, setOutlets] = useState<OutletRow[] | null>(null);
   const [selectedOutletId, setSelectedOutletId] = useState<string>("");
+  /**
+   * DARI MANA daftar outlet itu datang. Tanpa ini, "server tidak bisa
+   * dihubungi" dan "Anda memang belum ditugaskan ke outlet" berakhir di layar
+   * yang sama persis — dan pesannya menyuruh pemilik warung menghubungi
+   * manajer padahal yang mati adalah servernya. Terlihat saat membuka APK di
+   * ponsel sungguhan sebelum backend dideploy.
+   */
+  const [sumberOutlet, setSumberOutlet] = useState<"server" | "cache" | "gagal" | null>(null);
+  const [memuatUlang, setMemuatUlang] = useState(0);
 
   // GET /outlets sekarang sudah discope server (MULTI-OUTLET.md §3): kasir
   // hanya menerima outlet yang ditugaskan padanya, owner/manager menerima
@@ -37,6 +54,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
   // invarian #2 (CLAUDE.md §6) menjamin "kasir tetap bisa berjualan meski
   // internet mati". Kegagalan jaringan jatuh ke cache terakhir sebelum
   // menyerah.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: memuatUlang sengaja dipakai sebagai pemicu tombol "Coba lagi"
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -47,27 +65,30 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
         if (!res.ok) throw new Error("Gagal memuat daftar outlet");
         const { data }: { data: OutletRow[] } = await res.json();
         if (cancelled) return;
+        setSumberOutlet("server");
         const rows = data ?? [];
         setOutlets(rows);
         if (rows.length === 1) {
           setSelectedOutletId(rows[0].id);
         }
-        if (rows.length > 0 && user?.tenant_id) {
+        if (rows.length > 0 && identitas?.tenant_id) {
           await db.outlets.bulkPut(
-            rows.map((o) => ({ id: o.id, tenant_id: user.tenant_id, name: o.name })),
+            rows.map((o) => ({ id: o.id, tenant_id: identitas.tenant_id, name: o.name })),
           );
         }
       } catch {
         if (cancelled) return;
-        const cached = user?.tenant_id
-          ? await db.outlets.where("tenant_id").equals(user.tenant_id).toArray()
+        const cached = identitas?.tenant_id
+          ? await db.outlets.where("tenant_id").equals(identitas.tenant_id).toArray()
           : [];
         if (cached.length > 0) {
           toast.warning("Offline — memakai daftar outlet tersimpan terakhir");
+          setSumberOutlet("cache");
           setOutlets(cached);
           if (cached.length === 1) setSelectedOutletId(cached[0].id);
         } else {
-          toast.error("Gagal memuat daftar outlet");
+          toast.error("Gagal menghubungi server");
+          setSumberOutlet("gagal");
           setOutlets([]);
         }
       }
@@ -75,7 +96,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, user?.tenant_id]);
+  }, [accessToken, identitas?.tenant_id, memuatUlang]);
 
   const handleOpenShift = async () => {
     if (!selectedOutletId) {
@@ -97,7 +118,15 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
       // ditolak server (client tidak menampilkan error, item cuma tertahan
       // di antrean lokal selamanya).
       const shiftId = ulid();
-      const tenantId = user?.tenant_id || "tenant_default";
+      // TIDAK ADA lagi fallback "tenant_default". Shift bertenant palsu lebih
+      // buruk daripada shift yang gagal dibuat: ia menumpuk di perangkat,
+      // ditolak server saat sync, dan angkanya tidak pernah muncul di laporan
+      // pemilik — kegagalan yang diam.
+      const tenantId = identitas?.tenant_id;
+      if (!tenantId) {
+        toast.error("Sesi perangkat ini tidak dikenal. Login ulang saat ada internet.");
+        return;
+      }
       const outletId = selectedOutletId;
 
       const cash = Number.parseFloat(openingCash) || 0;
@@ -106,7 +135,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
         id: shiftId,
         tenant_id: tenantId,
         outlet_id: outletId,
-        cashier_id: user?.id || "cashier",
+        cashier_id: identitas?.id ?? "",
         opened_at: new Date().toISOString(),
         opening_cash: cash.toString(),
         status: "open" as const,
@@ -171,10 +200,35 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {outlets && outlets.length === 0 && (
+        {sumberOutlet === "gagal" && (
+          <div
+            role="alert"
+            className="mt-6 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-left font-sans text-sm text-red-800"
+          >
+            <p className="font-bold">Tidak bisa menghubungi server.</p>
+            <p className="mt-1">
+              Periksa koneksi internet perangkat ini. Bila internetnya normal, kemungkinan server
+              sedang tidak aktif — hubungi yang memasang aplikasi.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => {
+                setSumberOutlet(null);
+                setOutlets(null);
+                setMemuatUlang((n) => n + 1);
+              }}
+            >
+              Coba lagi
+            </Button>
+          </div>
+        )}
+
+        {sumberOutlet === "server" && outlets?.length === 0 && (
           <p
             role="alert"
-            className="mt-6 rounded-xl border-2 border-red-200 bg-red-50 p-3 font-sans text-sm font-bold text-red-700"
+            className="mt-6 rounded-xl border-2 border-red-300 bg-red-50 p-3 font-sans text-sm font-bold text-red-800"
           >
             Anda belum ditugaskan ke outlet mana pun. Hubungi owner/manager.
           </p>
