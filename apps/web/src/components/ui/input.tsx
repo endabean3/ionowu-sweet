@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { type InputHTMLAttributes, forwardRef } from "react";
+import { type InputHTMLAttributes, forwardRef, useId } from "react";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -13,7 +13,14 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  */
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, className, id, ...props }, ref) => {
-    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+    // useId, bukan label yang di-slug: dua field berlabel sama di satu halaman
+    // (mis. "Harga Jual" di tiap baris varian) menghasilkan id KEMBAR, dan
+    // <label htmlFor> kembar membuat ketukan pada label kedua memindahkan
+    // fokus ke input pertama.
+    const autoId = useId();
+    const inputId = id ?? autoId;
+    const errorId = `${inputId}-error`;
+    const hintId = `${inputId}-hint`;
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -25,11 +32,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : hint ? hintId : undefined}
           className={clsx(
             // Base
             "w-full px-4 py-3 rounded-[22px] text-base outline-none transition-all",
             // Background & border
-            "bg-white/60 backdrop-blur-sm border border-white/40",
+            "bg-surface/60 backdrop-blur-sm border border-surface/40",
             "shadow-[0_1px_3px_rgba(45,35,30,0.08)]",
             // Focus — ring matcha. Warna literal, bukan token+opacity: lihat
             // catatan di login/page.tsx soal keterbatasan opacity-modifier
@@ -45,8 +54,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           {...props}
         />
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        {hint && !error && <p className="text-xs text-muted">{hint}</p>}
+        {error && (
+          <p id={errorId} role="alert" className="text-xs font-semibold text-red-700">
+            {error}
+          </p>
+        )}
+        {hint && !error && (
+          <p id={hintId} className="text-xs text-muted">
+            {hint}
+          </p>
+        )}
       </div>
     );
   },

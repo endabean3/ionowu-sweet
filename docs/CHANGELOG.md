@@ -6,9 +6,8 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ## [1.9.0] — 2026-09-16
 
-> Nomor 1.7.0 dan 1.8.0 dilewati dengan sengaja: keduanya dipakai PR yang belum masuk `main`
-> (#16 cetak struk Bluetooth, #21 framer-motion + perapian UI). Urutannya tetap benar menurut
-> tanggal begitu PR-PR itu merge.
+> Nomor 1.7.0 dilewati dengan sengaja: ia dipakai PR #16 (cetak struk Bluetooth) yang belum
+> masuk `main`. Urutannya tetap benar menurut tanggal begitu PR itu merge.
 
 ### Ditambahkan
 * **Jalur rilis Google Play** — `PLAY-STORE.md` + konfigurasi penandatanganan rilis di
@@ -29,6 +28,67 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   **bertanda tangan** — itu butuh keystore yang hanya boleh dibuat pemilik.
 * **Yang memblokir penerbitan bukan kode:** keystore rilis (hanya pemilik yang boleh membuatnya),
   akun Play Console, dan **URL kebijakan privasi** semuanya belum ada.
+
+---
+
+## [1.8.0] — 2026-09-16
+
+> Nomor 1.7.0 dilewati dengan sengaja: ia dipakai PR cetak struk Bluetooth (#16) yang belum
+> masuk `main`. Begitu PR itu merge, urutannya tetap benar menurut tanggal.
+
+### Ditambahkan
+* **framer-motion di seluruh aplikasi** (keputusan pemilik 2026-09-16) — dipasang lewat
+  `LazyMotion features={domAnimation} strict` + `MotionConfig reducedMotion="user"`, dengan token
+  gerak tunggal di `src/lib/motion/tokens.ts` yang diturunkan dari Mochi Spring Physics
+  (fondasi-UI §A). `strict` memaksa komponen `m.*`: satu `motion.*` yang lolos akan menarik
+  seluruh pustaka ke bundle tanpa error dan tanpa ada yang menyadarinya.
+* **`components/ui/modal.tsx`** — dialog bersama untuk modal bayar dan shift.
+* **Token `--surface`** — permukaan padat yang sadar tema.
+
+### Diubah
+* **`pages/kasir.md` §Zona gerak: `none` → `fungsional`.** Aturan "nol animasi, impor pustaka
+  gerak diblokir dari `/kasir`" dicabut atas keputusan pemilik. Penggantinya bukan pelonggaran
+  bebas: daftar gerak yang boleh beserta alasannya, larangan stagger di grid produk (jalur
+  scan-to-cart < 100 ms), larangan animasi layout, dan kewajiban `prefers-reduced-motion`.
+
+### Diperbaiki
+* **Escape saat dialog terbuka MENGHAPUS isi keranjang.** Layar kasir punya pendengar Escape
+  global yang mengosongkan keranjang; menutup dialog pembayaran dengan Escape ikut menghapus
+  belanjaan pembeli yang sedang dilayani. `Modal` kini menangkap Escape di fase capture lalu
+  menghentikan penyebarannya. Diverifikasi lewat interaksi nyata di browser: dialog tertutup,
+  keranjang tetap berisi.
+* **Zoom dimatikan di seluruh aplikasi** (`maximumScale: 1`, `userScalable: false`) — melanggar
+  WCAG 1.4.4, memukul pemilik warung berusia 50+ dan kasir yang memeriksa ULID kecil. Diganti
+  `touch-action: manipulation`, yang mematikan double-tap-zoom TANPA mematikan cubit-zoom.
+* **`prefers-reduced-motion` tidak didukung sama sekali** — kini ditangani di CSS dan MotionConfig.
+* **18 permukaan `bg-white` ter-hardcode** menjadi putih di mode gelap sementara teksnya ikut
+  krem; tombol "Sync Now" harfiah putih di atas putih. Semua dipindah ke token `--surface`.
+* **Dialog tanpa semantik** — kini `role="dialog"` + `aria-modal` + nama, perangkap fokus,
+  pengembalian fokus ke pemicu, dan kunci gulir latar.
+* **Kontrol di bawah ambang sentuh 44px** — tombol sync (30px) dan tombol tema (36px) di header.
+* **Tautan tanpa nama di ponsel** — tautan "Dasbor" di layar kasir hanya berisi ikon setelah
+  labelnya disembunyikan `hidden sm:inline`; tombol kembali di katalog dan tambah produk sama.
+* **Baris keranjang terpotong di 375px** — nama produk tinggal satu-dua huruf karena dipaksa
+  satu baris dengan kontrol qty, total, dan tombol hapus. Kini bertingkat di bawah `sm`.
+* **`id` input kembar** — `Input` menurunkan id dari teks label, sehingga dua field berlabel sama
+  (mis. "Harga Jual" di tiap baris varian) berbagi id dan `<label htmlFor>` menunjuk field yang
+  salah. Kini `useId()`, plus `aria-invalid`/`aria-describedby` dan `role="alert"` pada error.
+* **Tema tidak tersimpan** — mode gelap kembali terang setiap muat ulang.
+* **`min-h-screen` (100vh) di lima layar** — di Chrome Android menyisakan konten di bawah bilah
+  alamat; diganti `100dvh`.
+* **Hover menempel di layar sentuh** — `.mochi-button:hover` kini di balik `@media (hover: hover)`.
+
+### Diketahui, belum selesai
+* **Rute `/kasir` di atas anggaran 150 KB** (PERFORMANCE-BUDGET §4). Sudah melewatinya sebelum
+  perubahan ini; framer-motion menambah ~20 kB di atas utang yang sudah ada. Angka anggaran
+  sengaja tidak dinaikkan agar utangnya tetap terlihat.
+* **Gerbang "Anggaran performa" hijau tanpa menguji apa pun.** `scripts/check-bundle-size.sh`
+  memeriksa `apps/web/.next/static`, tetapi job CI-nya checkout bersih **tanpa build** — direktori
+  itu tidak pernah ada, skrip keluar "dilewati" berstatus 0. Dijalankan pada build nyata ia
+  melaporkan 3501 KB karena menjumlahkan seluruh chunk statis, bukan JS awal per rute yang
+  dianggarkan. Belum diperbaiki di PR ini: memperbaikinya membuat gerbang itu merah sampai utang
+  bundle diselesaikan, dan itu keputusan tersendiri.
+* Gerak belum diuji di perangkat Android nyata maupun di dalam APK — baru di Chrome 375×812.
 
 ## [1.6.4] — 2026-09-14
 

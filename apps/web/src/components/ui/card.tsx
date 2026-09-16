@@ -10,7 +10,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = "milky", children, ...props }, ref) => {
     const variantStyles = {
       milky: "milky-glass",
-      solid: "bg-white border-2 border-card-border shadow-hard",
+      solid: "bg-surface border-2 border-card-border shadow-hard",
       matcha: "bg-sweet-matcha border-2 border-card-border shadow-hard",
       custard: "bg-sweet-custard border-2 border-card-border shadow-hard",
     };
