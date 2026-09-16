@@ -4,6 +4,29 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.11.0] — 2026-09-16
+
+### Ditambahkan
+* **`runbooks/deploy-pertama.md`** — runbook deploy produksi pertama, dari DNS sampai login dari
+  APK. Menutup jarak yang selama ini tersebar di DOKPLOY/DEPLOYMENT/GO-LIVE: dua proyek Dokploy
+  (ADR-0009), digest image (bukan tag), urutan migrasi sebelum kode, nilai environment persis,
+  dan daftar periksa pasca-deploy yang setiap barisnya punya perintah verifikasi.
+  * **Migrasi wajib menyambung langsung ke `postgres:5432`, bukan lewat PgBouncer.** PgBouncer
+    berjalan `POOL_MODE: transaction`, sementara goose memegang session advisory lock — lewat
+    transaction pooling, lock itu bisa jatuh ke koneksi backend berbeda. Dicatat sebagai
+    pengecualian pemeliharaan terhadap DAT-09; aplikasi tetap wajib lewat PgBouncer.
+  * **Uji CORS `https://localhost`** dengan `curl -X OPTIONS` — origin WebView APK (ADR-0010).
+    Tidak ada browser yang bisa menguji ini, dan kegagalannya membuat APK terlihat seperti
+    "server mati" padahal web berfungsi sempurna.
+  * Verifikasi URL API **di dalam image web** sebelum rilis, bukan pada konfigurasi build.
+
+### Diketahui, belum selesai
+* **Job migrasi pre-deploy di CI (DAT-05) belum ada.** `DOKPLOY.md` §2 menyebut migrasi sudah
+  "pindah ke CI", tetapi `.github/workflows/` tidak punya job itu — yang ada hanya migrasi
+  terhadap Postgres sementara milik CI. Sampai dibuat, langkah migrasi produksi manual.
+* Runbook ini **belum pernah dijalankan sampai selesai**; verifikasi pertamanya adalah deploy
+  produksi pertama itu sendiri.
+
 ## [1.10.0] — 2026-09-16
 
 ### Ditambahkan
