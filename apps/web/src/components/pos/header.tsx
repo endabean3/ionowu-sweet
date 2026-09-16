@@ -2,8 +2,10 @@
 
 import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
+import { naikMasukTegas } from "@/lib/motion/tokens";
 import { useSync } from "@/lib/sync/provider";
 import { useLiveQuery } from "dexie-react-hooks";
+import { AnimatePresence, m } from "framer-motion";
 import { Moon, RefreshCw, Sun, Wifi, WifiOff } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
@@ -49,6 +51,24 @@ export function POSHeader({ outletId }: HeaderProps) {
     // benar-benar tersedia dan aman dibaca.
     setIsOnline(navigator.onLine);
 
+    // Tema dipulihkan dari pilihan TERAKHIR kasir. Sebelumnya setiap muat
+    // ulang kembali ke mode terang, jadi kasir yang bekerja di ruang remang
+    // harus menekan tombol ini setiap kali aplikasi dibuka.
+    //
+    // Sengaja TIDAK mengikuti prefers-color-scheme sistem: ponsel Android
+    // banyak yang menyalakan mode gelap otomatis di malam hari, sementara
+    // layar kasir justru paling sering dipakai di bawah silau — mode gelap
+    // yang menyala sendiri di etalase kaca membuat angka lebih sulit dibaca,
+    // bukan lebih mudah. Gelap hanya kalau kasir memintanya.
+    try {
+      if (localStorage.getItem("ionowu.tema") === "dark-cocoa") {
+        setIsDark(true);
+        document.documentElement.setAttribute("data-theme", "dark-cocoa");
+      }
+    } catch {
+      // Penyimpanan diblokir: tema jatuh ke mode terang bawaan.
+    }
+
     const handleOnline = () => {
       setIsOnline(true);
       syncNow();
@@ -79,6 +99,11 @@ export function POSHeader({ outletId }: HeaderProps) {
       document.documentElement.setAttribute("data-theme", "dark-cocoa");
     } else {
       document.documentElement.removeAttribute("data-theme");
+    }
+    try {
+      localStorage.setItem("ionowu.tema", nextTheme ? "dark-cocoa" : "oat-milk");
+    } catch {
+      // Tema tetap berlaku untuk sesi ini meski tidak bisa disimpan.
     }
   };
 
@@ -114,11 +139,11 @@ export function POSHeader({ outletId }: HeaderProps) {
           type="button"
           onClick={() => syncNow()}
           disabled={!isOnline || isSyncing}
-          className="rounded-pill border-2 border-card-border bg-white px-3 py-1.5 font-sans text-xs font-bold text-main shadow-hard-sm hover:bg-gray-50 active:translate-y-px disabled:opacity-50"
-          title={
+          className="mochi-button h-11 rounded-pill border-2 border-card-border bg-surface px-4 font-sans text-xs font-bold text-main shadow-hard-sm disabled:opacity-50"
+          aria-label={
             lastSyncedAt
-              ? `Terakhir sync: ${lastSyncedAt.toLocaleTimeString()}`
-              : "Belum pernah sync"
+              ? `Sinkronkan sekarang. Terakhir sync ${lastSyncedAt.toLocaleTimeString("id-ID")}`
+              : "Sinkronkan sekarang. Belum pernah sync"
           }
         >
           {isSyncing ? "Syncing..." : "Sync Now"}
@@ -153,21 +178,39 @@ export function POSHeader({ outletId }: HeaderProps) {
         </div>
 
         {/* Sync Queue Badge */}
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-1.5 rounded-pill border-2 border-card-border bg-sweet-custard px-3 py-1.5 font-mono text-xs font-bold text-main shadow-hard-sm">
-            <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-            <span>{pendingCount} antrean</span>
-          </div>
-        )}
+        <AnimatePresence>
+          {pendingCount > 0 && (
+            <m.div
+              key="antrean"
+              variants={naikMasukTegas}
+              initial="sembunyi"
+              animate="tampil"
+              exit="pergi"
+              aria-live="polite"
+              className="flex items-center gap-1.5 rounded-pill border-2 border-card-border bg-sweet-custard px-3 py-1.5 font-mono text-xs font-bold text-main shadow-hard-sm"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              <span>{pendingCount} antrean menunggu kirim</span>
+            </m.div>
+          )}
+        </AnimatePresence>
 
         {/* Dark/Light Toggle */}
         <button
           type="button"
           onClick={toggleTheme}
-          aria-label="Toggle Theme"
-          className="flex h-9 w-9 items-center justify-center rounded-pill border-2 border-card-border bg-base text-main shadow-hard-sm transition-transform hover:scale-105"
+          aria-label={isDark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
+          aria-pressed={isDark}
+          className="mochi-button flex h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-base text-main shadow-hard-sm"
         >
-          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {isDark ? (
+            <Sun className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Moon className="h-4 w-4" aria-hidden="true" />
+          )}
         </button>
       </div>
     </header>

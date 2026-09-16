@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import {
   type PairedDevice,
   type SavedPrinter,
@@ -10,7 +11,7 @@ import {
   savePrinter,
 } from "@/lib/printer/bluetooth";
 import type { PaperWidth } from "@/lib/receipt/escpos";
-import { Printer, RefreshCw, X } from "lucide-react";
+import { Printer, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -57,84 +58,73 @@ export function PrinterPicker({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-main/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-[32px] border-2 border-card-border bg-base shadow-hard-lg">
-        <div className="flex items-center justify-between border-b-2 border-card-border bg-white px-6 py-4">
-          <h2 className="font-display text-xl font-bold text-main">Pilih Printer</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Tutup"
-            className="rounded-pill p-2 hover:bg-black/5"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto p-6">
-          <p className="mb-2 font-sans text-sm font-bold text-main">Lebar kertas</p>
-          <div className="mb-6 grid grid-cols-2 gap-3">
-            {([58, 80] as const).map((w) => (
-              <Button
-                key={w}
-                size="pos"
-                variant={paper === w ? "custard" : "ghost"}
-                className={paper === w ? "" : "border-card-border"}
-                onClick={() => setPaper(w)}
-              >
-                {w} mm
-              </Button>
-            ))}
-          </div>
-
-          <div className="mb-2 flex items-center justify-between">
-            <p className="font-sans text-sm font-bold text-main">Perangkat terpasang</p>
-            <Button size="sm" variant="ghost" onClick={() => void muat()} disabled={loading}>
-              <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Muat ulang
+    <Modal title="Pilih Printer" onClose={onClose}>
+      <div className="p-6">
+        <p className="mb-2 font-sans text-sm font-bold text-main">Lebar kertas</p>
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          {([58, 80] as const).map((w) => (
+            <Button
+              key={w}
+              size="pos"
+              variant={paper === w ? "custard" : "ghost"}
+              className={paper === w ? "" : "border-card-border"}
+              onClick={() => setPaper(w)}
+            >
+              {w} mm
             </Button>
-          </div>
-
-          {loading && devices === null && (
-            <p className="py-6 text-center font-bold text-muted">Membaca perangkat Bluetooth…</p>
-          )}
-
-          {error && (
-            <p className="rounded-2xl border-2 border-card-border bg-[#ffd6d6] p-4 font-sans text-sm font-bold text-main">
-              {error}
-            </p>
-          )}
-
-          {devices?.length === 0 && (
-            <p className="rounded-2xl border-2 border-card-border bg-white p-4 font-sans text-sm text-main">
-              Belum ada perangkat yang dipasangkan. Nyalakan printer, pasangkan lewat{" "}
-              <b>Pengaturan → Bluetooth</b> di ponsel ini (PIN tertera di manual printer), lalu
-              ketuk <b>Muat ulang</b>.
-            </p>
-          )}
-
-          <ul className="flex flex-col gap-2">
-            {devices?.map((d) => (
-              <li key={d.address}>
-                <button
-                  type="button"
-                  onClick={() => pilih(d)}
-                  className="mochi-button pos-touch-target flex w-full items-center gap-3 rounded-2xl border-2 border-card-border bg-card px-4 py-3 text-left shadow-hard-sm hover:bg-sweet-custard/40"
-                >
-                  <Printer className="h-5 w-5 shrink-0 text-main" aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-sans font-bold text-main">{d.name}</span>
-                    <span className="block font-mono text-xs text-muted">{d.address}</span>
-                  </span>
-                  {saved?.address === d.address && (
-                    <span className="font-sans text-xs font-bold text-main">Dipakai</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+          ))}
         </div>
+
+        <div className="mb-2 flex items-center justify-between">
+          <p className="font-sans text-sm font-bold text-main">Perangkat terpasang</p>
+          <Button size="sm" variant="ghost" onClick={() => void muat()} disabled={loading}>
+            <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Muat ulang
+          </Button>
+        </div>
+
+        {loading && devices === null && (
+          <p className="py-6 text-center font-bold text-muted">Membaca perangkat Bluetooth…</p>
+        )}
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-2xl border-2 border-card-border bg-[#ffd6d6] p-4 font-sans text-sm font-bold text-main"
+          >
+            {error}
+          </p>
+        )}
+
+        {devices?.length === 0 && (
+          <p className="rounded-2xl border-2 border-card-border bg-surface p-4 font-sans text-sm text-main">
+            Belum ada perangkat yang dipasangkan. Nyalakan printer, pasangkan lewat{" "}
+            <b>Pengaturan → Bluetooth</b> di ponsel ini (PIN tertera di manual printer), lalu ketuk{" "}
+            <b>Muat ulang</b>.
+          </p>
+        )}
+
+        <ul className="flex flex-col gap-2">
+          {devices?.map((d) => (
+            <li key={d.address}>
+              <button
+                type="button"
+                onClick={() => pilih(d)}
+                className="mochi-button pos-touch-target flex w-full items-center gap-3 rounded-2xl border-2 border-card-border bg-card px-4 py-3 text-left shadow-hard-sm hover:bg-sweet-custard/40"
+              >
+                <Printer className="h-5 w-5 shrink-0 text-main" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-sans font-bold text-main">{d.name}</span>
+                  <span className="block font-mono text-xs text-muted">{d.address}</span>
+                </span>
+                {saved?.address === d.address && (
+                  <span className="font-sans text-xs font-bold text-main">Dipakai</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-    </div>
+    </Modal>
   );
 }

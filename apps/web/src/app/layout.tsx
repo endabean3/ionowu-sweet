@@ -1,3 +1,4 @@
+import { MotionProvider } from "@/components/motion/motion-provider";
 import { AuthProvider } from "@/lib/auth/context";
 import { SyncProvider } from "@/lib/sync/provider";
 import type { Metadata, Viewport } from "next";
@@ -35,12 +36,18 @@ export const metadata: Metadata = {
   },
 };
 
+// TIDAK ADA maximumScale / userScalable: false.
+//
+// Keduanya sebelumnya mengunci zoom di seluruh aplikasi. Itu melanggar WCAG
+// 1.4.4 (Resize Text) dan memukul justru pengguna yang paling butuh: pemilik
+// warung berusia 50+ yang ingin memperbesar angka di layar, dan kasir yang
+// memeriksa ULID kecil di struk. Alasan klasik "mencegah zoom tak sengaja
+// saat mengetuk cepat" sudah ditangani `touch-action: manipulation` di
+// globals.css, yang mematikan double-tap-to-zoom TANPA mematikan cubit-zoom.
 export const viewport: Viewport = {
   themeColor: "#FAF6F0",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({
@@ -54,9 +61,11 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${fraunces.variable} ${spaceMono.variable}`}
     >
       <body className="min-h-screen bg-base text-main antialiased selection:bg-sweet-strawberry selection:text-main">
-        <AuthProvider>
-          <SyncProvider>{children}</SyncProvider>
-        </AuthProvider>
+        <MotionProvider>
+          <AuthProvider>
+            <SyncProvider>{children}</SyncProvider>
+          </AuthProvider>
+        </MotionProvider>
         <Toaster
           position="top-center"
           toastOptions={{

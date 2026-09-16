@@ -15,6 +15,11 @@
   --text-muted: 122 111 104;
   --card-bg: rgba(255, 255, 255, 0.88);
   --card-border: 45 35 30;
+  /* Permukaan padat di ATAS kanvas: bilah judul dialog, kolom isian, chip.
+     Sebelumnya ditulis `bg-surface` langsung di 19 tempat, sehingga di mode
+     gelap semuanya tetap putih sementara teksnya ikut menjadi krem — tombol
+     "Sync Now" harfiah menjadi putih di atas putih. */
+  --surface: 255 255 255;
 
   --sweet-strawberry: 255 164 182;
   --sweet-matcha: 162 232 206;
@@ -33,6 +38,7 @@
   --text-muted: 191 175 165;
   --card-bg: rgba(42, 32, 27, 0.86);
   --card-border: 82 64 54;
+  --surface: 42 32 27;
 
   --sweet-strawberry: 255 117 151;
   --sweet-matcha: 136 226 192;
@@ -64,17 +70,46 @@ body {
 }
 
 .mochi-button {
-  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s
+    cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Mematikan double-tap-to-zoom (sumber jeda ~300ms pada ketukan beruntun)
+     tanpa mematikan cubit-zoom — lihat catatan viewport di app/layout.tsx. */
+  touch-action: manipulation;
 }
 
-.mochi-button:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px rgb(var(--card-border));
+/* Hover HANYA untuk penunjuk yang benar-benar bisa mengambang. Di layar
+   sentuh, :hover menempel setelah ketukan: tombol tetap terangkat 2px setelah
+   jari diangkat, sehingga kasir melihat tombol yang seolah masih tertekan. */
+@media (hover: hover) and (pointer: fine) {
+  .mochi-button:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px rgb(var(--card-border));
+  }
 }
 
 .mochi-button:active {
   transform: translate(2px, 2px) scale(0.96);
   box-shadow: 1px 1px 0px rgb(var(--card-border));
+}
+
+/* ── Hormati "kurangi gerak" ──────────────────────────────────────────
+   Sisi framer-motion sudah ditangani MotionConfig reducedMotion="user"
+   (components/motion/motion-provider.tsx). Blok ini menutup sisi CSS:
+   transisi mochi, animate-spin pada ikon sync, dan animasi utilitas
+   Tailwind mana pun yang ditambahkan nanti.
+
+   Durasi tidak dinolkan melainkan disisakan 0,01ms, supaya event
+   `transitionend`/`animationend` tetap menyala dan logika yang menunggunya
+   tidak menggantung selamanya. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* POS specific touch optimization */
