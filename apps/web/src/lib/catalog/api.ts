@@ -57,3 +57,41 @@ export async function createProduct(accessToken: string, payload: CreateProductP
 
   return res.json();
 }
+
+/** Baris CSV yang tidak diimpor beserta alasannya (lihat catalog_import.go). */
+export interface BarisDilewati {
+  baris: number;
+  alasan: string;
+}
+
+export interface HasilImpor {
+  total_records: number;
+  dilewati: BarisDilewati[];
+}
+
+/**
+ * Unggah CSV katalog ke POST /products/import.
+ *
+ * Content-Type TIDAK diisi manual: browser harus menulis sendiri boundary
+ * multipart-nya. Mengisinya "multipart/form-data" tanpa boundary membuat
+ * server gagal membaca form dan menjawab "Gagal memproses form data".
+ */
+export async function importProducts(accessToken: string, file: File): Promise<HasilImpor> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${API_URL}/products/import`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(body?.error?.message ?? body?.error ?? "Impor gagal di server");
+  }
+  return {
+    total_records: body?.total_records ?? 0,
+    dilewati: Array.isArray(body?.dilewati) ? body.dilewati : [],
+  };
+}

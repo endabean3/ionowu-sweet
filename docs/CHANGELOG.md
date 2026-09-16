@@ -4,6 +4,20 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.15.0] — 2026-09-16
+
+### Ditambahkan
+* **Layar Katalog → Impor CSV** (`/katalog/impor`). Sebelumnya `POST /products/import` hanya bisa
+  dipanggil lewat terminal dengan token login — tidak praktis bagi pemilik warung, dan token itu
+  bukan sesuatu yang layak diserahkan ke orang lain. Layar ini menampilkan hasil apa adanya:
+  jumlah yang masuk **dan setiap baris yang dilewati beserta alasannya**. Setelah impor, katalog
+  langsung ditarik ke IndexedDB sehingga barangnya muncul di layar kasir, termasuk saat offline.
+  * Terverifikasi di browser dengan klik sungguhan: 150 barang Warung Wangi masuk dan tersinkron
+    ke perangkat (79 per ml); berkas berisi barcode ganda + harga kosong menampilkan
+    "2 baris TIDAK diimpor" dengan nomor baris dan alasannya.
+
+---
+
 ## [1.14.0] — 2026-09-16
 
 Ditemukan saat menyiapkan deploy pertama ke VPS sungguhan — setiap nilai di runbook kini

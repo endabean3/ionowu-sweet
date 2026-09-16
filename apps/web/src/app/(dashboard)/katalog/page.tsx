@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { daftarBertahap, naikMasuk } from "@/lib/motion/tokens";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { AlertTriangle, ArrowLeft, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileUp, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 
@@ -56,12 +56,20 @@ export default function KatalogPage() {
           </h1>
         </div>
 
-        <Link href="/katalog/tambah">
-          <Button variant="primary" size="default" className="gap-2 shadow-hard-sm">
-            <Plus className="h-4 w-4" />
-            <span>Tambah Produk</span>
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/katalog/impor">
+            <Button variant="secondary" size="default" className="gap-2 shadow-hard-sm">
+              <FileUp className="h-4 w-4" aria-hidden="true" />
+              <span>Impor CSV</span>
+            </Button>
+          </Link>
+          <Link href="/katalog/tambah">
+            <Button variant="primary" size="default" className="gap-2 shadow-hard-sm">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              <span>Tambah Produk</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* h-11 (44px) pada input: sebelumnya cuma py-1 (~28px tinggi klik),
