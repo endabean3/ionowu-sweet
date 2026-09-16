@@ -38,4 +38,14 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Printer termal Bluetooth (ThermalPrinterPlugin). Hanya menyambung ke
+         perangkat yang SUDAH dipasangkan: tanpa BLUETOOTH_SCAN, tanpa izin
+         lokasi. BLUETOOTH berlaku sampai Android 11; sejak Android 12 diganti
+         BLUETOOTH_CONNECT yang diminta saat printer pertama kali dipilih. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Tidak wajib: aplikasi tetap bisa dipasang dan berjualan di perangkat
+         tanpa Bluetooth, hanya tanpa cetak struk langsung. -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 </manifest>

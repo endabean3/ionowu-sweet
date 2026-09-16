@@ -1,68 +1,36 @@
 "use client";
 
 import { formatQuantity } from "@/lib/catalog/quantity";
+import {
+  METHOD_LABEL,
+  type ReceiptData,
+  formatWaktu,
+  lineDiscount,
+  lineGross,
+  rupiah,
+} from "@/lib/receipt/format";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+export type { ReceiptData, ReceiptLine } from "@/lib/receipt/format";
+
 /**
- * Struk untuk dicetak.
+ * Struk untuk dicetak lewat `window.print()` dan @media print.
  *
  * Seluruh isinya berasal dari data yang SUDAH ada di perangkat saat transaksi
  * terjadi — keranjang, hitungan uang, shift, dan sesi login. Tidak ada satu
  * pun panggilan jaringan: struk wajib bisa dicetak saat kasir offline
  * (CLAUDE.md §6.2), justru karena itulah momen ia paling dibutuhkan.
  *
- * Dicetak lewat `window.print()` dan @media print, bukan lewat Web Bluetooth
- * ke printer termal: dialog cetak bawaan sistem sudah menjangkau printer yang
- * terpasang, dan di ponsel ia menyediakan "Simpan sebagai PDF" atau bagikan —
- * yang berarti struk tetap berguna di warung yang belum punya printer sama
- * sekali. Mengejar ESC/POS langsung akan mengunci fitur ini pada perangkat
- * dan merek printer tertentu.
+ * Ini jalur cetak PWA/browser: dialog cetak bawaan sistem menjangkau printer
+ * yang terpasang dan menyediakan "Simpan sebagai PDF", jadi tetap berguna di
+ * warung tanpa printer. Di APK, WebView Android mengabaikan `window.print()`;
+ * di sana struk dikirim sebagai ESC/POS ke printer termal Bluetooth
+ * (lib/receipt/escpos.ts, ADR-0010). Keduanya memakai lib/receipt/format.ts
+ * supaya angka di kedua hasil cetak identik.
  */
-
-export interface ReceiptLine {
-  name: string;
-  /** String desimal — barang curah dijual 30 ml, 0,5 kg (lihat cart.tsx). */
-  quantity: string;
-  unitPrice: string;
-  discount: string;
-  /** Satuan jual; dicetak di struk supaya "30" tidak ambigu. */
-  uom?: string;
-}
-
-export interface ReceiptData {
-  transactionId: string;
-  occurredAt: string;
-  outletName: string;
-  cashierName: string;
-  lines: ReceiptLine[];
-  subtotal: string;
-  taxTotal: string;
-  grandTotal: string;
-  method: string;
-  givenAmount: number;
-  /** Kembalian; 0 untuk metode non-tunai. */
-  changeAmount: number;
-  /** true bila transaksi masih mengantre (dibuat saat offline). */
-  pending: boolean;
-}
-
-const METHOD_LABEL: Record<string, string> = {
-  cash: "Tunai",
-  qris: "QRIS",
-  card: "Kartu",
-  transfer: "Transfer",
-};
-
-function rupiah(n: number | string): string {
-  const v = typeof n === "string" ? Number(n) : n;
-  return `Rp ${Math.round(v).toLocaleString("id-ID")}`;
-}
-
 export function Receipt({ data }: { data: ReceiptData }) {
-  const waktu = new Date(data.occurredAt);
-
   // Dipasang langsung sebagai anak <body> lewat portal. Aturan cetaknya
   // menyembunyikan seluruh saudara <body> — kalau struk ikut tersarang di
   // dalam pohon halaman, leluhurnya yang ikut tersembunyi akan menyeretnya
@@ -79,16 +47,12 @@ export function Receipt({ data }: { data: ReceiptData }) {
     <div id="receipt-print-root" aria-hidden="true">
       <div className="receipt">
         <div className="receipt-center receipt-bold">{data.outletName}</div>
-        <div className="receipt-center receipt-small">
-          {waktu.toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}
-        </div>
+        <div className="receipt-center receipt-small">{formatWaktu(data.occurredAt)}</div>
         <div className="receipt-center receipt-small">Kasir: {data.cashierName}</div>
         <div className="receipt-sep" />
 
         {data.lines.map((l) => {
-          // Decimal, bukan float: 0,1 × 3 harus 0,3 di struk pembeli.
-          const bruto = new Decimal(l.unitPrice).times(l.quantity || 0);
-          const diskon = Number(l.discount || "0");
+          const diskon = lineDiscount(l);
           return (
             <div key={`${l.name}-${l.unitPrice}-${l.quantity}`} className="receipt-item">
               <div>{l.name}</div>
@@ -96,9 +60,9 @@ export function Receipt({ data }: { data: ReceiptData }) {
                 <span>
                   {l.uom ? formatQuantity(l.quantity, l.uom) : l.quantity} × {rupiah(l.unitPrice)}
                 </span>
-                <span>{rupiah(bruto.toNumber())}</span>
+                <span>{rupiah(lineGross(l))}</span>
               </div>
-              {diskon > 0 && (
+              {diskon.gt(0) && (
                 <div className="receipt-row receipt-small">
                   <span>Diskon</span>
                   <span>-{rupiah(diskon)}</span>
@@ -113,7 +77,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
           <span>Subtotal</span>
           <span>{rupiah(data.subtotal)}</span>
         </div>
-        {Number(data.taxTotal) > 0 && (
+        {new Decimal(data.taxTotal || "0").gt(0) && (
           <div className="receipt-row">
             <span>PPN</span>
             <span>{rupiah(data.taxTotal)}</span>

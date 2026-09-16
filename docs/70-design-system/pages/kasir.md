@@ -23,7 +23,7 @@ kasir, ia dekoratif dan tidak boleh ada di sini.
 |---|---|
 | Baris keranjang masuk/keluar | Kasir harus melihat barang benar-benar masuk, tanpa membaca ulang seluruh daftar |
 | Bar ringkasan bawah naik/turun | Menjelaskan dari mana total itu muncul saat item pertama ditambahkan |
-| Dialog (bayar, shift) | Kaitan ruang antara tombol pemicu dan panel yang terbuka |
+| Dialog (bayar, shift, printer) | Kaitan ruang antara tombol pemicu dan panel yang terbuka |
 | Badge antrean sync | Perubahan status yang datang sendiri, bukan dari aksi kasir |
 
 **Wajib, dan mahal dipelajari:**

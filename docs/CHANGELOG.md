@@ -46,8 +46,8 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ## [1.9.0] — 2026-09-16
 
-> Nomor 1.7.0 dilewati dengan sengaja: ia dipakai PR #16 (cetak struk Bluetooth) yang belum
-> masuk `main`. Urutannya tetap benar menurut tanggal begitu PR itu merge.
+> Nomor 1.7.0 ada di bawah (PR #16, cetak struk Bluetooth) — dirilis lebih dulu menurut tanggal,
+> tetapi merge-nya belakangan.
 
 ### Ditambahkan
 * **Jalur rilis Google Play** — `PLAY-STORE.md` + konfigurasi penandatanganan rilis di
@@ -130,6 +130,25 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   bundle diselesaikan, dan itu keputusan tersendiri.
 * Gerak belum diuji di perangkat Android nyata maupun di dalam APK — baru di Chrome 375×812.
 
+---
+
+## [1.7.0] — 2026-09-14
+
+### Ditambahkan
+* **Cetak struk ke printer termal Bluetooth di APK** — kebutuhan kedua ADR-0010.
+  * Plugin native lokal `ThermalPrinter` (`android/.../printer/ThermalPrinterPlugin.java`):
+    Bluetooth klasik SPP, hanya ke perangkat yang sudah dipasangkan (tanpa `BLUETOOTH_SCAN`/izin
+    lokasi), koneksi di utas terpisah. Ditulis sendiri, bukan plugin komunitas.
+  * Tata letak ESC/POS di TypeScript murni (`src/lib/receipt/escpos.ts`, 58 mm/32 kolom dan
+    80 mm/48 kolom) dengan uji vitest yang membaca balik byte dan menolak perintah tak dikenal.
+  * `src/lib/receipt/format.ts` — data + format rupiah dipakai bersama struk HTML dan ESC/POS.
+    Rupiah kini dibulatkan lewat Decimal, bukan `Math.round(Number(...))`.
+  * Pemilih printer + lebar kertas di layar kasir, disimpan per perangkat. Browser/PWA tetap
+    memakai `window.print()`.
+* **Belum terverifikasi di perangkat:** plugin belum dikompilasi (host tanpa JDK) dan belum diuji
+  dengan printer sungguhan. Printer yang hanya BLE tidak didukung.
+
+---
 ## [1.6.4] — 2026-09-14
 
 ### Ditambahkan
