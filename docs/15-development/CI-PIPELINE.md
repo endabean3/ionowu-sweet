@@ -182,7 +182,29 @@ disiapkan (CLAUDE.md §4), dan build lokal membawa branch apa pun yang sedang ak
 tetap berguna untuk uji cepat di HP pengembang.
 
 **Bukan untuk Play Store.** APK debug ditandatangani kunci debug. Build release butuh keystore
-milik pemilik di GitHub Secrets — belum ada.
+milik pemilik — belum ada. Jalur rilisnya ada di
+[PLAY-STORE.md](../50-operations/PLAY-STORE.md).
+
+---
+
+## 3c. `android-build.yml` — Kompilasi Android, Otomatis di PR
+
+Berjalan pada setiap PR yang menyentuh `apps/web/android/**`, `capacitor.config.ts`,
+`apps/web/package.json`, atau workflow-nya sendiri.
+
+Alasannya: sebelum ini, satu-satunya jalur yang mengompilasi Android adalah §3b yang **manual dan
+hanya dari `main`** — berkas Gradle yang rusak baru ketahuan setelah merge, oleh orang yang sedang
+mengejar rilis.
+
+| Langkah | Membuktikan |
+|---|---|
+| `pnpm build` + `cap sync android` | Ekspor statis Capacitor masih jadi |
+| `gradlew assembleDebug` | `build.gradle`, `MainActivity`, dan plugin native terkompilasi — termasuk blok `signingConfigs` rilis, yang dievaluasi saat konfigurasi |
+| `gradlew tasks \| grep bundleRelease` | Tanpa keystore, konfigurasi rilis nonaktif dengan sendirinya dan tidak membuat build gagal |
+
+`NEXT_PUBLIC_API_URL` di job ini sengaja diisi domain palsu: yang diuji kompilasinya, bukan
+artefaknya. APK dari job ini tidak diunggah dan tidak boleh dipasang di HP mana pun — APK untuk
+kasir hanya datang dari §3b.
 
 ---
 

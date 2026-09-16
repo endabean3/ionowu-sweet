@@ -4,6 +4,32 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.9.0] — 2026-09-16
+
+> Nomor 1.7.0 dan 1.8.0 dilewati dengan sengaja: keduanya dipakai PR yang belum masuk `main`
+> (#16 cetak struk Bluetooth, #21 framer-motion + perapian UI). Urutannya tetap benar menurut
+> tanggal begitu PR-PR itu merge.
+
+### Ditambahkan
+* **Jalur rilis Google Play** — `PLAY-STORE.md` + konfigurasi penandatanganan rilis di
+  `android/app/build.gradle` + target `make aab`. Kredensial dibaca dari
+  `android/keystore.properties` (di-gitignore) atau environment; tidak pernah masuk repo.
+  `versionCode`/`versionName` kini bisa dinaikkan lewat environment — Play menolak unggahan
+  dengan `versionCode` yang sudah dipakai.
+* **`android-build.yml`** — gerbang kompilasi Android di SETIAP PR yang menyentuh berkas
+  Android/Gradle/Capacitor. Sebelumnya satu-satunya jalur yang mengompilasi Android
+  (`apk-debug.yml`) bersifat manual dan hanya dari `main`, sehingga berkas Gradle yang rusak baru
+  ketahuan setelah merge. URL API di job ini sengaja palsu — yang diuji kompilasinya, bukan
+  artefaknya, dan APK-nya tidak pernah diunggah.
+
+### Diketahui, belum selesai
+* **Tidak bisa diverifikasi di mesin pengembang** (host sengaja tanpa JDK, ADR-0010
+  §Konsekuensi). Karena itu `android-build.yml` ditambahkan: kompilasinya dibuktikan di CI pada
+  PR ini juga, bukan ditunda sampai setelah merge. Yang TETAP belum terbukti adalah jalur
+  **bertanda tangan** — itu butuh keystore yang hanya boleh dibuat pemilik.
+* **Yang memblokir penerbitan bukan kode:** keystore rilis (hanya pemilik yang boleh membuatnya),
+  akun Play Console, dan **URL kebijakan privasi** semuanya belum ada.
+
 ## [1.6.4] — 2026-09-14
 
 ### Ditambahkan

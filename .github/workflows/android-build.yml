@@ -1,0 +1,61 @@
+# Gerbang kompilasi Android — berjalan di SETIAP PR yang menyentuh berkas
+# Android/Gradle/Capacitor.
+#
+# Kenapa ada, padahal sudah ada apk-debug.yml: workflow itu MANUAL dan hanya
+# dari `main`, jadi berkas Gradle yang rusak baru ketahuan SETELAH merge —
+# oleh orang yang sedang mengejar rilis. Kelas kegagalan yang sama pernah
+# terjadi di repo ini (gerbang E2E dan golangci-lint yang hijau tanpa menguji
+# apa pun). Job ini menutupnya di tingkat PR.
+#
+# Yang dibuktikan: build.gradle + MainActivity + plugin native benar-benar
+# terkompilasi, termasuk blok signingConfigs rilis — blok itu dievaluasi saat
+# konfigurasi, jadi assembleDebug sudah cukup untuk membuktikannya sah.
+#
+# URL API-nya SENGAJA palsu. APK dari job ini tidak pernah diunggah dan tidak
+# boleh dipasang di HP mana pun: yang diuji kompilasinya, bukan artefaknya.
+# APK yang dipakai kasir hanya datang dari apk-debug.yml (ADR-0010).
+
+name: Android
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/android/**'
+      - 'apps/web/capacitor.config.ts'
+      - 'apps/web/package.json'
+      - '.github/workflows/android-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  gradle:
+    name: Kompilasi Android (Gradle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: '24', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+
+      # capacitor.build.gradle mengunci sourceCompatibility JavaVersion.VERSION_21.
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: '21', cache: gradle }
+
+      - name: Build web statis + cap sync
+        env:
+          BUILD_TARGET: capacitor
+          # Placeholder yang jelas-jelas bukan produksi — lihat catatan di atas.
+          NEXT_PUBLIC_API_URL: https://api.invalid.test
+        run: cd apps/web && pnpm build && npx cap sync android
+
+      - name: Gradle assembleDebug
+        run: cd apps/web/android && ./gradlew assembleDebug --no-daemon
+
+      # Tanpa keystore, konfigurasi rilis HARUS nonaktif dengan sendirinya.
+      # Kalau suatu saat ia menjadi wajib, build di mesin siapa pun yang tidak
+      # punya keystore akan gagal — dan itu harus ketahuan di sini.
+      - name: Rilis tanpa keystore tetap terkonfigurasi
+        run: cd apps/web/android && ./gradlew tasks --all --no-daemon | grep -q bundleRelease

@@ -82,6 +82,7 @@ RBAC), itu tanda dokumen harus dipecah.
 | **Modul SOP** | `00-product/SOP-MODULE.md` | 🟡 Draft baru | SOP per kategori — pembeda utama |
 | Provisioning Server | `50-operations/SERVER-PROVISIONING.md` | 🟡 Draft baru | Ketentuan server + bootstrap |
 | Go-Live | `50-operations/GO-LIVE.md` | 🟡 Draft baru | Checklist rilis pertama |
+| `50-operations/PLAY-STORE.md` | 🟡 Draft | Rilis ke Google Play: keystore, AAB, izin, blokir |
 | ADR-0004 Build di CI | `10-architecture/adr/` | ✅ **Diterima** | ghcr.io, rollback deterministik |
 | ADR-0005 Telemetri eksternal | `10-architecture/adr/` | ✅ **Diterima** | Merevisi OBSERVABILITY §6 |
 | ADR-0001 Hybrid Go/TS | `10-architecture/adr/` | ✅ | |

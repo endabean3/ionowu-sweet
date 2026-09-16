@@ -12,6 +12,8 @@
 *.pfx
 *.jks
 *.keystore
+# Kredensial penandatanganan Play Store — jalur + kata sandi keystore.
+keystore.properties
 *.crt
 *.cer
 *.der
