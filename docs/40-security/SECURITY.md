@@ -90,6 +90,29 @@ func TenantMiddleware(next http.Handler) http.Handler {
 * **Access Token:** Masa aktif pendek (**15 Menit**), ditandatangani menggunakan algoritma asimetris **Ed25519 / RS256**.
 * **Refresh Token:** Masa aktif panjang (**30 Hari**), disimpan di tabel database dan Redis untuk memungkinkan *Instant Token Revocation* (misal: jika perangkat kasir hilang atau kasir diberhentikan).
 
+### B2. Yang disimpan di perangkat klien (ditambahkan 2026-09-16)
+
+| Kunci | Tempat | Isi | Dihapus saat |
+|---|---|---|---|
+| access token | memori React saja | JWT 15 menit | tab/aplikasi ditutup |
+| `ionowu_rt` | localStorage | refresh token | logout, atau server **menolak** token (401/403) |
+| `ionowu_profil` | localStorage | `id`, `tenant_id`, `name`, `email`, `role` — **tanpa token** | sama dengan `ionowu_rt` |
+
+**Kegagalan jaringan tidak menghapus apa pun.** Sebelumnya setiap kegagalan refresh — termasuk
+"server tidak terjangkau" — menghapus `ionowu_rt`, sehingga kasir yang membuka aplikasi saat
+toko offline terkunci di halaman login yang juga tidak bisa dihubungi. Kini hanya penolakan
+tegas dari server yang menghapus sesi (`AuthDitolakError` di `apps/web/src/lib/auth/api.ts`).
+
+`ionowu_profil` ada agar kasir offline tetap menulis data dengan `tenant_id` yang benar.
+Tanpanya, shift offline dibuat dengan tenant tebakan `"tenant_default"` dan penjualan masuk
+antrean dengan `tenant_id` kosong.
+
+**Batas yang disadari:** siapa pun yang memegang ponsel kasir yang pernah login bisa membuka
+layar kasir dan melihat data lokalnya. Perlindungannya adalah kunci layar ponsel dan PIN Lock
+(§C, belum diimplementasikan) — bukan penjaga sesi, yang sengaja toleran supaya toko tetap
+bisa berjualan saat offline (CLAUDE.md §6.2). Layar pemilik (dasbor, katalog) tetap wajib
+sesi hidup.
+
 ---
 
 ### C. Auto-Lock Layar Kasir (*PIN Lock*)

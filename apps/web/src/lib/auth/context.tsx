@@ -21,7 +21,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { type AuthSession, apiLogin, apiLogout, apiRefresh } from "./api";
+import { AuthDitolakError, type AuthSession, apiLogin, apiLogout, apiRefresh } from "./api";
+import { hapusProfil, simpanProfil } from "./profile";
 
 const RT_KEY = "ionowu_rt";
 
@@ -52,6 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Simpan sesi baru ke state dan jadwalkan auto-refresh. */
   const applySession = useCallback((session: AuthSession) => {
     setUser(session.user as AuthUser);
+    // Dicatat supaya kasir offline (sesi mati, user null) tetap punya
+    // tenant_id — lihat lib/auth/profile.ts.
+    simpanProfil(session.user as AuthUser);
     setAccessToken(session.access_token);
     localStorage.setItem(RT_KEY, session.refresh_token);
 
@@ -77,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAccessToken(null);
     localStorage.removeItem(RT_KEY);
+    hapusProfil();
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
   }, []);
 
@@ -90,7 +95,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     apiRefresh(storedRefreshToken)
       .then(applySession)
-      .catch(clearSession)
+      .catch((err: unknown) => {
+        // HANYA penolakan tegas dari server yang menghapus sesi.
+        //
+        // Sebelumnya setiap kegagalan memanggil clearSession — termasuk
+        // "server tidak terjangkau". Akibatnya kasir yang membuka aplikasi
+        // saat toko offline kehilangan refresh token perangkatnya, lalu
+        // terkunci di halaman login yang juga tidak bisa dihubungi. Terbukti
+        // dengan mematikan pos-engine lalu memuat ulang: URL berpindah ke
+        // /login dan `ionowu_rt` lenyap.
+        if (err instanceof AuthDitolakError) {
+          clearSession();
+          return;
+        }
+        // Jaringan/server bermasalah: token perangkat DIPERTAHANKAN. Tidak ada
+        // sesi hidup, tetapi perangkat tetap dikenal — dan lib/auth/access.ts
+        // memakai itu untuk membiarkan kasir tetap berjualan.
+        setUser(null);
+        setAccessToken(null);
+      })
       .finally(() => setIsLoading(false));
 
     return () => {

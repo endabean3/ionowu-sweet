@@ -21,6 +21,36 @@ export interface AuthSession {
   };
 }
 
+/**
+ * Server BENAR-BENAR menolak kredensialnya (401/403).
+ *
+ * Hanya kegagalan jenis ini yang boleh membuat sesi dihapus. Membedakannya
+ * penting karena kasir offline memakai jalur kode yang sama persis.
+ */
+export class AuthDitolakError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthDitolakError";
+    this.status = status;
+  }
+}
+
+/**
+ * Server tidak terjangkau sama sekali — internet mati, VPS mati, DNS salah.
+ *
+ * Token perangkat TIDAK boleh dihapus karena ini: ia belum terbukti tidak
+ * sah, dan menghapusnya mengunci kasir keluar dari aplikasi yang seharusnya
+ * tetap bisa berjualan offline (CLAUDE.md §6.2). Untuk login ulang ia butuh
+ * internet — yang justru sedang tidak ada.
+ */
+export class JaringanError extends Error {
+  constructor(message = "Tidak bisa menghubungi server") {
+    super(message);
+    this.name = "JaringanError";
+  }
+}
+
 export interface ApiError {
   error: {
     code: string;
@@ -31,16 +61,30 @@ export interface ApiError {
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      headers: { "Content-Type": "application/json", ...options.headers },
+      ...options,
+    });
+  } catch (err) {
+    // fetch hanya melempar bila permintaannya tidak pernah sampai: DNS gagal,
+    // koneksi ditolak, perangkat offline. Tidak ada jawaban server sama
+    // sekali — jadi tidak ada yang membuktikan kredensialnya salah.
+    throw new JaringanError(err instanceof Error ? err.message : undefined);
+  }
 
   if (!res.ok) {
     const err: ApiError = await res.json().catch(() => ({
       error: { code: "NETWORK_ERROR", message: res.statusText, request_id: "", timestamp: "" },
     }));
-    throw new Error(err.error?.message ?? "Terjadi kesalahan");
+    const pesan = err.error?.message ?? "Terjadi kesalahan";
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthDitolakError(pesan, res.status);
+    }
+    // 5xx: server hidup tapi rusak. Sama seperti jaringan mati, ini BUKAN
+    // bukti bahwa token perangkat tidak sah.
+    throw new Error(pesan);
   }
 
   // 204 No Content (logout) tidak punya body

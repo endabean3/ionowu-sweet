@@ -4,6 +4,39 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.12.0] — 2026-09-16
+
+Semua temuan di bawah muncul saat APK dipasang di **Redmi 9A sungguhan** (Android 10, RAM
+2,8 GB) dan saat pos-engine **benar-benar dimatikan** — bukan dari membaca kode.
+
+### Diperbaiki
+* **Kasir offline terkunci keluar dari aplikasinya sendiri.** `AuthProvider` menghapus refresh
+  token pada SETIAP kegagalan refresh, termasuk "server tidak terjangkau". Kasir yang membuka
+  aplikasi saat toko offline kehilangan kredensialnya lalu dilempar ke halaman login yang juga
+  tidak bisa dihubungi — invarian #2 (CLAUDE.md §6.2) patah. Kini `apiFetch` membedakan
+  `AuthDitolakError` (401/403) dari `JaringanError`; hanya yang pertama menghapus sesi. 5 uji.
+* **Shift offline dibuat dengan tenant `"tenant_default"`, penjualan offline dengan `tenant_id`
+  kosong, dan cache outlet tidak bisa dibaca.** Ketiganya bergantung pada `user.tenant_id`, yang
+  bernilai null tepat saat offline — padahal cache outlet ditulis justru untuk keadaan itu.
+  Kini identitas terakhir disimpan (`lib/auth/profile.ts`, tanpa token) dan dipakai sebagai
+  cadangan. Fallback `"tenant_default"` dihapus: shift yang gagal dibuat lebih baik daripada
+  shift bertenant palsu yang ditolak server secara diam-diam. 5 uji.
+* **Layar kasir terbuka tanpa login.** Tidak ada penjaga sesi sama sekali. Kini ada
+  `SessionGuard`: layar kasir boleh dibuka dengan sesi mati **asal perangkat pernah dipakai
+  login** (toleran offline); layar pemilik wajib sesi hidup. 6 uji, termasuk kasus
+  "kasir offline dengan sesi mati tetap boleh berjualan".
+* **Pesan "Anda belum ditugaskan ke outlet" muncul saat servernya yang mati.** Kegagalan
+  jaringan dan outlet kosong berakhir di layar yang sama. Kini dibedakan; kegagalan jaringan
+  berbunyi "Tidak bisa menghubungi server" dengan tombol **Coba lagi**.
+
+### Terverifikasi ujung ke ujung (pos-engine dimatikan)
+Login → matikan server → muat ulang: tetap di `/kasir`, refresh token tetap ada, cache outlet
+terbaca, shift terbuka dengan tenant asli, penjualan 50 ml masuk antrean dengan tenant asli,
+tidak ada satu pun data bertenant palsu. Perangkat yang belum pernah login tetap dilempar ke
+`/login`.
+
+---
+
 ## [1.11.0] — 2026-09-16
 
 ### Ditambahkan
@@ -26,6 +59,8 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   terhadap Postgres sementara milik CI. Sampai dibuat, langkah migrasi produksi manual.
 * Runbook ini **belum pernah dijalankan sampai selesai**; verifikasi pertamanya adalah deploy
   produksi pertama itu sendiri.
+
+---
 
 ## [1.10.0] — 2026-09-16
 
@@ -66,6 +101,8 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   bukan-NULL. Produk pertama berhasil, produk KEDUA selalu gagal 500 "Gagal menyimpan varian".
   Ditemukan saat menambah produk kedua di aplikasi nyata — cacat ini tidak terlihat dari membaca
   kode karena produk pertama selalu berhasil.
+
+---
 
 ## [1.9.0] — 2026-09-16
 
@@ -172,6 +209,7 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   dengan printer sungguhan. Printer yang hanya BLE tidak didukung.
 
 ---
+
 ## [1.6.4] — 2026-09-14
 
 ### Ditambahkan
