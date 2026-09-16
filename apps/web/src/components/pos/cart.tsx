@@ -1,8 +1,10 @@
 "use client";
 
-import { Button } from "@/lib/../components/ui/button";
+import { Button } from "@/components/ui/button";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import type { MoneyTotal } from "@/lib/money/calc";
+import { naikMasukTegas } from "@/lib/motion/tokens";
+import { AnimatePresence, m } from "framer-motion";
 import { Minus, Plus, ShoppingBag, Trash2, Zap } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
@@ -87,74 +89,83 @@ export function POSCart({
               <p className="text-xs text-muted/70">Scan barcode atau klik menu di sebelah kiri</p>
             </div>
           ) : (
-            items.map((it) => {
-              const lineTotal = (Number(it.unitPrice) * it.quantity).toLocaleString("id-ID");
-              return (
-                <div
-                  key={it.variantId}
-                  className="flex items-center justify-between rounded-squircle-sm border border-card-border bg-card p-3 shadow-hard-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <h4 className="truncate font-sans text-sm font-bold text-main">{it.name}</h4>
-                    <p className="font-mono text-xs text-muted">
-                      Rp {Number(it.unitPrice).toLocaleString("id-ID")}
-                    </p>
-                  </div>
+            <AnimatePresence initial={false}>
+              {items.map((it) => {
+                const lineTotal = (Number(it.unitPrice) * it.quantity).toLocaleString("id-ID");
+                return (
+                  <m.div
+                    key={it.variantId}
+                    layout={false}
+                    variants={naikMasukTegas}
+                    initial="sembunyi"
+                    animate="tampil"
+                    exit="pergi"
+                    className="flex flex-col gap-2 rounded-squircle-sm border border-card-border bg-card p-3 shadow-hard-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-sans text-sm font-bold text-main sm:truncate">
+                        {it.name}
+                      </h4>
+                      <p className="font-mono text-xs text-muted">
+                        Rp {Number(it.unitPrice).toLocaleString("id-ID")}
+                      </p>
+                    </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {/* Qty Controls — 44px minimum (WCAG 2.5.5 / UI-UX Pro Max
+                    <div className="flex items-center justify-between gap-1.5 sm:justify-end">
+                      {/* Qty Controls — 44px minimum (WCAG 2.5.5 / UI-UX Pro Max
                        touch-target-size): kasir sering mengetuk cepat berulang
                        kali sambil terburu-buru, target 28px sebelumnya
                        menyebabkan salah pencet baris tetangga. */}
-                    <div className="flex items-center rounded-pill border border-card-border bg-base p-0.5">
-                      <button
-                        type="button"
-                        aria-label={`Kurangi qty ${it.name}`}
-                        onClick={() => {
-                          playPop();
-                          onUpdateQty(it.variantId, -1);
-                        }}
-                        className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
-                      >
-                        <Minus className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                      <span className="w-7 text-center font-mono text-sm font-bold tabular-nums">
-                        {it.quantity}
+                      <div className="flex items-center rounded-pill border border-card-border bg-base p-0.5">
+                        <button
+                          type="button"
+                          aria-label={`Kurangi qty ${it.name}`}
+                          onClick={() => {
+                            playPop();
+                            onUpdateQty(it.variantId, -1);
+                          }}
+                          className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
+                        >
+                          <Minus className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <span className="w-7 text-center font-mono text-sm font-bold tabular-nums">
+                          {it.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Tambah qty ${it.name}`}
+                          onClick={() => {
+                            playPop();
+                            onUpdateQty(it.variantId, 1);
+                          }}
+                          className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
+                        >
+                          <Plus className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
+
+                      {/* Line Total */}
+                      <span className="w-20 text-right font-mono text-sm font-bold tabular-nums">
+                        Rp {lineTotal}
                       </span>
+
+                      {/* Delete */}
                       <button
                         type="button"
-                        aria-label={`Tambah qty ${it.name}`}
+                        aria-label={`Hapus ${it.name} dari keranjang`}
                         onClick={() => {
                           playPop();
-                          onUpdateQty(it.variantId, 1);
+                          onRemoveItem(it.variantId);
                         }}
-                        className="flex h-11 w-11 items-center justify-center rounded-pill hover:bg-black/5 active:scale-95"
+                        className="flex h-11 w-11 items-center justify-center text-muted hover:text-red-600 active:scale-95"
                       >
-                        <Plus className="h-4 w-4" aria-hidden="true" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </div>
-
-                    {/* Line Total */}
-                    <span className="w-20 text-right font-mono text-sm font-bold tabular-nums">
-                      Rp {lineTotal}
-                    </span>
-
-                    {/* Delete */}
-                    <button
-                      type="button"
-                      aria-label={`Hapus ${it.name} dari keranjang`}
-                      onClick={() => {
-                        playPop();
-                        onRemoveItem(it.variantId);
-                      }}
-                      className="flex h-11 w-11 items-center justify-center text-muted hover:text-red-500 active:scale-95"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+                  </m.div>
+                );
+              })}
+            </AnimatePresence>
           )}
         </div>
       </div>

@@ -149,6 +149,18 @@ Untuk mengimplementasikan desain **Sweet Creamy Spatial Luxe** ke dalam aplikasi
 | Library | Package | Peran dalam Sistem |
 |---|---|---|
 | 👑 **Framer Motion** | `framer-motion` | Raja animasi spring physics (`stiffness: 400`, `damping: 25`), morphing layout via `layoutId`, dan gesture drag. |
+
+> **Status implementasi (2026-09-16):** terpasang dan berlaku di seluruh aplikasi, dengan tiga
+> batas yang tidak boleh dilonggarkan tanpa alasan baru:
+>
+> 1. **`LazyMotion features={domAnimation}`** — bukan `domMax`. Mesin *layout animation* tidak
+>    ikut dikirim, jadi `layoutId` di baris atas **tidak tersedia**; menghidupkannya berarti
+>    menambah bundle di rute yang anggarannya sudah terlampaui.
+> 2. **`strict`** — hanya komponen `m.*`. Satu `motion.*` yang lolos menarik seluruh pustaka
+>    tanpa error apa pun.
+> 3. **Nilai spring hidup di `apps/web/src/lib/motion/tokens.ts`**, bukan disebar per komponen.
+>
+> Layar kasir punya aturan tambahan: [pages/kasir.md](./pages/kasir.md) §Zona gerak.
 | 📱 **Vaul** | `vaul` | Bottom Sheet / Drawer modal dengan elastisitas inersia native iOS & background scale-down. |
 | 🔔 **Sonner** | `sonner` | Toast notification mengambang dengan transisi tumpuk (*stacking animation*) yang sangat fluid. |
 | ⌨️ **cmdk** | `cmdk` | Command Palette (Spotlight / Raycast) super cepat untuk shortcut keyboard kasir. |

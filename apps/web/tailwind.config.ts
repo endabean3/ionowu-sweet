@@ -23,6 +23,7 @@ const config: Config = {
           border: "rgb(var(--card-border) / <alpha-value>)",
         },
         main: "rgb(var(--text-main) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
         muted: "rgb(var(--text-muted) / <alpha-value>)",
         sweet: {
           strawberry: "rgb(var(--sweet-strawberry) / <alpha-value>)",

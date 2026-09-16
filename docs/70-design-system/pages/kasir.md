@@ -5,18 +5,52 @@
 > sering sambil berdiri, kadang di bawah silau matahari, di perangkat murah,
 > dan kadang tanpa internet. Setiap keputusan di bawah tunduk pada itu.
 
-## Zona gerak: `none` (mutlak)
+## Zona gerak: `fungsional`
 
-```tsx
-<MotionZone zone="none">…</MotionZone>
-```
+> **Direvisi 2026-09-16 atas keputusan pemilik produk.** Sebelumnya zona ini
+> `none` (mutlak): nol animasi, dan impor pustaka gerak diblokir dari jalur
+> `/kasir`. Aturan itu **dicabut** — framer-motion kini berlaku di seluruh
+> aplikasi, termasuk layar ini. Yang di bawah adalah batas penggantinya,
+> bukan pelonggaran tanpa syarat.
 
-Nol animasi dekoratif. Yang tersisa hanya umpan balik fungsional CSS di bawah
-100 ms: press state, fokus, dan perubahan warna baris.
+Gerak di layar ini harus **fungsional**: ia menjelaskan sebab-akibat yang baru
+saja terjadi. Kalau sebuah animasi bisa dihapus tanpa mengurangi pemahaman
+kasir, ia dekoratif dan tidak boleh ada di sini.
 
-ESLint memblokir impor `gsap`, `motion`, dan bahkan `@/components/motion/*`
-dari `src/app/(app)/kasir/**`. Ini disengaja — di kasir, wrapper zona pun tidak
-perlu, karena jawabannya selalu "tidak".
+**Yang boleh, dan alasannya:**
+
+| Gerak | Alasan |
+|---|---|
+| Baris keranjang masuk/keluar | Kasir harus melihat barang benar-benar masuk, tanpa membaca ulang seluruh daftar |
+| Bar ringkasan bawah naik/turun | Menjelaskan dari mana total itu muncul saat item pertama ditambahkan |
+| Dialog (bayar, shift) | Kaitan ruang antara tombol pemicu dan panel yang terbuka |
+| Badge antrean sync | Perubahan status yang datang sendiri, bukan dari aksi kasir |
+
+**Yang tetap dilarang:**
+
+- **Stagger pada grid produk.** Grid dirender ulang setiap huruf yang diketik
+  di kolom cari; stagger membuat seluruh katalog berkedip di tiap ketukan, dan
+  ini jalur scan-to-cart yang dijanjikan < 100 ms.
+- Animasi `width`/`height`/`top`/`left` — hanya `transform` dan `opacity`.
+- Animasi layout framer-motion. Paket fitur yang dipasang sengaja
+  `domAnimation`, bukan `domMax`, sehingga mesin layout animation tidak ikut
+  terkirim ke perangkat kasir.
+- Skeleton shimmer (lihat "Yang dilarang di layar ini" di bawah).
+
+**Syarat yang mengikat:**
+
+1. Durasi masuk memakai token `springTegas` (`src/lib/motion/tokens.ts`); keluar
+   selalu lebih cepat daripada masuk.
+2. `prefers-reduced-motion` dihormati terpusat lewat `MotionConfig
+   reducedMotion="user"` + blok CSS di `globals.css`. Tidak ada komponen yang
+   boleh menangani ini sendiri-sendiri.
+3. Gerak tidak pernah memblokir input: tidak ada animasi yang harus selesai
+   sebelum kasir bisa menekan tombol berikutnya.
+
+**Ongkos yang diterima.** framer-motion menambah **20 kB** (gzip, First Load JS)
+pada rute ini: 193 kB → 213 kB. Lihat catatan anggaran di bawah — rute ini
+sudah melewati anggarannya bahkan sebelum penambahan tersebut, dan itu belum
+diselesaikan.
 
 ## Ukuran — menimpa default
 
@@ -65,6 +99,13 @@ harus mengklik kolom scan lagi, alurnya salah.
 
 **150 KB gzip.** Rute ini yang paling ketat di seluruh produk. Setiap dependensi
 baru di jalur `/kasir` harus dibenarkan di PR-nya.
+
+> **Terukur 2026-09-16 (`next build`): 213 kB First Load JS — DI ATAS anggaran.**
+> Rute ini sudah 193 kB sebelum framer-motion, jadi pelanggarannya **bukan**
+> disebabkan oleh gerak; framer-motion menambah 20 kB di atas utang yang sudah
+> ada. Angka anggaran sengaja TIDAK dinaikkan agar utangnya tetap terlihat.
+> Belum ada gerbang CI yang menegakkannya (PERFORMANCE-BUDGET §4 menyebut
+> "gerbang CI", dan gerbang itu belum ada).
 
 ## Uji sebelum kirim
 

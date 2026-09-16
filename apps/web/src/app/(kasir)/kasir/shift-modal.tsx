@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
@@ -133,8 +134,8 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-main/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-[32px] border-2 border-card-border bg-white p-8 shadow-hard-lg text-center">
+    <Modal ariaLabel="Buka shift kasir" onClose={onClose} dismissible={false} size="md">
+      <div className="bg-surface p-8 text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-card-border bg-sweet-custard shadow-hard-sm mb-6">
           <Coffee className="h-10 w-10 text-main" />
         </div>
@@ -155,10 +156,11 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
                   key={o.id}
                   type="button"
                   onClick={() => setSelectedOutletId(o.id)}
-                  className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left font-sans font-bold transition-all ${
+                  aria-pressed={selectedOutletId === o.id}
+                  className={`pos-touch-target flex items-center gap-3 rounded-xl border-2 p-3 text-left font-sans font-bold transition-all ${
                     selectedOutletId === o.id
                       ? "border-card-border bg-sweet-custard text-main"
-                      : "border-card-border bg-white text-muted hover:bg-gray-50"
+                      : "border-card-border bg-surface text-muted hover:bg-main/5"
                   }`}
                 >
                   <Store className="h-5 w-5 shrink-0" />
@@ -170,7 +172,10 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
         )}
 
         {outlets && outlets.length === 0 && (
-          <p className="mt-6 rounded-xl border-2 border-red-200 bg-red-50 p-3 font-sans text-sm font-bold text-red-600">
+          <p
+            role="alert"
+            className="mt-6 rounded-xl border-2 border-red-200 bg-red-50 p-3 font-sans text-sm font-bold text-red-700"
+          >
             Anda belum ditugaskan ke outlet mana pun. Hubungi owner/manager.
           </p>
         )}
@@ -188,9 +193,10 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
             </span>
             <input
               type="number"
+              inputMode="numeric"
               value={openingCash}
               onChange={(e) => setOpeningCash(e.target.value)}
-              className="flex-1 rounded-r-xl border-2 border-card-border bg-white p-3 font-mono text-lg font-bold outline-none focus:ring-2 focus:ring-sweet-strawberry"
+              className="flex-1 rounded-r-xl border-2 border-card-border bg-surface p-3 font-mono text-lg font-bold outline-none focus:ring-2 focus:ring-sweet-strawberry"
               id="modal_awal"
               placeholder="100000"
             />
@@ -213,10 +219,10 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
               window.location.href = "/dashboard";
             }}
           >
-            <Lock className="mr-2 h-4 w-4" /> Kembali ke Dasbor
+            <Lock className="mr-2 h-4 w-4" aria-hidden="true" /> Kembali ke Dasbor
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
