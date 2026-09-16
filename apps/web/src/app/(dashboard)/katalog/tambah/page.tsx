@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/context";
 import { createProduct } from "@/lib/catalog/api";
+import { naikMasuk } from "@/lib/motion/tokens";
 import { useSync } from "@/lib/sync/provider";
+import { AnimatePresence, m } from "framer-motion";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,13 +74,18 @@ export default function TambahProdukPage() {
   };
 
   return (
-    <div className="min-h-screen bg-base p-4 md:p-8">
+    <div className="min-h-[100dvh] bg-base p-4 md:p-8">
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <Link href="/katalog">
-            <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
-              <ArrowLeft className="h-5 w-5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Kembali ke katalog"
+              className="pos-touch-target p-0"
+            >
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </Button>
           </Link>
           <h1 className="font-display text-2xl font-black text-main">
@@ -89,7 +96,7 @@ export default function TambahProdukPage() {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="space-y-6 rounded-[32px] border-2 border-card-border bg-white/60 p-6 shadow-hard backdrop-blur-sm sm:p-8"
+          className="space-y-6 rounded-[32px] border-2 border-card-border bg-surface/60 p-6 shadow-hard backdrop-blur-sm sm:p-8"
         >
           <div className="space-y-4">
             <h2 className="font-sans text-sm font-bold uppercase tracking-wider text-muted">
@@ -127,67 +134,81 @@ export default function TambahProdukPage() {
               </Button>
             </div>
 
-            {variants.map((v, i) => (
-              // key HANYA index — sebelumnya key ikut menyertakan v.name
-              // (nilai yang sedang diketik user), jadi SETIAP huruf yang
-              // diketik di Nama Varian mengubah key dan memaksa React
-              // unmount+remount seluruh baris, termasuk field Harga Jual/
-              // Modal di dalamnya: fokus dan nilai yang sedang diisi jadi
-              // tidak stabil. Daftar ini hanya tumbuh/menyusut tanpa
-              // reorder (addVariant menambah di akhir, removeVariant
-              // memfilter), jadi index AMAN dipakai sebagai key di sini —
-              // linter tidak tahu invarian itu.
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: list hanya tumbuh/menyusut di akhir, tanpa reorder
-                key={i}
-                className="flex flex-col gap-3 rounded-xl border border-card-border/50 bg-white p-4 shadow-sm sm:flex-row sm:items-start"
-              >
-                <div className="flex-1 space-y-3">
-                  <Input
-                    label="Nama Varian"
-                    value={v.name}
-                    onChange={(e) => updateVariant(i, "name", e.target.value)}
-                    placeholder="Regular, Large, dll"
-                    required
-                  />
-                  <div className="flex gap-3">
+            <AnimatePresence initial={false}>
+              {variants.map((v, i) => (
+                // key HANYA index — sebelumnya key ikut menyertakan v.name
+                // (nilai yang sedang diketik user), jadi SETIAP huruf yang
+                // diketik di Nama Varian mengubah key dan memaksa React
+                // unmount+remount seluruh baris, termasuk field Harga Jual/
+                // Modal di dalamnya: fokus dan nilai yang sedang diisi jadi
+                // tidak stabil. Daftar ini hanya tumbuh/menyusut tanpa
+                // reorder (addVariant menambah di akhir, removeVariant
+                // memfilter), jadi index AMAN dipakai sebagai key di sini —
+                // linter tidak tahu invarian itu.
+                <m.div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: list hanya tumbuh/menyusut di akhir, tanpa reorder
+                  key={i}
+                  variants={naikMasuk}
+                  initial="sembunyi"
+                  animate="tampil"
+                  exit="pergi"
+                  className="mb-3 flex flex-col gap-3 rounded-xl border border-card-border/50 bg-surface p-4 shadow-sm sm:flex-row sm:items-start"
+                >
+                  <div className="flex-1 space-y-3">
                     <Input
-                      label="Harga Jual"
-                      type="number"
-                      value={v.price}
-                      onChange={(e) => updateVariant(i, "price", e.target.value)}
-                      placeholder="0"
-                      min="0"
+                      label="Nama Varian"
+                      value={v.name}
+                      onChange={(e) => updateVariant(i, "name", e.target.value)}
+                      placeholder="Regular, Large, dll"
                       required
-                      className="flex-1"
                     />
-                    <Input
-                      label="Harga Modal (HPP)"
-                      type="number"
-                      value={v.cost}
-                      onChange={(e) => updateVariant(i, "cost", e.target.value)}
-                      placeholder="0"
-                      min="0"
-                      className="flex-1"
-                    />
+                    <div className="flex gap-3">
+                      <Input
+                        label="Harga Jual"
+                        type="number"
+                        value={v.price}
+                        onChange={(e) => updateVariant(i, "price", e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        required
+                        className="flex-1"
+                      />
+                      <Input
+                        label="Harga Modal (HPP)"
+                        type="number"
+                        value={v.cost}
+                        onChange={(e) => updateVariant(i, "cost", e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        className="flex-1"
+                      />
+                    </div>
                   </div>
-                </div>
-                {variants.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => removeVariant(i)}
-                    className="mt-6 h-10 w-10 shrink-0 text-red-500 hover:bg-red-50 sm:mt-1"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
+                  {variants.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeVariant(i)}
+                      aria-label={`Hapus varian ${v.name || i + 1}`}
+                      // h-11 w-11, BUKAN pos-touch-target: di ponsel baris varian
+                      // adalah flex-col, dan min-width 48px tanpa lebar tetap
+                      // membuat tombol hapus melebar satu baris penuh. 44px sudah
+                      // memenuhi ambang sentuh tanpa mengubah tata letaknya.
+                      className="mt-2 h-11 w-11 shrink-0 self-end text-red-600 hover:bg-red-50 sm:mt-1 sm:self-auto"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                </m.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
+            <div
+              role="alert"
+              className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-700"
+            >
               {error}
             </div>
           )}

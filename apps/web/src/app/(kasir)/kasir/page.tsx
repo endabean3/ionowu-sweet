@@ -9,8 +9,10 @@ import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { calculateCart } from "@/lib/money/calc";
+import { barBawah } from "@/lib/motion/tokens";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { useLiveQuery } from "dexie-react-hooks";
+import { AnimatePresence, m } from "framer-motion";
 import { ArrowLeft, Barcode, Layers, Search, Wallet } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
@@ -332,6 +334,7 @@ export default function KasirPage() {
             </div>
             <Link
               href="/dashboard"
+              aria-label="Dasbor"
               className="mochi-button flex h-11 items-center gap-1.5 rounded-pill border-2 border-card-border bg-base px-4 font-sans text-xs font-bold text-main shadow-hard-sm"
             >
               <Layers className="h-4 w-4" />
@@ -359,6 +362,10 @@ export default function KasirPage() {
             ))}
           </div>
 
+          {/* Grid produk sengaja TANPA animasi masuk/stagger. Ini jalur
+             scan-to-cart yang dijanjikan < 100ms (PERFORMANCE-BUDGET §3), dan
+             daftarnya dirender ulang setiap kali kasir mengetik di kolom cari —
+             stagger di sini berarti seluruh katalog berkedip di tiap huruf. */}
           <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {!mounted || !dbProducts || !dbVariants ? (
               // Teks statis, bukan skeleton shimmer — pages/kasir.md melarang
@@ -399,39 +406,55 @@ export default function KasirPage() {
          melewati seluruh produk hanya untuk menagih, dan total belanja tidak
          pernah terlihat sambil memilih barang. Bar ini membuat angka dan
          aksi utama selalu satu ketukan jauhnya. */}
-      {cartItems.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden">
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-sans text-xs font-bold text-muted">
-                {totalItemCount} item · sudah termasuk PPN
-              </p>
-              <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
-                Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
-              </p>
+      <AnimatePresence>
+        {cartItems.length > 0 && (
+          <m.div
+            key="bar-ringkasan"
+            variants={barBawah}
+            initial="sembunyi"
+            animate="tampil"
+            exit="pergi"
+            className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden"
+          >
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-sans text-xs font-bold text-muted">
+                  {totalItemCount} item · sudah termasuk PPN
+                </p>
+                <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
+                  Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
+                </p>
+              </div>
+              <Button
+                size="pos-lg"
+                variant="primary"
+                className="shrink-0 gap-2 shadow-hard"
+                onClick={() => setIsCheckingOut(true)}
+              >
+                <Wallet className="h-5 w-5" aria-hidden="true" />
+                Bayar
+              </Button>
             </div>
-            <Button
-              size="pos-lg"
-              variant="primary"
-              className="shrink-0 gap-2 shadow-hard"
-              onClick={() => setIsCheckingOut(true)}
-            >
-              <Wallet className="h-5 w-5" aria-hidden="true" />
-              Bayar
-            </Button>
-          </div>
-        </div>
-      )}
+          </m.div>
+        )}
+      </AnimatePresence>
 
-      {isCheckingOut && (
-        <PaymentModal
-          totals={cartTotals}
-          onClose={() => setIsCheckingOut(false)}
-          onPay={processPayment}
-        />
-      )}
+      <AnimatePresence>
+        {isCheckingOut && (
+          <PaymentModal
+            key="modal-bayar"
+            totals={cartTotals}
+            onClose={() => setIsCheckingOut(false)}
+            onPay={processPayment}
+          />
+        )}
+      </AnimatePresence>
 
-      {showShiftModal && !activeShift && <ShiftModal onClose={() => setShowShiftModal(false)} />}
+      <AnimatePresence>
+        {showShiftModal && !activeShift && (
+          <ShiftModal key="modal-shift" onClose={() => setShowShiftModal(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Tak terlihat di layar; hanya muncul di hasil cetak. */}
       {lastReceipt && <Receipt data={lastReceipt} />}
