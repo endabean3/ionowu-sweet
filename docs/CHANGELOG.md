@@ -4,6 +4,26 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.15.1] — 2026-09-17
+
+### Diperbaiki
+* **Runbook deploy akan menolak image web yang sebenarnya benar.** Langkah 1 memeriksa URL API
+  di `.next/static` relatif terhadap direktori kerja `/app`, padahal image berlayout monorepo
+  dan build-nya ada di `/app/apps/web/.next/static`. `grep` gagal dengan *No such file or
+  directory*, tetapi pipeline tetap keluar 0 karena `head` berhasil — hasilnya "nol baris",
+  persis gejala yang runbook tafsirkan sebagai *image salah, berhenti*.
+  * Kini jalurnya absolut dan diperiksa lebih dulu (`[ -d ]`, exit 2 bila tidak ada), sehingga
+    "jalur salah" dan "image salah" tidak lagi bisa tertukar. Keluarannya juga sekaligus
+    menghitung kemunculan `localhost:…`, dan ada tabel cara menafsirkan tiap hasil.
+  * Diuji pada image rilis nyata (web `a0ac35f5…`): jalur benar → `14
+    https://api.sweet.ionowu.com`, exit 0; jalur salah yang disimulasikan → `JALUR SALAH`,
+    exit 2.
+  * Ditemukan saat menjalankan prasyarat deploy pertama terhadap server sungguhan.
+    `GO-LIVE` §2.G tidak diubah: ia memeriksa build **lokal** dari akar repo, dan jalur
+    relatifnya memang benar di sana.
+
+---
+
 ## [1.15.0] — 2026-09-16
 
 ### Ditambahkan

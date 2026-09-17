@@ -79,11 +79,27 @@ Verifikasi **isi image web**, jangan hanya percaya build hijau — URL API dibak
 
 ```bash
 docker run --rm ghcr.io/endabean3/ionowu-sweet/web@sha256:<WEB_DIGEST> \
-  sh -c 'grep -rl "api.sweet.ionowu.com" .next/static | head -3'
+  sh -c 'd=/app/apps/web/.next/static; [ -d "$d" ] || { echo "JALUR SALAH: $d tidak ada di image"; exit 2; }; grep -rhoE "https://api\.sweet\.ionowu\.com|localhost:[0-9]+" "$d" | sort | uniq -c'
 ```
 
-Nol hasil = **berhenti**. Image itu memuat URL yang salah dan tidak boleh dirilis
-([GO-LIVE](../GO-LIVE.md) §2.G).
+Hasil yang benar **satu baris saja**, berisi URL produksi (diuji 2026-09-17 pada digest
+`a0ac35f5…`: `14 https://api.sweet.ionowu.com`). Tafsirkan keluarannya begini:
+
+| Keluaran | Artinya | Tindakan |
+|---|---|---|
+| Satu baris `https://api.sweet.ionowu.com` | Image benar | Lanjut |
+| Ada baris `localhost:…` | URL dev ikut terbakar | **Berhenti** — image tidak boleh dirilis ([GO-LIVE](../GO-LIVE.md) §2.G) |
+| Kosong | Bundle tidak memuat URL API sama sekali | **Berhenti** — image tidak boleh dirilis |
+| `JALUR SALAH …` (exit 2) | Layout image berubah, **bukan** image yang salah | Cari ulang: `docker run --rm <image> sh -c 'find / -type d -path "*.next/static" 2>/dev/null'`, perbaiki jalur di sini |
+
+> **Kenapa jalurnya absolut dan diperiksa lebih dulu.** Versi sebelumnya mencari di
+> `.next/static` relatif terhadap direktori kerja `/app`, padahal image ini berlayout
+> monorepo (`CMD node apps/web/server.js`) sehingga build-nya ada di
+> `/app/apps/web/.next/static`. `grep` gagal dengan *No such file or directory*, tetapi
+> pipeline tetap keluar **0** karena `head` berhasil — jadi hasilnya "nol baris", persis
+> gejala yang oleh runbook ini ditafsirkan sebagai *image salah, berhenti*. Siapa pun yang
+> mengikutinya apa adanya akan menolak image yang sebenarnya benar. Pemeriksaan `[ -d ]`
+> memisahkan dua kegagalan yang tadinya tak bisa dibedakan.
 
 ---
 
