@@ -184,7 +184,7 @@ jobs:
       - name: Nyalakan pos-engine & web
         run: |
           cd services/pos-engine
-          IONOWU_SWEET_DATABASE_URL="$DB" IONOWU_SWEET_CORS_ORIGINS="http://localhost:3000,https://localhost" PORT=8080 setsid nohup go run ./cmd/api > /tmp/api.log 2>&1 &
+          IONOWU_SWEET_DATABASE_URL="$DB" IONOWU_SWEET_CORS_ORIGINS="http://localhost:3000,https://localhost" IONOWU_SWEET_AUTH_RATE_PER_MINUTE=1000 PORT=8080 setsid nohup go run ./cmd/api > /tmp/api.log 2>&1 &
           cd "$GITHUB_WORKSPACE/apps/web"
           setsid nohup pnpm dev > /tmp/web.log 2>&1 &
           sleep 2

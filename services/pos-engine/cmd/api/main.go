@@ -42,7 +42,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	router := httpapi.NewRouter(pool, cfg.JWTPublicKey, cfg.JWTPrivateKey, cfg.AllowedOrigins)
+	router := httpapi.NewRouter(pool, cfg.JWTPublicKey, cfg.JWTPrivateKey, cfg.AllowedOrigins, cfg.AuthPerMinute)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,

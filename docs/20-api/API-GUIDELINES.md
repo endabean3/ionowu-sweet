@@ -128,6 +128,10 @@ Untuk menjaga kestabilan sistem kasir dari spam atau serangan DoS:
   hitungannya; `pos-engine` belum punya klien Redis.
 * **IP klien = entri paling kanan `X-Forwarded-For`** (yang ditulis Traefik). Entri paling
   kiri dikirim klien dan bisa dipalsukan untuk mendapat kuota baru tiap permintaan.
+* **Batasnya bisa diatur lewat `IONOWU_SWEET_AUTH_RATE_PER_MINUTE`** (bawaan 10). Nilai ini
+  hanya dinaikkan di CI: uji E2E mendaftar dan login dari satu IP runner, dan 14 uji melewati
+  10/menit. Nilai `0`, negatif, atau bukan angka **ditolak saat start**, jadi rate limit tidak
+  bisa dimatikan diam-diam lewat salah ketik. **Jangan diisi di produksi.**
 * **`/auth/refresh` sengaja tidak dibatasi.** Seluruh kasir satu toko berbagi satu IP NAT;
   refresh yang ditolak melempar kasir keluar saat jam ramai. Refresh butuh token sah, jadi
   bukan jalur menebak kata sandi.

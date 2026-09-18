@@ -33,6 +33,12 @@ bukan dari membaca kode.
   ("Enter", "F2") hanya tampil di layar lebar, dan chip kategori yang isinya hanya "Semua" disembunyikan.
 * Toast bayar kini menampilkan **kembalian**.
 
+### Diperbaiki — CI
+* **Gerbang E2E merah karena rate limit #31.** Setiap uji E2E mendaftar dan login dari satu IP
+  runner. Dengan uji printer baru jumlahnya melewati 10/menit, sehingga server menjawab
+  `429 RATE_LIMITED`. Kini batasnya diatur lewat `IONOWU_SWEET_AUTH_RATE_PER_MINUTE` (bawaan
+  10, CI 1000). Nilai 0, negatif, atau bukan angka ditolak saat start. 3 uji Go.
+
 ### Terverifikasi
 * vitest 44/44 (termasuk 2 uji baru untuk halaman cetak uji), tsc, dan biome bersih.
 * Playwright 14/14 di Chromium dan Mobile Chrome, termasuk `printer-bluetooth.spec.ts` baru yang
