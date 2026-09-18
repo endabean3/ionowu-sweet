@@ -52,6 +52,10 @@ type syncVariant struct {
 	UomPrecision  int16  `json:"uom_precision"`
 	Price         string `json:"price"` // decimal
 	StockQuantity string `json:"stock_quantity"`
+	// Satuan tempat stock_quantity dihitung bila berbeda dari uom (ADR-0012):
+	// bibit dijual per ml, stoknya gram. Kosong = sama dengan uom.
+	StockUom      string `json:"stock_uom,omitempty"`
+	StockFactor   string `json:"stock_factor,omitempty"`
 	MinStockAlert string `json:"min_stock_alert"`
 	IsActive      bool   `json:"is_active"`
 }
@@ -145,6 +149,8 @@ func (h *SyncHandler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
 			StockQuantity: row.StockQuantity.String(),
 			MinStockAlert: row.MinStockAlert.String(),
 			IsActive:      row.IsActive,
+			StockUom:      row.StockUom,
+			StockFactor:   stockFactorString(row.StockUom, row.StockFactor),
 		})
 	}
 
@@ -338,6 +344,9 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 		unitPrice decimal.Decimal
 		unitCost  decimal.Decimal
 		subtotal  decimal.Decimal
+		// Satuan stok bila berbeda dari satuan jual (ADR-0012).
+		stockUom    string
+		stockFactor decimal.Decimal
 	}
 	resolvedItems := make([]resolved, 0, len(p.Items))
 	moneyItems := make([]money.Item, 0, len(p.Items))
@@ -355,6 +364,7 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 		resolvedItems = append(resolvedItems, resolved{
 			variantID: it.VariantID, itemType: variant.ItemType, uom: variant.Uom,
 			qty: it.Qty, unitPrice: it.UnitPrice, unitCost: variant.CostPrice, subtotal: lineSubtotal,
+			stockUom: variant.StockUom, stockFactor: variant.StockFactor,
 		})
 		moneyItems = append(moneyItems, money.Item{Quantity: it.Qty, UnitPrice: it.UnitPrice, Discount: it.Discount})
 	}
@@ -424,8 +434,9 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 		if it.itemType != "stock" && it.itemType != "composite" {
 			continue // service/time_based: tidak berstok
 		}
+		keluar, satuanStok := stockDeduction(it.qty, it.uom, it.stockUom, it.stockFactor)
 		balance, err := qtx.DecrementStockAllowNegative(ctx, store.DecrementStockAllowNegativeParams{
-			TenantID: tenantID, ID: it.variantID, StockQuantity: it.qty,
+			TenantID: tenantID, ID: it.variantID, StockQuantity: keluar,
 		})
 		if err != nil {
 			return "rejected", "gagal memotong stok: " + err.Error()
@@ -433,8 +444,8 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 		actorID := cashierID
 		stockEvents = append(stockEvents, store.InsertStockEventsParams{
 			ID: ulid.Make().String(), TenantID: tenantID, OutletID: p.OutletID,
-			VariantID: it.variantID, EventType: "sale", QuantityDelta: it.qty.Neg(),
-			BalanceAfter: balance, Uom: it.uom, ReferenceID: &sale.ID, ActorUserID: &actorID,
+			VariantID: it.variantID, EventType: "sale", QuantityDelta: keluar.Neg(),
+			BalanceAfter: balance, Uom: satuanStok, ReferenceID: &sale.ID, ActorUserID: &actorID,
 		})
 	}
 	if len(stockEvents) > 0 {

@@ -79,6 +79,9 @@ type resolvedItem struct {
 	UnitPrice decimal.Decimal
 	UnitCost  decimal.Decimal
 	Subtotal  decimal.Decimal
+	// Satuan stok bila berbeda dari satuan jual (ADR-0012).
+	StockUom    string
+	StockFactor decimal.Decimal
 }
 
 func toTimestamptz(t time.Time) pgtype.Timestamptz {
@@ -138,6 +141,8 @@ func (h *CheckoutHandler) PostSale(w http.ResponseWriter, r *http.Request) {
 			saleItemInput: it,
 			ItemType:      variant.ItemType,
 			Uom:           variant.Uom,
+			StockUom:      variant.StockUom,
+			StockFactor:   variant.StockFactor,
 			UnitPrice:     variant.Price,
 			UnitCost:      variant.CostPrice,
 			Subtotal:      lineSubtotal,
@@ -248,8 +253,9 @@ func (h *CheckoutHandler) PostSale(w http.ResponseWriter, r *http.Request) {
 	for _, it := range resolved {
 		switch it.ItemType {
 		case "stock":
+			keluar, satuanStok := stockDeduction(it.Qty, it.Uom, it.StockUom, it.StockFactor)
 			balance, err := qtx.DecrementStockStrict(ctx, store.DecrementStockStrictParams{
-				TenantID: tenantID, ID: it.VariantID, StockQuantity: it.Qty,
+				TenantID: tenantID, ID: it.VariantID, StockQuantity: keluar,
 			})
 			if errors.Is(err, pgx.ErrNoRows) {
 				RespondError(w, http.StatusUnprocessableEntity, "INSUFFICIENT_STOCK",
@@ -262,8 +268,8 @@ func (h *CheckoutHandler) PostSale(w http.ResponseWriter, r *http.Request) {
 			}
 			stockEvents = append(stockEvents, store.InsertStockEventsParams{
 				ID: ulid.Make().String(), TenantID: tenantID, OutletID: req.OutletID,
-				VariantID: it.VariantID, EventType: "sale", QuantityDelta: it.Qty.Neg(),
-				BalanceAfter: balance, Uom: it.Uom, ReferenceID: &sale.ID, ActorUserID: &cashierID,
+				VariantID: it.VariantID, EventType: "sale", QuantityDelta: keluar.Neg(),
+				BalanceAfter: balance, Uom: satuanStok, ReferenceID: &sale.ID, ActorUserID: &cashierID,
 			})
 		case "composite":
 			// Menjual 1 induk composite mengurangi stok setiap komponen BOM

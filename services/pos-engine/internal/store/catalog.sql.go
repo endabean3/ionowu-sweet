@@ -82,9 +82,19 @@ func (q *Queries) GetBomComponents(ctx context.Context, arg GetBomComponentsPara
 const getVariantForCheckout = `-- name: GetVariantForCheckout :one
 SELECT
     v.id, v.item_type, v.uom, v.uom_precision, COALESCE(o.price, v.price) AS price,
-    v.cost_price, v.stock_quantity
+    v.cost_price, v.stock_quantity, COALESCE(sc.to_uom, '')::VARCHAR AS stock_uom, COALESCE(sc.factor, 0)::DECIMAL AS stock_factor
 FROM variants v
 LEFT JOIN outlet_price_overrides o ON o.variant_id = v.id AND o.tenant_id = v.tenant_id AND o.outlet_id = $3
+LEFT JOIN LATERAL (
+    -- Satuan STOK bila berbeda dari satuan jual (ADR-0012): bibit dijual per
+    -- ml tetapi stoknya dihitung dalam gram. Konversi yang berlaku adalah
+    -- yang BERANGKAT dari satuan jual varian.
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
 WHERE v.tenant_id = $1 AND v.id = $2 AND v.is_active
 `
 
@@ -102,6 +112,8 @@ type GetVariantForCheckoutRow struct {
 	Price         decimal.Decimal `db:"price" json:"price"`
 	CostPrice     decimal.Decimal `db:"cost_price" json:"cost_price"`
 	StockQuantity decimal.Decimal `db:"stock_quantity" json:"stock_quantity"`
+	StockUom      string          `db:"stock_uom" json:"stock_uom"`
+	StockFactor   decimal.Decimal `db:"stock_factor" json:"stock_factor"`
 }
 
 func (q *Queries) GetVariantForCheckout(ctx context.Context, arg GetVariantForCheckoutParams) (GetVariantForCheckoutRow, error) {
@@ -115,6 +127,8 @@ func (q *Queries) GetVariantForCheckout(ctx context.Context, arg GetVariantForCh
 		&i.Price,
 		&i.CostPrice,
 		&i.StockQuantity,
+		&i.StockUom,
+		&i.StockFactor,
 	)
 	return i, err
 }
@@ -124,10 +138,21 @@ SELECT
     v.id, v.product_id, p.category_id, p.name AS product_name, v.name AS variant_name,
     v.sku, v.barcode, v.item_type, v.uom, v.uom_precision,
     COALESCE(o.price, v.price) AS price, v.stock_quantity, v.min_stock_alert,
-    v.is_active, GREATEST(v.created_at, p.created_at) AS updated_at
+    v.is_active, GREATEST(v.created_at, p.created_at) AS updated_at,
+    COALESCE(sc.to_uom, '')::VARCHAR AS stock_uom, COALESCE(sc.factor, 0)::DECIMAL AS stock_factor
 FROM variants v
 JOIN products p ON p.id = v.product_id AND p.tenant_id = v.tenant_id
 LEFT JOIN outlet_price_overrides o ON o.variant_id = v.id AND o.tenant_id = v.tenant_id AND o.outlet_id = $2
+LEFT JOIN LATERAL (
+    -- Satuan STOK bila berbeda dari satuan jual (ADR-0012): bibit dijual per
+    -- ml tetapi stoknya dihitung dalam gram. Konversi yang berlaku adalah
+    -- yang BERANGKAT dari satuan jual varian.
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
 WHERE v.tenant_id = $1
 ORDER BY v.id
 LIMIT $3
@@ -155,6 +180,8 @@ type ListCatalogForSyncRow struct {
 	MinStockAlert decimal.Decimal `db:"min_stock_alert" json:"min_stock_alert"`
 	IsActive      bool            `db:"is_active" json:"is_active"`
 	UpdatedAt     interface{}     `db:"updated_at" json:"updated_at"`
+	StockUom      string          `db:"stock_uom" json:"stock_uom"`
+	StockFactor   decimal.Decimal `db:"stock_factor" json:"stock_factor"`
 }
 
 func (q *Queries) ListCatalogForSync(ctx context.Context, arg ListCatalogForSyncParams) ([]ListCatalogForSyncRow, error) {
@@ -182,6 +209,8 @@ func (q *Queries) ListCatalogForSync(ctx context.Context, arg ListCatalogForSync
 			&i.MinStockAlert,
 			&i.IsActive,
 			&i.UpdatedAt,
+			&i.StockUom,
+			&i.StockFactor,
 		); err != nil {
 			return nil, err
 		}

@@ -222,7 +222,11 @@ paths:
         kenyataan pada 2026-09-16.
 
         Kolom CSV (baris pertama header, dilewati):
-        `ProductName, VariantName, SKU, Barcode, Price, CostPrice, Uom, UomPrecision, StockQuantity, ItemType`
+        `ProductName, VariantName, SKU, Barcode, Price, CostPrice, Uom, UomPrecision, StockQuantity, ItemType, StockUom, StockFactor`
+
+        `StockUom` + `StockFactor` opsional (ADR-0012): satuan STOK bila berbeda dari satuan
+        jual — bibit dijual `ml`, stoknya `g`, faktor 1 (gram per ml, bawaan 1). Bila diisi,
+        `StockQuantity` dibaca dalam satuan stok dan boleh sampai 3 desimal.
 
         Setiap baris diproses dalam SAVEPOINT sendiri: baris yang gagal dilewati dan
         **dilaporkan** di `dilewati`, baris lain tetap masuk. `Price` wajib diisi — harga
@@ -828,6 +832,10 @@ components:
         price: { type: number, format: decimal }
         cost: { type: number, format: decimal }
         is_active: { type: boolean }
+        uom: { type: string, description: "Satuan JUAL (tercetak di nota)" }
+        stock_quantity: { type: string, format: decimal, description: "Dalam stock_uom bila ada, selain itu dalam uom" }
+        stock_uom: { type: string, description: "Satuan STOK bila berbeda dari uom (ADR-0012), mis. g untuk bibit yang dijual per ml. Tidak ada = sama dengan uom" }
+        stock_factor: { type: string, format: decimal, description: "Satuan stok per 1 satuan jual (mis. 1 g per ml)" }
 
     VariantInput:
       type: object

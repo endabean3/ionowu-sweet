@@ -127,7 +127,13 @@ export default function KatalogPage() {
                                   Menipis
                                 </span>
                               ) : null}
-                              <span>Stok: {variant.stock_quantity}</span>
+                              <span>
+                                Stok: {Number(variant.stock_quantity).toLocaleString("id-ID")}{" "}
+                                {variant.stock_uom || variant.uom}
+                                {variant.stock_uom && variant.stock_uom !== variant.uom
+                                  ? ` · dijual per ${variant.uom}`
+                                  : ""}
+                              </span>
                             </p>
                           </div>
                           <div className="text-right">

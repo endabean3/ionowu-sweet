@@ -77,3 +77,38 @@ func TestParseBarisImpor_DesimalSesuaiPresisiDiterima(t *testing.T) {
 		t.Errorf("237.5 ml dengan presisi 1 ditolak: %s", alasan)
 	}
 }
+
+func TestParseBarisImpor_SatuanStokGram(t *testing.T) {
+	// Bibit dijual per ml, stoknya gram (ADR-0012). Stok 250.5 g sah
+	// walaupun presisi JUAL-nya 1 desimal.
+	b, alasan := parseBarisImpor(baris("Macbrame Scandal Vica,Reguler,WW-084,,1000,,ml,1,250.55,stock,g,0.92"))
+	if alasan != "" {
+		t.Fatalf("baris sah ditolak: %s", alasan)
+	}
+	if b.stockUom != "g" || b.stockFactor.String() != "0.92" || b.stockQty.String() != "250.55" {
+		t.Fatalf("satuan stok salah: %q %s %s", b.stockUom, b.stockFactor, b.stockQty)
+	}
+
+	// Faktor kosong = 1 g per ml.
+	b, _ = parseBarisImpor(baris("Laverne Vanilla Lucy,Reguler,,,2000,,ml,1,100,stock,g,"))
+	if b.stockFactor.String() != "1" {
+		t.Fatalf("faktor bawaan %s, mau 1", b.stockFactor)
+	}
+
+	// Satuan stok sama dengan satuan jual = tanpa konversi.
+	b, _ = parseBarisImpor(baris("Dupa,Reguler,,,2000,,pack,0,45,stock,pack,"))
+	if b.stockUom != "" {
+		t.Fatalf("satuan sama tetap dikonversi: %q", b.stockUom)
+	}
+
+	for _, line := range []string{
+		"Bibit,Reguler,,,1000,,ml,1,100,stock,g,0",
+		"Bibit,Reguler,,,1000,,ml,1,100,stock,g,-1",
+		"Bibit,Reguler,,,1000,,ml,1,100,stock,g,satu",
+		"Bibit,Reguler,,,1000,,ml,1,100.0001,stock,g,1",
+	} {
+		if _, alasan := parseBarisImpor(baris(line)); alasan == "" {
+			t.Errorf("seharusnya ditolak: %s", line)
+		}
+	}
+}

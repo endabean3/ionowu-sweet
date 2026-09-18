@@ -117,9 +117,20 @@ func (q *Queries) InsertStockOpnameItem(ctx context.Context, arg InsertStockOpna
 }
 
 const listStockLevels = `-- name: ListStockLevels :many
-SELECT v.id AS variant_id, p.name AS product_name, v.name AS variant_name, v.stock_quantity, v.uom, v.min_stock_alert
+SELECT v.id AS variant_id, p.name AS product_name, v.name AS variant_name, v.stock_quantity,
+       COALESCE(sc.to_uom, v.uom)::VARCHAR AS uom, v.min_stock_alert
 FROM variants v
 JOIN products p ON p.id = v.product_id AND p.tenant_id = v.tenant_id
+LEFT JOIN LATERAL (
+    -- Satuan STOK bila berbeda dari satuan jual (ADR-0012): bibit dijual per
+    -- ml tetapi stoknya dihitung dalam gram. Konversi yang berlaku adalah
+    -- yang BERANGKAT dari satuan jual varian.
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
 WHERE v.tenant_id = $1 AND v.is_active = TRUE AND v.item_type IN ('stock', 'composite')
 ORDER BY p.name ASC, v.name ASC
 `
@@ -133,6 +144,8 @@ type ListStockLevelsRow struct {
 	MinStockAlert decimal.Decimal `db:"min_stock_alert" json:"min_stock_alert"`
 }
 
+// `uom` di sini adalah satuan STOK (satuan tempat stock_quantity dihitung):
+// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 func (q *Queries) ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error) {
 	rows, err := q.db.Query(ctx, listStockLevels, tenantID)
 	if err != nil {
