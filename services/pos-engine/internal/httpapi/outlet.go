@@ -192,6 +192,7 @@ func (h *OutletHandler) PatchOutlet(w http.ResponseWriter, r *http.Request) {
 		ReceiptFooter:    req.ReceiptFooter,
 		WarrantyDays:     req.WarrantyDays,
 		SocialHandle:     req.SocialHandle,
+		BibitPercent:     req.BibitPercent,
 	})
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
@@ -234,6 +235,8 @@ type patchOutletRequest struct {
 	WarrantyDays *int16 `json:"warranty_days"`
 	// Akun media sosial toko yang wajib di-follow calon member (mis. TikTok).
 	SocialHandle *string `json:"social_handle"`
+	// Persen bibit dalam racikan parfum (sisanya pelarut); 0 = tanpa racikan.
+	BibitPercent *int16 `json:"bibit_percent"`
 }
 
 // Batas panjang mengikuti kolom (outlets.name VARCHAR(200), phone
@@ -285,6 +288,10 @@ func (p *patchOutletRequest) normalize() string {
 	// Batas sama dengan CHECK di migrasi 00011.
 	if p.WarrantyDays != nil && (*p.WarrantyDays < 0 || *p.WarrantyDays > 365) {
 		return "Lama garansi harus 0–365 hari"
+	}
+	// Batas sama dengan CHECK di migrasi 00013.
+	if p.BibitPercent != nil && (*p.BibitPercent < 0 || *p.BibitPercent > 100) {
+		return "Persen bibit harus 0–100"
 	}
 	return ""
 }

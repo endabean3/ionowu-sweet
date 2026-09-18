@@ -398,6 +398,7 @@ export default function KasirPage() {
         outletPhone: outlet?.phone,
         footer: outlet?.receipt_footer,
         warrantyDays: outlet?.warranty_days,
+        recipePercent: outlet?.bibit_percent,
         member: member
           ? { code: member.member_code, name: member.name, bonuses: bonusMember }
           : null,
@@ -711,6 +712,7 @@ export default function KasirPage() {
           uomPrecision={qtyTarget.product.uomPrecision}
           hargaSatuan={qtyTarget.product.price}
           nilaiAwal={qtyTarget.line?.quantity}
+          racikanPersen={outlet?.bibit_percent}
           onClose={() => setQtyTarget(null)}
           onConfirm={(quantity) => {
             setQuantity(qtyTarget.product, quantity);

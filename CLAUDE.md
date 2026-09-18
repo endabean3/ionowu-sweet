@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 93 dokumen .md di docs/ · 11 folder · 12 ADR diterima (0001–0012)
-12 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
+13 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
 ```
 
 > Angka dihitung ulang 2026-09-18 langsung dari repo. Audit dokumen menyeluruh
@@ -177,6 +177,8 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   kode `M-XXXXXX` + barcode CODE128 di nota, bonus tester tiap beli & merchandise perdana.
   Bisa offline; `customers` diproses paling awal di `/sync/push`.
 * **Garansi di nota** (migrasi 00011): "Garansi N hari s/d <tanggal>", diatur di Pengaturan.
+* **Racikan parfum** (migrasi 00013): Pengaturan "% bibit" (Warung Wangi 65 → 65:35). Nota berisi
+  bibit ml mencetak takaran botol 10–100 ml; keypad kasir menampilkan "Botol 30 ml → 19,5 ml".
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
   menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.

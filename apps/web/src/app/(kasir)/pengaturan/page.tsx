@@ -36,6 +36,8 @@ interface Form {
   /** Teks di input; diubah ke angka saat simpan. */
   warranty_days: string;
   social_handle: string;
+  /** Teks di input; diubah ke angka saat simpan. */
+  bibit_percent: string;
 }
 
 const kosong: Form = {
@@ -45,6 +47,7 @@ const kosong: Form = {
   receipt_footer: "",
   warranty_days: "0",
   social_handle: "",
+  bibit_percent: "0",
 };
 
 function keForm(o: OutletRow): Form {
@@ -55,6 +58,7 @@ function keForm(o: OutletRow): Form {
     receipt_footer: o.receipt_footer ?? "",
     warranty_days: String(o.warranty_days ?? 0),
     social_handle: o.social_handle ?? "",
+    bibit_percent: String(o.bibit_percent ?? 0),
   };
 }
 
@@ -124,8 +128,17 @@ export default function PengaturanPage() {
     Number.isInteger(garansiHari) &&
     garansiHari >= 0 &&
     garansiHari <= 365;
+  const racikan = Number(form.bibit_percent);
+  const racikanSah =
+    form.bibit_percent.trim() !== "" && Number.isInteger(racikan) && racikan >= 0 && racikan <= 100;
   const dapatSimpan =
-    bolehUbah && !offline && berubah && form.name.trim() !== "" && garansiSah && !menyimpan;
+    bolehUbah &&
+    !offline &&
+    berubah &&
+    form.name.trim() !== "" &&
+    garansiSah &&
+    racikanSah &&
+    !menyimpan;
 
   const simpan = async () => {
     if (!accessToken || !dapatSimpan) return;
@@ -137,12 +150,17 @@ export default function PengaturanPage() {
       receipt_footer: form.receipt_footer.trim(),
       warranty_days: garansiHari,
       social_handle: form.social_handle.trim().replace(/^@/, ""),
+      bibit_percent: racikan,
     };
     try {
       await patchOutlet(accessToken, outletId, rapi);
       const baru = (outlets ?? []).map((o) => (o.id === outletId ? { ...o, ...rapi } : o));
       setOutlets(baru);
-      setForm({ ...rapi, warranty_days: String(rapi.warranty_days) });
+      setForm({
+        ...rapi,
+        warranty_days: String(rapi.warranty_days),
+        bibit_percent: String(rapi.bibit_percent),
+      });
       if (identitas?.tenant_id) await cacheOutlets(identitas.tenant_id, baru);
       toast.success("Pengaturan toko tersimpan", {
         description: "Struk berikutnya memakai data ini.",
@@ -170,6 +188,7 @@ export default function PengaturanPage() {
       outletPhone: form.phone,
       footer: form.receipt_footer,
       warrantyDays: garansiSah ? garansiHari : 0,
+      recipePercent: racikanSah ? racikan : 0,
       cashierName: identitas?.name ?? "Kasir",
       lines: [
         {
@@ -190,7 +209,7 @@ export default function PengaturanPage() {
       pending: false,
     };
     return printedText(encodeReceipt(contoh, kertas)).replace(/\n+$/, "");
-  }, [form, kertas, identitas?.name, garansiHari, garansiSah]);
+  }, [form, kertas, identitas?.name, garansiHari, garansiSah, racikan, racikanSah]);
 
   const keluar = async () => {
     if (
@@ -319,6 +338,21 @@ export default function PengaturanPage() {
                   max={365}
                   hint='Dicetak di nota: "Garansi 7 hari s/d <tanggal>". 0 = tanpa garansi.'
                   error={garansiSah ? undefined : "Isi 0–365 hari"}
+                />
+                <Input
+                  label="Racikan: % bibit"
+                  value={form.bibit_percent}
+                  onChange={ubah("bibit_percent")}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={100}
+                  hint={
+                    racikanSah && racikan > 0
+                      ? `${racikan}% bibit : ${100 - racikan}% pelarut — takaran per ukuran botol dicetak di nota berisi bibit. 0 = tanpa racikan.`
+                      : "Mis. 65 → 65% bibit : 35% pelarut. 0 = tanpa racikan."
+                  }
+                  error={racikanSah ? undefined : "Isi 0–100"}
                 />
                 <Input
                   label="Akun TikTok toko"

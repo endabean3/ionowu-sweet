@@ -230,6 +230,7 @@ type Outlet struct {
 	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
 	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
+	BibitPercent     int16              `db:"bibit_percent" json:"bibit_percent"`
 }
 
 type OutletPriceOverride struct {

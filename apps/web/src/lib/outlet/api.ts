@@ -12,6 +12,7 @@ export interface OutletRow {
   receipt_footer?: string | null;
   warranty_days?: number | null;
   social_handle?: string | null;
+  bibit_percent?: number | null;
 }
 
 export interface OutletProfile {
@@ -21,6 +22,7 @@ export interface OutletProfile {
   receipt_footer: string;
   warranty_days: number;
   social_handle: string;
+  bibit_percent: number;
 }
 
 /**
@@ -39,6 +41,7 @@ export async function cacheOutlets(tenantId: string, rows: OutletRow[]): Promise
       receipt_footer: o.receipt_footer ?? null,
       warranty_days: o.warranty_days ?? 0,
       social_handle: o.social_handle ?? null,
+      bibit_percent: o.bibit_percent ?? 0,
     })),
   );
 }

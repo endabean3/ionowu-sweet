@@ -172,6 +172,18 @@ body {
     gap: 4px;
   }
 
+  /* Barcode member: lebar tetap 44 mm & tinggi 12 mm — cukup besar untuk
+     dipindai kamera ponsel dari kertas 58 mm. print-color-adjust memaksa
+     batang hitam tetap tercetak walau "cetak latar belakang" dimatikan. */
+  .receipt-barcode {
+    display: block;
+    width: 44mm;
+    height: 12mm;
+    margin: 1.5mm auto 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .receipt-item {
     margin-bottom: 2px;
   }

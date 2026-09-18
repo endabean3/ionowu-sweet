@@ -10,6 +10,7 @@ import {
   quickQuantities,
   toQuantityString,
 } from "@/lib/catalog/quantity";
+import { ml, takaranRacikan } from "@/lib/receipt/recipe";
 import type Decimal from "decimal.js";
 import { useEffect, useRef, useState } from "react";
 
@@ -32,6 +33,7 @@ export function QtyKeypad({
   uomPrecision,
   hargaSatuan,
   nilaiAwal,
+  racikanPersen,
   onClose,
   onConfirm,
 }: {
@@ -41,6 +43,8 @@ export function QtyKeypad({
   hargaSatuan: string;
   /** Diisi saat MENGUBAH baris keranjang; kosong saat menambah baru. */
   nilaiAwal?: string;
+  /** Persen bibit racikan toko; > 0 → pintasan per ukuran botol untuk ml. */
+  racikanPersen?: number | null;
   onClose: () => void;
   onConfirm: (quantity: string) => void;
 }) {
@@ -73,7 +77,17 @@ export function QtyKeypad({
     }
   };
 
-  const pintasan = quickQuantities(uom);
+  // Racikan (Warung Wangi 65:35): untuk bibit per ml, pintasan berupa UKURAN
+  // BOTOL — "Botol 30 ml" mengisi 19,5 ml bibit. Kasir tidak perlu menghitung
+  // sendiri berapa ml bibit untuk botol yang diminta pembeli. Hanya takaran
+  // yang sah untuk presisi satuannya (bibit 1 desimal butuh presisi ≥ 1).
+  const racikan =
+    uom === "ml"
+      ? takaranRacikan(racikanPersen).filter(
+          (t) => (t.bibit.split(".")[1]?.length ?? 0) <= uomPrecision,
+        )
+      : [];
+  const pintasan = racikan.length > 0 ? [] : quickQuantities(uom);
 
   return (
     <Modal title="Jumlah" onClose={onClose} size="md">
@@ -121,6 +135,34 @@ export function QtyKeypad({
               ? `= Rp ${pratinjau.toDecimalPlaces(0).toNumber().toLocaleString("id-ID")}`
               : " "}
           </p>
+        )}
+
+        {racikan.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 font-sans text-xs font-bold text-main">
+              Bibit untuk botol ({racikanPersen}% bibit : {100 - (racikanPersen ?? 0)}% pelarut)
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {racikan.map((t) => (
+                <Button
+                  key={t.botol}
+                  type="button"
+                  size="pos"
+                  variant="custard"
+                  className="h-auto flex-col px-1 py-2 leading-tight"
+                  aria-label={`Botol ${t.botol} ml: ${ml(t.bibit)} ml bibit, ${ml(t.pelarut)} ml pelarut`}
+                  onClick={() => {
+                    setTeks(ml(t.bibit));
+                    setError(null);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <span className="font-sans text-xs">Botol {t.botol} ml</span>
+                  <span className="font-mono text-sm font-black">{ml(t.bibit)} ml</span>
+                </Button>
+              ))}
+            </div>
+          </div>
         )}
 
         {pintasan.length > 0 && (

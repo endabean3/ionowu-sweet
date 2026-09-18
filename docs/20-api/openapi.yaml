@@ -649,6 +649,7 @@ paths:
                 receipt_footer: { type: string, maxLength: 200, description: "Teks penutup struk; kosong = \"Terima kasih\"" }
                 warranty_days: { type: integer, minimum: 0, maximum: 365, description: "Garansi (hari) yang dicetak di nota; 0 = tanpa garansi" }
                 social_handle: { type: string, maxLength: 100, description: "Akun TikTok toko; \"@\" di depan dibuang" }
+                bibit_percent: { type: integer, minimum: 0, maximum: 100, description: "Persen bibit racikan parfum (sisanya pelarut); 0 = tanpa racikan" }
                 timezone: { type: string }
                 business_day_start: { type: string, example: "00:00" }
                 is_active: { type: boolean, description: "Owner saja" }
@@ -1035,6 +1036,7 @@ components:
         phone: { type: string, nullable: true }
         receipt_footer: { type: string, nullable: true, description: "Teks penutup struk (migrasi 00010)" }
         social_handle: { type: string, nullable: true, description: "Akun media sosial toko yang wajib di-follow calon member (migrasi 00012)" }
+        bibit_percent: { type: integer, description: "Persen bibit racikan parfum; 0 = tanpa racikan (migrasi 00013)" }
         warranty_days: { type: integer, description: "Garansi (hari) di nota; 0 = tanpa garansi (migrasi 00011)" }
         is_active: { type: boolean }
 
