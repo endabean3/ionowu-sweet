@@ -4,6 +4,18 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.17.2] — 2026-09-18
+
+### Diperbaiki
+* **Ikon dan layar pembuka APK masih bawaan Capacitor** (tanda "X" biru). Kini ikon launcher
+  memakai tanda merek (`public/icons/icon-mark.png`) di atas merah muda `#FB89BA`, sama dengan
+  ikon PWA. Ikon adaptif (Android 8+) diberi tanda setinggi 42% kanvas supaya muat di zona
+  aman masker bulat maupun squircle. Ikon lama (persegi dan bulat) disediakan untuk Android 7.
+  Layar pembuka (11 ukuran, portrait dan landscape) memakai tanda di atas krem `--bg-base`.
+  Tanda hanya diperkecil, tidak pernah diperbesar, agar tetap tajam.
+
+---
+
 ## [1.17.1] — 2026-09-18
 
 Ditemukan dari screenshot APK di **Redmi 9C** sungguhan (720×1600) dan dibuktikan lewat
