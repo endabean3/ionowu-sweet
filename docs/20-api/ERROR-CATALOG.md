@@ -80,6 +80,7 @@ Setiap kode wajib punya satu kelas. Kelas menentukan perilaku klien, bukan pesan
 | `VARIANT_NOT_FOUND` | 404 | ⛔ | |
 | `BARCODE_ALREADY_EXISTS` | 409 | 👤 | Barcode dipakai varian lain dalam tenant |
 | `CATEGORY_NOT_FOUND` | 404 | ⛔ | |
+| `OUTLET_NOT_FOUND` | 404 | ⛔ | Id outlet salah **atau milik tenant lain** — sengaja tidak dibedakan |
 | `IMPORT_FILE_INVALID` | 400 | 👤 | Format berkas rusak |
 | `IMPORT_ROW_ERRORS` | 422 | 👤 | Sebagian baris gagal; sertakan nomor baris |
 | `PLAN_LIMIT_EXCEEDED` | 402 | 👤 | Melewati batas paket ([PRICING](../00-product/PRICING-PACKAGING.md)) |
@@ -100,6 +101,7 @@ Setiap kode wajib punya satu kelas. Kelas menentukan perilaku klien, bukan pesan
 
 | Kode | HTTP | Kelas | Kapan terjadi |
 |---|:---:|:---:|---|
+| `VALIDATION_ERROR` | 400 / 422 | 👤 | Payload rusak (400) atau isian tidak sah (422); pesan menyebut kolomnya. Sudah dipakai luas sebelum tercatat di sini |
 | `RATE_LIMITED` | 429 | 🔁 | Hormati header `Retry-After` |
 | `INTERNAL_ERROR` | 500 | 🔁 | |
 | `SERVICE_UNAVAILABLE` | 503 | 🔁 | Sedang deploy / degradasi |

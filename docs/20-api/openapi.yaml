@@ -621,6 +621,37 @@ paths:
             application/json: { schema: { $ref: "#/components/schemas/Outlet" } }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /outlets/{id}:
+    patch:
+      tags: [outlets]
+      summary: Ubah profil toko & struk
+      description: >
+        Owner: semua outlet. Manager: hanya outlet tempat ia ditugaskan, dan
+        tidak boleh mengubah `is_active` (RBAC-MODEL §Matriks). Kolom yang
+        tidak dikirim tidak berubah; string kosong mengosongkan kolom opsional.
+        Id salah dan id milik tenant lain sama-sama dijawab 404.
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                address: { type: string, maxLength: 200 }
+                phone: { type: string, maxLength: 50 }
+                receipt_footer: { type: string, maxLength: 200, description: "Teks penutup struk; kosong = \"Terima kasih\"" }
+                timezone: { type: string }
+                business_day_start: { type: string, example: "00:00" }
+                is_active: { type: boolean, description: "Owner saja" }
+      responses:
+        "200": { description: Outlet diupdate }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: OUTLET_NOT_FOUND }
+        "422": { description: "VALIDATION_ERROR (nama kosong, teks terlalu panjang)" }
+
   # ═══════════════════════════════════════════════════════════════
   # SYNC — FR-40..48 (endpoint paling kritis di seluruh API)
   # ═══════════════════════════════════════════════════════════════
@@ -974,6 +1005,8 @@ components:
         name: { type: string }
         timezone: { type: string, example: "Asia/Jakarta" }
         address: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        receipt_footer: { type: string, nullable: true, description: "Teks penutup struk (migrasi 00010)" }
         is_active: { type: boolean }
 
     OutletInput:

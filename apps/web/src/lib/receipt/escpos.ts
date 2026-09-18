@@ -5,6 +5,7 @@ import {
   formatWaktu,
   lineDiscount,
   lineGross,
+  receiptFooter,
   rupiah,
 } from "./format";
 
@@ -36,12 +37,23 @@ const LF = 0x0a;
  * terlihat salah, bukan diam-diam hilang.
  */
 export function toPrinterText(text: string): string {
-  return text
-    .replace(/\s/gu, " ")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/×/g, "x")
-    .replace(/[^\x20-\x7e]/gu, "?");
+  return (
+    text
+      .replace(/\s/gu, " ")
+      // NFKD, bukan NFD: selain menurunkan aksen, ia juga membuka bentuk
+      // "kompatibilitas" — ① → 1, ² → 2, ﬁ → fi. Katalog Warung Wangi punya
+      // "Tutup ①" s.d. "Tutup ⑨"; dengan NFD kesembilannya tercetak
+      // "Tutup ?" dan kasir tak bisa tahu tutup mana yang terjual.
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .replace(/×/g, "x")
+      .replace(/[\u2010-\u2015\u2212]/gu, "-") // tanda pisah & minus
+      .replace(/[\u2018\u2019\u201A\u2032]/gu, "'")
+      .replace(/[\u201C\u201D\u201E\u2033]/gu, '"')
+      .replace(/\u2044/gu, "/") // garis pecahan dari ½ → 1⁄2
+      .replace(/\u2026/gu, "...")
+      .replace(/[^\x20-\x7e]/gu, "?")
+  );
 }
 
 /** Bungkus per kata; kata yang lebih panjang dari satu baris dipotong paksa. */
@@ -130,6 +142,8 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
     .bold(true)
     .lines(wrap(t(data.outletName), w))
     .bold(false);
+  if (data.outletAddress?.trim()) out.lines(wrap(t(data.outletAddress), w));
+  if (data.outletPhone?.trim()) out.lines(wrap(t(`Telp/WA ${data.outletPhone}`), w));
   out.lines(wrap(t(formatWaktu(data.occurredAt)), w));
   out.lines(wrap(t(`Kasir: ${data.cashierName}`), w));
   out.align("left").line(sep);
@@ -139,16 +153,20 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
     // Satuan ikut dicetak untuk barang curah: "30 ml x Rp 500". Tanpa itu
     // struk parfum refill hanya berbunyi "30 x Rp 500" dan pembeli tidak
     // bisa memastikan ia ditagih untuk 30 ml, bukan 30 botol.
-    const satuan = l.uom ? ` ${t(l.uom)}` : "";
+    // "pcs" TIDAK dicetak: "1 x Rp 4.000" sudah jelas, dan "1 pcs x" hanya
+    // memakan kolom di kertas 58 mm.
+    const satuan = l.uom && l.uom !== "pcs" ? ` ${t(l.uom)}` : "";
     out.lines(row(`${l.quantity}${satuan} x ${rupiah(l.unitPrice)}`, rupiah(lineGross(l)), w));
     const diskon = lineDiscount(l);
     if (diskon.gt(0)) out.lines(row("Diskon", `-${rupiah(diskon)}`, w));
   }
 
   out.line(sep);
-  out.lines(row("Subtotal", rupiah(data.subtotal), w));
+  // Subtotal & pajak hanya bila ada pajak — tanpa pajak, Subtotal sama
+  // persis dengan TOTAL dan hanya menambah satu baris kertas.
   if (new Decimal(data.taxTotal || "0").gt(0)) {
-    out.lines(row("PPN", rupiah(data.taxTotal), w));
+    out.lines(row("Subtotal", rupiah(data.subtotal), w));
+    out.lines(row("Pajak", rupiah(data.taxTotal), w));
   }
   out
     .bold(true)
@@ -169,7 +187,7 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
   // Lihat catatan sejenis di receipt.tsx: struk offline sah bagi pembeli,
   // tetapi belum terlihat di laporan pemilik sampai antreannya terkirim.
   if (data.pending) out.line("(belum tersinkronisasi)");
-  out.line("Terima kasih").align("left");
+  out.lines(wrap(t(receiptFooter(data)), w)).align("left");
 
   // ESC d 4 — dorong kertas melewati gigi sobek; GS V B 0 — potong. Printer
   // tanpa pisau (mayoritas 58mm) mengabaikan perintah potong.
@@ -209,4 +227,24 @@ export function encodeTestPage(paper: PaperWidth, printerName: string): Uint8Arr
   out.cmd(ESC, 0x64, 4);
   out.cmd(GS, 0x56, 0x42, 0x00);
   return out.build();
+}
+
+/**
+ * Teks yang BENAR-BENAR tercetak dari byte ESC/POS: perintah yang dipakai
+ * encoder ini dilompati — `ESC @` (2 byte), `ESC a|E|d n` (3 byte), dan
+ * `GS V B n` (4 byte) — karena argumennya bisa berupa byte cetak seperti
+ * 'a' atau 'E'. (Versi pertama menganggap SEMUA perintah ESC 3 byte; reset
+ * `ESC @` lalu menelan byte ESC berikutnya dan huruf 'a' dari `ESC a 1`
+ * muncul di depan nama toko pada pratinjau.) Dipakai pratinjau struk di Pengaturan — pratinjau
+ * disusun dari byte yang sama persis dengan yang dikirim ke printer, jadi
+ * tidak mungkin berbeda dari hasil cetak.
+ */
+export function printedText(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === ESC) i += bytes[i + 1] === 0x40 ? 1 : 2;
+    else if (bytes[i] === GS) i += 3;
+    else out += String.fromCharCode(bytes[i]);
+  }
+  return out;
 }

@@ -213,20 +213,25 @@ export function POSCart({
 
       {/* Cart Summary & Checkout */}
       <div className="mt-4 border-t-2 border-card-border pt-4">
-        <div className="space-y-1.5 font-sans text-sm">
-          <div className="flex justify-between text-muted">
-            <span>Subtotal</span>
-            <span className="font-mono font-semibold tabular-nums">
-              Rp {Number(totals.subtotal.toString()).toLocaleString("id-ID")}
-            </span>
+        {/* Rincian Subtotal + pajak hanya bila ada pajak. Tanpa pajak,
+           subtotal SAMA dengan total — dua angka kembar hanya menambah
+           baris yang harus dibaca kasir. */}
+        {!totals.taxTotal.isZero() && (
+          <div className="space-y-1.5 font-sans text-sm text-main">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span className="font-mono font-semibold tabular-nums">
+                Rp {Number(totals.subtotal.toString()).toLocaleString("id-ID")}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Pajak</span>
+              <span className="font-mono font-semibold tabular-nums">
+                Rp {Number(totals.taxTotal.toString()).toLocaleString("id-ID")}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between text-muted">
-            <span>PPN (11%)</span>
-            <span className="font-mono font-semibold tabular-nums">
-              Rp {Number(totals.taxTotal.toString()).toLocaleString("id-ID")}
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Blok --primary tinta hitam (pages/kasir.md §Warna): "Total belanja
            memakai blok --primary dengan tinta hitam, bukan teks pink" —

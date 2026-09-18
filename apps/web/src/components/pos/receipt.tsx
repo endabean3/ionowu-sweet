@@ -7,6 +7,7 @@ import {
   formatWaktu,
   lineDiscount,
   lineGross,
+  receiptFooter,
   rupiah,
 } from "@/lib/receipt/format";
 import Decimal from "decimal.js";
@@ -47,6 +48,12 @@ export function Receipt({ data }: { data: ReceiptData }) {
     <div id="receipt-print-root" aria-hidden="true">
       <div className="receipt">
         <div className="receipt-center receipt-bold">{data.outletName}</div>
+        {data.outletAddress?.trim() && (
+          <div className="receipt-center receipt-small">{data.outletAddress}</div>
+        )}
+        {data.outletPhone?.trim() && (
+          <div className="receipt-center receipt-small">Telp/WA {data.outletPhone}</div>
+        )}
         <div className="receipt-center receipt-small">{formatWaktu(data.occurredAt)}</div>
         <div className="receipt-center receipt-small">Kasir: {data.cashierName}</div>
         <div className="receipt-sep" />
@@ -58,7 +65,8 @@ export function Receipt({ data }: { data: ReceiptData }) {
               <div>{l.name}</div>
               <div className="receipt-row receipt-small">
                 <span>
-                  {l.uom ? formatQuantity(l.quantity, l.uom) : l.quantity} × {rupiah(l.unitPrice)}
+                  {l.uom && l.uom !== "pcs" ? formatQuantity(l.quantity, l.uom) : l.quantity} ×{" "}
+                  {rupiah(l.unitPrice)}
                 </span>
                 <span>{rupiah(lineGross(l))}</span>
               </div>
@@ -73,15 +81,17 @@ export function Receipt({ data }: { data: ReceiptData }) {
         })}
 
         <div className="receipt-sep" />
-        <div className="receipt-row">
-          <span>Subtotal</span>
-          <span>{rupiah(data.subtotal)}</span>
-        </div>
         {new Decimal(data.taxTotal || "0").gt(0) && (
-          <div className="receipt-row">
-            <span>PPN</span>
-            <span>{rupiah(data.taxTotal)}</span>
-          </div>
+          <>
+            <div className="receipt-row">
+              <span>Subtotal</span>
+              <span>{rupiah(data.subtotal)}</span>
+            </div>
+            <div className="receipt-row">
+              <span>Pajak</span>
+              <span>{rupiah(data.taxTotal)}</span>
+            </div>
+          </>
         )}
         <div className="receipt-row receipt-bold">
           <span>TOTAL</span>
@@ -109,7 +119,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
         {data.pending && (
           <div className="receipt-center receipt-small">(belum tersinkronisasi)</div>
         )}
-        <div className="receipt-center receipt-small">Terima kasih 🙏</div>
+        <div className="receipt-center receipt-small">{receiptFooter(data)}</div>
       </div>
     </div>,
     document.body,

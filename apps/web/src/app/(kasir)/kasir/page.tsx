@@ -144,7 +144,12 @@ export default function KasirPage() {
           discount: it.discount || "0",
         })),
         discount: "0",
-        taxRate: "0.11", // PPN 11%
+        // TANPA PPN: Warung Wangi (dan kebanyakan UMKM) bukan PKP, jadi
+        // menambah 11% berarti menagih pembeli lebih mahal dari label harga.
+        // Server tidak menghitung pajak sendiri — ia memakai `tax` yang
+        // dikirim di payload penjualan — jadi cukup diubah di sini. Bila
+        // kelak ada tenant PKP, tarif ini pindah ke Pengaturan toko.
+        taxRate: "0",
       }),
     [cartItems],
   );
@@ -360,6 +365,9 @@ export default function KasirPage() {
         transactionId: txId,
         occurredAt: new Date().toISOString(),
         outletName: outlet?.name ?? "Toko",
+        outletAddress: outlet?.address,
+        outletPhone: outlet?.phone,
+        footer: outlet?.receipt_footer,
         cashierName: identitas?.name ?? "Kasir",
         lines: cartItems.map((it) => ({
           name: it.name,
@@ -552,9 +560,7 @@ export default function KasirPage() {
         >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="font-sans text-xs font-bold text-muted">
-                {totalItemCount} item · sudah termasuk PPN
-              </p>
+              <p className="font-sans text-xs font-bold text-muted">{totalItemCount} item</p>
               <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
                 Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
               </p>

@@ -25,6 +25,11 @@ export interface ReceiptData {
   transactionId: string;
   occurredAt: string;
   outletName: string;
+  /** Profil toko dari Pengaturan (outlets.address/phone/receipt_footer).
+   *  Kosong = baris itu tidak dicetak; footer kosong = "Terima kasih". */
+  outletAddress?: string | null;
+  outletPhone?: string | null;
+  footer?: string | null;
   cashierName: string;
   lines: ReceiptLine[];
   subtotal: string;
@@ -69,4 +74,9 @@ export function lineDiscount(line: ReceiptLine): Decimal {
 
 export function formatWaktu(iso: string): string {
   return new Date(iso).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" });
+}
+
+/** Penutup struk: isian pemilik, atau "Terima kasih" bila kosong. */
+export function receiptFooter(data: Pick<ReceiptData, "footer">): string {
+  return data.footer?.trim() || "Terima kasih";
 }

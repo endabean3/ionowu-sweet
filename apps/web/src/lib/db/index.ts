@@ -86,6 +86,12 @@ export interface LocalOutlet {
   id: string;
   tenant_id: string;
   name: string;
+  // Profil toko untuk struk (Pengaturan). Ikut di-cache supaya struk yang
+  // dicetak saat OFFLINE tetap memuat alamat, telepon, dan penutupnya.
+  // Kolom tak berindeks → tidak perlu menaikkan versi skema Dexie.
+  address?: string | null;
+  phone?: string | null;
+  receipt_footer?: string | null;
 }
 
 export class IonowuDB extends Dexie {

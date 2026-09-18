@@ -84,6 +84,7 @@ menggantikan manager, itu keliru: SPG adalah staf lantai penjualan, bukan penyel
 | **Administrasi** | | | | | |
 | Kelola karyawan & PIN | ✅ | ⚠️ Outletnya | ❌ | ❌ | ❌ |
 | Tambah/hapus outlet | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Ubah profil toko & struk (alamat, telepon, penutup struk) | ✅ | ✅ (outletnya) | ❌ | ❌ | ❌ |
 | Kelola distributor | ✅ | ✅ | ❌ | ✅ | ❌ |
 
 > ### ⚠️ Konflik yang harus diputuskan: Gudang vs HPP
