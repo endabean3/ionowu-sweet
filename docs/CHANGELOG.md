@@ -4,6 +4,32 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.19.0] — 2026-09-18
+
+### Ditambahkan
+* **Bibit dijual per ml, stoknya dalam gram** ([ADR-0012](./10-architecture/adr/0012-satuan-jual-vs-satuan-stok.md)).
+  Permintaan pemilik Warung Wangi: nota hanya menyebut ml, dan setiap penjualan tetap tercatat
+  sebagai gram keluar. Memakai tabel `uom_conversions` yang sudah ada sejak 00003 tetapi belum
+  pernah dipakai; **tanpa migrasi**.
+  * Penjualan X ml mengurangi stok X × faktor gram di `/sync/push` **dan** `POST /sales`. Ledger
+    `stock_events` mencatat gram; `sales_items` tetap ml sehingga nota dan omzet tidak berubah.
+  * `/sync/pull` mengirim `stock_uom`/`stock_factor`; kartu kasir dan katalog menampilkan
+    "Aman · 320 g". `GET /stock/levels` memakai satuan stok.
+  * Impor CSV: kolom opsional **`StockUom`**, **`StockFactor`** (bawaan 1).
+
+### Terverifikasi
+* Uji Go `stockDeduction` (6 kasus, termasuk faktor 0,92 dan pembulatan 3 desimal) dan parser
+  impor (7 kasus). Ujung ke ujung di database lokal dengan katalog Warung Wangi: impor 161 barang,
+  90 konversi `ml→g` tersimpan; jual 30 ml "Macbrame Scandal Vica" lewat `/sync/push` → stok
+  350 g → **320 g**, ledger **−30 g**, item penjualan **30 ml**.
+
+### Diketahui, belum diperbaiki
+* `/sync/push` memperlakukan barang `composite` (BOM) seperti barang biasa — komponen resepnya
+  tidak dipotong. Hanya `POST /sales` yang menjalankan BOM, padahal kasir menjual lewat sync.
+  Belum berdampak karena belum ada barang `composite`.
+
+---
+
 ## [1.18.0] — 2026-09-18
 
 Fokus Warung Wangi Dongko. Diverifikasi di 360px dengan katalog nyata (162 produk) di

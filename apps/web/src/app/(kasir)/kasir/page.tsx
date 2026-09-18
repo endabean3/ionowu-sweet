@@ -119,6 +119,7 @@ export default function KasirPage() {
         category: "Kategori", // TODO: Ambil nama kategori jika sudah ada db.categories
         price: v.price,
         stock: v.stock_quantity,
+        stockUom: v.stock_uom || v.uom || "pcs",
         minStockAlert: v.min_stock_alert,
         // Dari server lewat /sync/pull, bukan ditebak dari nama satuan.
         uom: v.uom ?? "pcs",

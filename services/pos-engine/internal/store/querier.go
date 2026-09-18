@@ -187,6 +187,8 @@ type Querier interface {
 	// benar untuk semua peran tanpa cabang kasus khusus di kode Go.
 	ListOutletsForUser(ctx context.Context, arg ListOutletsForUserParams) ([]ListOutletsForUserRow, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	// `uom` di sini adalah satuan STOK (satuan tempat stock_quantity dihitung):
+	// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)
 	LookupVariantByBarcode(ctx context.Context, arg LookupVariantByBarcodeParams) (LookupVariantByBarcodeRow, error)
 	// Indeks unik parsial mencegah dua shift terbuka untuk kasir yang sama.

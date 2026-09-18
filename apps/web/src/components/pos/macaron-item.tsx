@@ -12,6 +12,8 @@ export interface MacaronProduct {
   category: string;
   price: string;
   stock: string;
+  /** Satuan stok — gram untuk bibit yang dijual per ml (ADR-0012). */
+  stockUom: string;
   minStockAlert: string;
   /** Satuan jual varian: pcs, ml, g, kg… (migrasi 00003). */
   uom: string;
@@ -50,10 +52,14 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
   const formattedPrice = Number(product.price).toLocaleString("id-ID");
   // Stok dari Decimal, bukan Number: "25000.000" gram tampil "25.000", dan
   // pecahan ml tidak berubah jadi 4999.999999.
+  // Stok berjalan dalam SATUAN STOK: bibit Warung Wangi dijual per ml tetapi
+  // stoknya gram (ADR-0012), jadi kartunya berbunyi "Aman · 250 g".
+  const satuanStokBeda = product.stockUom !== product.uom;
+  const presisiStok = satuanStokBeda ? 1 : product.uomPrecision;
   const stokTampil = new Decimal(product.stock || 0)
-    .toDecimalPlaces(product.uomPrecision)
+    .toDecimalPlaces(presisiStok)
     .toNumber()
-    .toLocaleString("id-ID", { maximumFractionDigits: product.uomPrecision });
+    .toLocaleString("id-ID", { maximumFractionDigits: presisiStok });
   const level = stockLevel(product.stock, product.minStockAlert);
   const curah = isCurah(product.uomPrecision);
 
@@ -80,7 +86,7 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
         )}
         <span className="truncate">
           {level.label} · {stokTampil}
-          {curah ? ` ${product.uom}` : ""}
+          {satuanStokBeda ? ` ${product.stockUom}` : curah ? ` ${product.uom}` : ""}
         </span>
       </span>
 

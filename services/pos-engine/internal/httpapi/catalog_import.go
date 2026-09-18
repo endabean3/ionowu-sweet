@@ -32,13 +32,18 @@ func NewCatalogImportHandler(pool *pgxpool.Pool) *CatalogImportHandler {
 //
 // Format CSV (baris pertama header, dilewati apa pun isinya):
 //
-//	ProductName, VariantName, SKU, Barcode, Price, CostPrice, Uom, UomPrecision, StockQuantity, ItemType
+//	ProductName, VariantName, SKU, Barcode, Price, CostPrice, Uom, UomPrecision, StockQuantity, ItemType, StockUom, StockFactor
 //
 // Kolom ke-7 (Uom) dst opsional — kosong berarti "pcs"/0/0/"stock" (arketipe A,
 // retail satuan). Arketipe B (Warung Wangi: ml, Media Boga: gram/kg) WAJIB
 // mengisi Uom eksplisit; UomPrecision menentukan berapa digit desimal boleh
 // diinput kasir saat menimbang (MARKET-SEGMENTS.md §4 — stok arketipe B harus
 // desimal, bukan dibulatkan diam-diam jadi "pcs").
+//
+// StockUom + StockFactor (opsional, ADR-0012): satuan STOK bila berbeda dari
+// satuan jual. Bibit Warung Wangi: Uom "ml" (dijual per ml), StockUom "g",
+// StockFactor 1 (gram per ml) — StockQuantity lalu dibaca dalam GRAM, dan
+// setiap penjualan X ml mengurangi stok X × faktor gram. Faktor kosong = 1.
 //
 // Resep/BOM (Warung Wangi: bibit + botol + alkohol) TIDAK dicakup format ini —
 // item_type "composite" bisa diimpor tapi baris bom_components-nya harus
@@ -137,6 +142,17 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 			continue
 		}
 
+		if b.stockUom != "" {
+			if _, err = sp.Exec(ctx, `
+				INSERT INTO uom_conversions (id, tenant_id, variant_id, from_uom, to_uom, factor)
+				VALUES ($1, $2, $3, $4, $5, $6)
+			`, ulid.Make().String(), tenantID, variantID, b.uom, b.stockUom, b.stockFactor); err != nil {
+				_ = sp.Rollback(ctx)
+				dilewati = append(dilewati, BarisDilewati{Baris: nomorBaris, Alasan: "satuan stok gagal disimpan"})
+				continue
+			}
+		}
+
 		if err = sp.Commit(ctx); err != nil {
 			dilewati = append(dilewati, BarisDilewati{Baris: nomorBaris, Alasan: "baris gagal dikonfirmasi"})
 			continue
@@ -176,6 +192,9 @@ type barisImpor struct {
 	uomPrecision             int
 	stockQty                 decimal.Decimal
 	itemType                 string
+	// Satuan stok bila berbeda dari satuan jual; "" = sama (ADR-0012).
+	stockUom    string
+	stockFactor decimal.Decimal
 }
 
 // parseBarisImpor memvalidasi satu baris CSV. Fungsi murni — tanpa database —
@@ -248,6 +267,20 @@ func parseBarisImpor(row []string) (barisImpor, string) {
 		b.uomPrecision = n
 	}
 
+	// Satuan stok (kolom 11-12) dibaca LEBIH DULU: ia menentukan dalam satuan
+	// apa kolom stok ditulis, dan karenanya presisi yang berlaku.
+	if su := kol(10); su != "" && !strings.EqualFold(su, b.uom) {
+		b.stockUom = su
+		b.stockFactor = decimal.NewFromInt(1)
+		if f := kol(11); f != "" {
+			factor, err := decimal.NewFromString(f)
+			if err != nil || !factor.IsPositive() {
+				return barisImpor{}, "faktor satuan stok harus angka lebih dari 0"
+			}
+			b.stockFactor = factor
+		}
+	}
+
 	// Stok boleh kosong (= 0) dan boleh NEGATIF: transaksi offline yang sudah
 	// terjadi tidak pernah ditolak (CLAUDE.md §6.4). Yang ditolak hanya
 	// isian yang bukan angka.
@@ -256,7 +289,13 @@ func parseBarisImpor(row []string) (barisImpor, string) {
 		if err != nil {
 			return barisImpor{}, "stok bukan angka"
 		}
-		if -qty.Exponent() > int32(b.uomPrecision) && !qty.Equal(qty.Truncate(int32(b.uomPrecision))) {
+		// Stok dalam satuan stok tersendiri (gram) boleh sampai 3 desimal —
+		// presisi kolomnya — bukan presisi satuan JUAL.
+		presisi := int32(b.uomPrecision)
+		if b.stockUom != "" {
+			presisi = 3
+		}
+		if !qty.Equal(qty.Truncate(presisi)) {
 			return barisImpor{}, "stok punya desimal melebihi presisi satuan"
 		}
 		b.stockQty = qty

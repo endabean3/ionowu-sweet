@@ -33,6 +33,9 @@ export interface LocalVariant {
   stock_quantity: string;
   min_stock_alert: string;
   is_active: boolean;
+  /** Satuan tempat stock_quantity dihitung bila berbeda dari uom (ADR-0012):
+   *  bibit dijual per ml, stoknya gram. Kosong/undefined = sama dengan uom. */
+  stock_uom?: string;
 }
 
 export interface LocalCartItem {

@@ -26,6 +26,7 @@ interface SyncPullVariant {
   stock_quantity: string;
   min_stock_alert: string;
   is_active: boolean;
+  stock_uom?: string;
 }
 
 interface SyncPullResponse {
@@ -86,6 +87,7 @@ export async function pullCatalog(accessToken: string, deviceId: string, tenantI
             stock_quantity: v.stock_quantity,
             min_stock_alert: v.min_stock_alert,
             is_active: v.is_active,
+            stock_uom: v.stock_uom || undefined,
           })),
         );
       }

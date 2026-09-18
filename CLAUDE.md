@@ -142,7 +142,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 ## 7. Kondisi Saat Ini
 
 ```
-93 dokumen .md di docs/ · 11 folder · 11 ADR diterima (0001–0011)
+93 dokumen .md di docs/ · 11 folder · 12 ADR diterima (0001–0012)
 10 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
 ```
 
@@ -170,6 +170,9 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   jual per ml/gram, dashboard, katalog (tambah, impor CSV), printer Bluetooth, halaman
   **Pengaturan** (profil toko & penutup struk, pratinjau struk, printer, akun), modul uang
   TS yang lulus uji paritas terhadap fixture Go.
+* **Satuan jual ≠ satuan stok** (ADR-0012): bibit Warung Wangi dijual per **ml** tetapi
+  stoknya **gram** lewat `uom_conversions` (faktor g/ml). Nota ml, ledger stok gram. Kode yang
+  membaca stok **wajib** memakai `stock_uom`, bukan `variants.uom`.
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
   menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.
