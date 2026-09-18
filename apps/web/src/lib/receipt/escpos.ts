@@ -7,6 +7,7 @@ import {
   lineGross,
   receiptFooter,
   rupiah,
+  warrantyLine,
 } from "./format";
 
 /**
@@ -187,6 +188,12 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
   // Lihat catatan sejenis di receipt.tsx: struk offline sah bagi pembeli,
   // tetapi belum terlihat di laporan pemilik sampai antreannya terkirim.
   if (data.pending) out.line("(belum tersinkronisasi)");
+  const garansi = warrantyLine(data);
+  if (garansi)
+    out
+      .bold(true)
+      .lines(wrap(t(garansi), w))
+      .bold(false);
   out.lines(wrap(t(receiptFooter(data)), w)).align("left");
 
   // ESC d 4 — dorong kertas melewati gigi sobek; GS V B 0 — potong. Printer

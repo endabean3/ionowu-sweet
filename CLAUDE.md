@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 93 dokumen .md di docs/ · 11 folder · 12 ADR diterima (0001–0012)
-10 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
+11 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
 ```
 
 > Angka dihitung ulang 2026-09-18 langsung dari repo. Audit dokumen menyeluruh

@@ -369,6 +369,7 @@ export default function KasirPage() {
         outletAddress: outlet?.address,
         outletPhone: outlet?.phone,
         footer: outlet?.receipt_footer,
+        warrantyDays: outlet?.warranty_days,
         cashierName: identitas?.name ?? "Kasir",
         lines: cartItems.map((it) => ({
           name: it.name,
