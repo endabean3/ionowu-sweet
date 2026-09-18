@@ -172,7 +172,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.
 * **CI**: build → ghcr.io (ADR-0004), gerbang keamanan, Playwright E2E offline
   (`apps/web/e2e/`, dijalankan di `ci.yml`).
-* **Rate limit** hanya `/auth/login` + `/auth/register`, in-process per replika (PR #31) —
+* **Rate limit** hanya `/auth/login` + `/auth/register`, in-process per replika (PR #31, di-merge 2026-09-18; **429 di produksi belum diverifikasi** — perintahnya ada di deskripsi PR) —
   endpoint lain belum dibatasi. Lihat [API-GUIDELINES](./docs/20-api/API-GUIDELINES.md) §6.
 
 ### Belum digarap — jangan diasumsikan ada
