@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { MoneyInput } from "@/components/ui/money-input";
 import type { MoneyTotal } from "@/lib/money/calc";
 import { naikMasukTegas } from "@/lib/motion/tokens";
 import { m } from "framer-motion";
@@ -85,7 +86,7 @@ export function PaymentModal({ totals, onClose, onPay }: PaymentModalProps) {
                 className={`pos-touch-target flex flex-col items-center gap-2 rounded-2xl border-2 p-3 font-sans font-bold transition-all shadow-hard-sm ${
                   isSelected
                     ? `border-card-border ${m.color} text-main scale-105`
-                    : "border-card-border bg-surface text-muted hover:bg-main/5"
+                    : "border-card-border bg-surface text-main hover:bg-main/5"
                 }`}
               >
                 <Icon className="h-6 w-6" />
@@ -98,23 +99,16 @@ export function PaymentModal({ totals, onClose, onPay }: PaymentModalProps) {
         {method === "cash" && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="given_amount" className="font-sans text-sm font-bold text-muted">
+              <label htmlFor="given_amount" className="font-sans text-sm font-bold text-main">
                 Uang Diterima
               </label>
-              <div className="mt-1 flex gap-2">
-                <span className="flex items-center rounded-l-xl border-2 border-r-0 border-card-border bg-surface px-4 font-mono font-bold">
-                  Rp
-                </span>
-                <input
-                  id="given_amount"
-                  type="number"
-                  inputMode="numeric"
-                  value={givenAmount}
-                  onChange={(e) => setGivenAmount(e.target.value)}
-                  className="flex-1 rounded-r-xl border-2 border-card-border bg-surface p-3 font-mono text-lg font-bold outline-none focus:ring-2 focus:ring-sweet-strawberry"
-                  placeholder="0"
-                />
-              </div>
+              <MoneyInput
+                id="given_amount"
+                className="mt-1"
+                value={givenAmount}
+                onChange={(e) => setGivenAmount(e.target.value)}
+                placeholder="0"
+              />
             </div>
 
             <div className="flex flex-wrap gap-2">

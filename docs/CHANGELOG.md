@@ -4,6 +4,33 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.17.1] — 2026-09-18
+
+Ditemukan dari screenshot APK di **Redmi 9C** sungguhan (720×1600) dan dibuktikan lewat
+computed style di WebView (remote debugging), bukan dari tebakan.
+
+### Diperbaiki
+* **Teks yang diketik tak terlihat di SEMUA kolom isian** (Email, Password, dan setiap `Input`/
+  `Select`). Warnanya `rgb(250 246 240)`, yaitu krem latar, di atas putih. Penyebabnya token
+  warna `base` di Tailwind: sebagai entri `colors` ia ikut membuat utilitas `text-base`, yang
+  bentrok dengan ukuran huruf bawaan `text-base` (16px). Setiap `text-base` jadi sekaligus
+  mewarnai teks krem. Kini `base` hanya `backgroundColor`, dan `bg-base` tetap berfungsi.
+  Terukur ulang: teks di Login, Buka Shift, Cari produk, dan Bayar kini `rgb(45 35 30)`.
+* **Kolom isian tanpa tepi yang terlihat.** Tepinya putih 40% di atas kartu putih, sehingga
+  kolom Password tampak bukan kolom. Kini tepinya tinta 25%, dan fokusnya tinta penuh dengan
+  cincin mint. Sebelumnya fokus berwarna mint di atas putih, kontras ±1,3:1.
+* **Kolom rupiah di modal Bayar dan Buka Shift** kini satu kolom dengan "Rp" di dalamnya,
+  lewat komponen bersama `MoneyInput`. Sebelumnya berupa dua kotak terpisah yang tepinya tak
+  menyatu, dengan panah naik/turun yang tak berguna di layar sentuh, dan kolom yang mepet ke
+  tepi layar 360px.
+* Label abu yang sulit dibaca di bawah cahaya terang ("Uang Diterima", "QRIS", "Kartu",
+  label modal awal berhuruf kapital yang patah jadi "LACI)") kini berwarna tinta.
+
+### Terverifikasi
+* vitest 44/44, tsc, dan biome bersih; Playwright 14/14.
+
+---
+
 ## [1.17.0] — 2026-09-18
 
 Layar kasir diperiksa pada lebar 360 px (Redmi 9A) lewat transaksi sungguhan di Playwright,

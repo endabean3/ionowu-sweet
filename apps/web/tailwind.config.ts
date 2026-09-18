@@ -17,7 +17,6 @@ const config: Config = {
         // opacity (bg-base, text-main) tidak berubah perilakunya. Token CSS
         // di globals.css HARUS berformat triplet RGB ("250 246 240"), bukan
         // hex, agar rgb(var(--x) / n) valid.
-        base: "rgb(var(--bg-base) / <alpha-value>)",
         card: {
           DEFAULT: "var(--card-bg)",
           border: "rgb(var(--card-border) / <alpha-value>)",
@@ -33,6 +32,16 @@ const config: Config = {
           taro: "rgb(var(--sweet-taro) / <alpha-value>)",
           peach: "rgb(var(--sweet-peach) / <alpha-value>)",
         },
+      },
+      // `base` SENGAJA hanya warna LATAR, bukan entri `colors`. Sebagai warna
+      // umum ia ikut membuat utilitas `text-base` — yang bentrok dengan ukuran
+      // huruf bawaan `text-base` (16px): setiap `text-base` sekaligus
+      // mewarnai teks jadi krem latar. Akibatnya teks yang diketik di kolom
+      // Email/Password tak terlihat (krem di atas putih), terbukti lewat
+      // computed style di WebView Redmi 9C. Kalau butuh warna krem untuk
+      // teks, buat token dengan nama lain.
+      backgroundColor: {
+        base: "rgb(var(--bg-base) / <alpha-value>)",
       },
       boxShadow: {
         hard: "var(--shadow-hard)",
