@@ -518,7 +518,9 @@ offline. Artinya:
 Mitigasi yang wajib diputuskan sebelum implementasi:
 
 - [ ] Batasi jumlah pelanggan yang di-cache di perangkat (mis. hanya yang aktif 90 hari)
-- [ ] Jangan simpan email & tanggal lahir di perangkat — cukup nama & telepon
+- [x] Jangan simpan email & tanggal lahir di perangkat — cukup nama & telepon. **Ditegakkan
+      2026-09-19:** `/sync/pull` hanya mengirim nama, WA, kode member, akun media sosial, dan
+      tanggal merchandise (`ListCustomersForSync`); galat member tidak pernah memuat nomor WA.
 - [ ] Pencabutan perangkat (`refresh_tokens.revoked_reason = 'device_lost'`) harus memicu
       penghapusan data lokal saat perangkat online kembali
 - [ ] Tinjau ulang [THREAT-MODEL](../40-security/THREAT-MODEL.md) untuk pelaku "pencuri perangkat"

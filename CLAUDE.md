@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 93 dokumen .md di docs/ · 11 folder · 12 ADR diterima (0001–0012)
-11 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
+12 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
 ```
 
 > Angka dihitung ulang 2026-09-18 langsung dari repo. Audit dokumen menyeluruh
@@ -173,6 +173,10 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 * **Satuan jual ≠ satuan stok** (ADR-0012): bibit Warung Wangi dijual per **ml** tetapi
   stoknya **gram** lewat `uom_conversions` (faktor g/ml). Nota ml, ledger stok gram. Kode yang
   membaca stok **wajib** memakai `stock_uom`, bukan `variants.uom`.
+* **Member pelanggan** (migrasi 00012): daftar di kasir (WA wajib + wajib follow TikTok toko),
+  kode `M-XXXXXX` + barcode CODE128 di nota, bonus tester tiap beli & merchandise perdana.
+  Bisa offline; `customers` diproses paling awal di `/sync/push`.
+* **Garansi di nota** (migrasi 00011): "Garansi N hari s/d <tanggal>", diatur di Pengaturan.
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
   menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.
@@ -183,7 +187,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ### Belum digarap — jangan diasumsikan ada
 
-Void transaksi (refund ada, void tidak), transfer stok antar-outlet, CRM/pelanggan, SOP,
+Void transaksi (refund ada, void tidak), transfer stok antar-outlet, CRM lanjutan (segmentasi, poin, WA — member dasar SUDAH ada), SOP,
 layanan Python (ADR-0006), rate limit berbasis Redis (pos-engine belum punya klien Redis),
 jalur principal platform/distributor (RBAC-MODEL.md §5 — `TenantMiddleware` menolaknya
 eksplisit), dan skenario uji [OFFLINE-SYNC-SPEC](./docs/30-data/OFFLINE-SYNC-SPEC.md) di luar

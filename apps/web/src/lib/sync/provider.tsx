@@ -1,5 +1,6 @@
 "use client";
 
+import { db } from "@/lib/db";
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth } from "../auth/context";
 import { pullCatalog, pushQueue } from "./engine";
@@ -59,6 +60,27 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       syncNow();
     }
   }, [accessToken, lastSyncedAt, syncNow]);
+
+  // Kirim antrean BARU secara berkala selama online. Sebelumnya antrean hanya
+  // dikirim saat aplikasi dibuka, saat jaringan kembali online, atau saat
+  // tombol "Sinkron" ditekan — penjualan dan member dari toko yang terus
+  // online tertahan di perangkat sampai aplikasi dibuka ulang, jadi dasbor
+  // pemilik dan penanda "merchandise pertama" tertinggal. Hanya item
+  // "pending": item "failed" (ditolak server) tidak diulang otomatis tiap
+  // 20 detik — ia tetap bisa diulang lewat tombol Sinkron.
+  useEffect(() => {
+    if (!accessToken) return;
+    const t = setInterval(async () => {
+      if (!navigator.onLine) return;
+      try {
+        const baru = await db.syncQueue.where("status").equals("pending").count();
+        if (baru > 0) void syncNow();
+      } catch {
+        // IndexedDB tak terbaca sesaat: coba lagi di putaran berikutnya.
+      }
+    }, 20_000);
+    return () => clearInterval(t);
+  }, [accessToken, syncNow]);
 
   return (
     <SyncContext.Provider value={{ isSyncing, lastSyncedAt, syncNow }}>

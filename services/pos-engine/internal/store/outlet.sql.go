@@ -14,7 +14,7 @@ import (
 const insertOutlet = `-- name: InsertOutlet :one
 INSERT INTO outlets (id, tenant_id, name, address, phone, timezone, business_day_start)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer, warranty_days
+RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer, warranty_days, social_handle
 `
 
 type InsertOutletParams struct {
@@ -38,6 +38,7 @@ type InsertOutletRow struct {
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
 	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
+	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 }
 
 func (q *Queries) InsertOutlet(ctx context.Context, arg InsertOutletParams) (InsertOutletRow, error) {
@@ -62,13 +63,14 @@ func (q *Queries) InsertOutlet(ctx context.Context, arg InsertOutletParams) (Ins
 		&i.BusinessDayStart,
 		&i.ReceiptFooter,
 		&i.WarrantyDays,
+		&i.SocialHandle,
 	)
 	return i, err
 }
 
 const listOutlets = `-- name: ListOutlets :many
 SELECT id, tenant_id, name, address, phone, is_active, created_at, timezone, business_day_start,
-       receipt_footer, warranty_days
+       receipt_footer, warranty_days, social_handle
 FROM outlets
 WHERE tenant_id = $1
 ORDER BY created_at ASC
@@ -86,6 +88,7 @@ type ListOutletsRow struct {
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
 	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
+	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 }
 
 func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutletsRow, error) {
@@ -109,6 +112,7 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 			&i.BusinessDayStart,
 			&i.ReceiptFooter,
 			&i.WarrantyDays,
+			&i.SocialHandle,
 		); err != nil {
 			return nil, err
 		}
@@ -122,7 +126,7 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 
 const listOutletsForUser = `-- name: ListOutletsForUser :many
 SELECT o.id, o.tenant_id, o.name, o.address, o.phone, o.is_active, o.created_at,
-       o.timezone, o.business_day_start, o.receipt_footer, o.warranty_days
+       o.timezone, o.business_day_start, o.receipt_footer, o.warranty_days, o.social_handle
 FROM outlets o
 JOIN user_outlet_assignments uoa ON uoa.outlet_id = o.id
 WHERE uoa.tenant_id = $1 AND uoa.user_id = $2
@@ -146,6 +150,7 @@ type ListOutletsForUserRow struct {
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
 	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
+	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 }
 
 // MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
@@ -175,6 +180,7 @@ func (q *Queries) ListOutletsForUser(ctx context.Context, arg ListOutletsForUser
 			&i.BusinessDayStart,
 			&i.ReceiptFooter,
 			&i.WarrantyDays,
+			&i.SocialHandle,
 		); err != nil {
 			return nil, err
 		}
@@ -196,7 +202,8 @@ SET
     business_day_start = COALESCE($7, business_day_start),
     is_active = COALESCE($8, is_active),
     receipt_footer = COALESCE($9, receipt_footer),
-    warranty_days = COALESCE($10, warranty_days)
+    warranty_days = COALESCE($10, warranty_days),
+    social_handle = COALESCE($11, social_handle)
 WHERE tenant_id = $1 AND id = $2
 `
 
@@ -211,6 +218,7 @@ type UpdateOutletParams struct {
 	IsActive         *bool       `db:"is_active" json:"is_active"`
 	ReceiptFooter    *string     `db:"receipt_footer" json:"receipt_footer"`
 	WarrantyDays     *int16      `db:"warranty_days" json:"warranty_days"`
+	SocialHandle     *string     `db:"social_handle" json:"social_handle"`
 }
 
 // :execrows, bukan :exec — id yang salah atau milik tenant lain harus
@@ -227,6 +235,7 @@ func (q *Queries) UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int
 		arg.IsActive,
 		arg.ReceiptFooter,
 		arg.WarrantyDays,
+		arg.SocialHandle,
 	)
 	if err != nil {
 		return 0, err

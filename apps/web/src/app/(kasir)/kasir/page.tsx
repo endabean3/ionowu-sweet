@@ -4,6 +4,7 @@ import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
 import { LastReceipt } from "@/components/pos/last-receipt";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
+import { MemberPanel } from "@/components/pos/member-panel";
 import { PrinterPicker } from "@/components/pos/printer-picker";
 import { QtyKeypad } from "@/components/pos/qty-keypad";
 import { Receipt, type ReceiptData } from "@/components/pos/receipt";
@@ -12,7 +13,8 @@ import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
 import { profilTerakhir } from "@/lib/auth/profile";
 import { isCurah } from "@/lib/catalog/quantity";
-import { db } from "@/lib/db";
+import { type LocalCustomer, db } from "@/lib/db";
+import { formatWA, looksLikeMemberCode } from "@/lib/member/member";
 import { calculateCart } from "@/lib/money/calc";
 import { barBawah } from "@/lib/motion/tokens";
 import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
@@ -20,7 +22,7 @@ import { enqueueOfflineAction } from "@/lib/sync/queue";
 import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { ArrowLeft, Barcode, Layers, Search, Wallet } from "lucide-react";
+import { ArrowLeft, Barcode, Layers, Search, UserRound, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -35,6 +37,13 @@ export default function KasirPage() {
   const identitas = user ?? profilTerakhir();
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  // Member yang ditempelkan ke transaksi berjalan (opsional). Dilepas lagi
+  // setelah bayar — member tidak "menempel" ke pembeli berikutnya.
+  const [member, setMember] = useState<LocalCustomer | null>(null);
+  const [memberPanelOpen, setMemberPanelOpen] = useState(false);
+  // Scanner mengetik kode lalu menekan Enter. Tanpa jeda ini, Enter itu
+  // membuka pembayaran tepat setelah kartu member dipindai.
+  const memberScanAt = useRef(0);
   const [cartItems, setCartItems] = useState<CartLine[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
   const [showShiftModal, setShowShiftModal] = useState<boolean>(true); // Tampilkan shift modal di awal
@@ -169,7 +178,13 @@ export default function KasirPage() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !isCheckingOut && !showShiftModal && cartItems.length > 0) {
+      if (
+        e.key === "Enter" &&
+        !isCheckingOut &&
+        !showShiftModal &&
+        cartItems.length > 0 &&
+        Date.now() - memberScanAt.current > 600
+      ) {
         e.preventDefault();
         setIsCheckingOut(true);
       } else if (e.key === "Escape") {
@@ -357,8 +372,21 @@ export default function KasirPage() {
             },
           ],
           occurred_at: new Date().toISOString(),
+          ...(member ? { customer_id: member.id } : {}),
         },
       });
+
+      // Bonus member (permintaan pemilik): tester di SETIAP pembelian, dan
+      // merchandise hanya di pembelian PERTAMA. "Pertama" dicatat di perangkat
+      // seketika — transaksi berikutnya (bahkan sebelum sync) tidak lagi
+      // dianggap pertama. Server menyimpan tanggalnya sendiri saat sync.
+      const pembelianPertama = member ? !member.merchandise_given_at : false;
+      const bonusMember = member
+        ? ["1 tester", ...(pembelianPertama ? ["merchandise perdana"] : [])]
+        : [];
+      if (member && pembelianPertama) {
+        await db.customers.update(member.id, { merchandise_given_at: new Date().toISOString() });
+      }
 
       // Disusun dari keranjang SEBELUM dikosongkan, dan seluruhnya dari data
       // lokal — struk harus tetap tercetak saat offline.
@@ -370,6 +398,9 @@ export default function KasirPage() {
         outletPhone: outlet?.phone,
         footer: outlet?.receipt_footer,
         warrantyDays: outlet?.warranty_days,
+        member: member
+          ? { code: member.member_code, name: member.name, bonuses: bonusMember }
+          : null,
         cashierName: identitas?.name ?? "Kasir",
         lines: cartItems.map((it) => ({
           name: it.name,
@@ -406,7 +437,22 @@ export default function KasirPage() {
         });
       }
 
+      if (member) {
+        // Terpisah dari toast "Lunas" dan bertahan lebih lama: ini TINDAKAN
+        // yang harus dilakukan kasir sekarang, bukan sekadar informasi.
+        toast(
+          pembelianPertama
+            ? `🎁 Member ${member.member_code}: beri 1 tester + merchandise perdana`
+            : `Member ${member.member_code}: beri 1 tester`,
+          {
+            description: pembelianPertama ? "Pembelian pertama member ini." : undefined,
+            duration: 12000,
+          },
+        );
+      }
+
       setCartItems([]);
+      setMember(null);
       setIsCheckingOut(false);
       barcodeInputRef.current?.focus();
     } catch (err) {
@@ -446,11 +492,47 @@ export default function KasirPage() {
                 aria-label="Cari produk atau scan barcode (pintasan F2)"
                 aria-keyshortcuts="F2"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSearchQuery(v);
+                  // Kartu/nota member dipindai ke kolom yang sama dengan
+                  // produk: kode yang cocok langsung menempel ke transaksi.
+                  if (looksLikeMemberCode(v) && identitas?.tenant_id) {
+                    const kode = v.trim().toUpperCase();
+                    void db.customers
+                      .where("member_code")
+                      .equals(kode)
+                      .filter((c) => c.tenant_id === identitas.tenant_id)
+                      .first()
+                      .then((c) => {
+                        if (!c) return;
+                        memberScanAt.current = Date.now();
+                        setMember(c);
+                        setSearchQuery("");
+                        playPop();
+                        toast.success(`Member ${c.member_code} dipakai`, {
+                          description: c.name ?? formatWA(c.phone),
+                        });
+                      });
+                  }
+                }}
                 className="pos-touch-target w-full rounded-pill border-2 border-card-border bg-card px-4 py-2 font-sans text-base font-bold text-main placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sweet-strawberry"
               />
               <Search className="absolute right-4 top-3.5 h-5 w-5 text-muted pointer-events-none" />
             </div>
+            <button
+              type="button"
+              onClick={() => setMemberPanelOpen(true)}
+              aria-label={
+                member ? `Member ${member.member_code}, ganti member` : "Pilih atau daftar member"
+              }
+              className={`mochi-button flex h-11 shrink-0 items-center gap-1.5 rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold text-main shadow-hard-sm ${
+                member ? "bg-sweet-matcha" : "bg-base"
+              }`}
+            >
+              <UserRound className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Member</span>
+            </button>
             <Link
               href="/dashboard"
               aria-label="Dasbor"
@@ -520,6 +602,26 @@ export default function KasirPage() {
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
             onCheckout={() => setIsCheckingOut(true)}
+            memberSlot={
+              member && (
+                <div className="flex items-center gap-2 rounded-2xl border-2 border-card-border bg-sweet-matcha px-3 py-2">
+                  <UserRound className="h-4 w-4 shrink-0 text-main" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate font-sans text-sm font-bold text-main">
+                    {member.member_code}
+                    {member.name ? ` · ${member.name}` : ""}
+                    {!member.merchandise_given_at && " · 🎁 pembelian pertama"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMember(null)}
+                    aria-label="Lepas member dari transaksi ini"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-main hover:bg-card"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              )
+            }
             emptyExtra={
               lastReceipt && (
                 <div className="hidden rounded-squircle-sm border-2 border-card-border bg-card p-3 lg:block">
@@ -562,7 +664,9 @@ export default function KasirPage() {
         >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="font-sans text-xs font-bold text-muted">{totalItemCount} item</p>
+              <p className="truncate font-sans text-xs font-bold text-main">
+                {totalItemCount} item{member ? ` · Member ${member.member_code}` : ""}
+              </p>
               <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
                 Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
               </p>
@@ -633,6 +737,21 @@ export default function KasirPage() {
       {lastReceipt && <Receipt data={lastReceipt} />}
 
       {printer.pickerOpen && <PrinterPicker rp={printer} />}
+
+      {memberPanelOpen && identitas?.tenant_id && (
+        <MemberPanel
+          tenantId={identitas.tenant_id}
+          outletId={activeShift?.outlet_id ?? ""}
+          storeHandle={outlet?.social_handle}
+          onClose={() => setMemberPanelOpen(false)}
+          onSelect={(c) => {
+            setMember(c);
+            setMemberPanelOpen(false);
+            barcodeInputRef.current?.focus();
+            toast.success(`Member ${c.member_code} dipakai`);
+          }}
+        />
+      )}
     </div>
   );
 }

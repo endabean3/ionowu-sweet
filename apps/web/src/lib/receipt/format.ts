@@ -21,6 +21,13 @@ export interface ReceiptLine {
   uom?: string;
 }
 
+export interface ReceiptMember {
+  code: string;
+  name?: string;
+  /** Bonus yang diberikan kasir, dicetak sebagai bukti (mis. "1 tester"). */
+  bonuses: string[];
+}
+
 export interface ReceiptData {
   transactionId: string;
   occurredAt: string;
@@ -30,6 +37,8 @@ export interface ReceiptData {
   outletAddress?: string | null;
   outletPhone?: string | null;
   footer?: string | null;
+  /** Member yang ditempelkan kasir; kosong = transaksi tanpa member. */
+  member?: ReceiptMember | null;
   /** Lama garansi (hari) dari Pengaturan; 0/kosong = tidak dicetak. */
   warrantyDays?: number | null;
   cashierName: string;

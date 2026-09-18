@@ -266,3 +266,27 @@ describe("garansi di nota", () => {
     expect(cetak({ ...contoh, warrantyDays: null })).not.toContain("Garansi");
   });
 });
+
+describe("member di nota", () => {
+  const denganMember: ReceiptData = {
+    ...contoh,
+    member: { code: "M-433XJB", name: "Siti", bonuses: ["1 tester", "merchandise perdana"] },
+  };
+
+  it("kode, bonus, dan barcode CODE128 tercetak", () => {
+    const bytes = encodeReceipt(denganMember, 58);
+    const teks = printedText(bytes);
+    expect(teks).toContain("Member M-433XJB (Siti)");
+    expect(teks).toContain("Bonus: 1 tester");
+    expect(teks).toContain("Bonus: merchandise perdana");
+    expect(teks).toContain("||| M-433XJB |||");
+    // GS k 73 n "{B" + data — panjang n = 2 + 8.
+    const i = Array.from(bytes).findIndex((b, k) => b === 0x1d && bytes[k + 1] === 0x6b);
+    expect(Array.from(bytes.slice(i, i + 6))).toEqual([0x1d, 0x6b, 73, 10, 0x7b, 0x42]);
+    for (const b of teks.split("\n")) expect(b.length).toBeLessThanOrEqual(COLUMNS[58]);
+  });
+
+  it("tanpa member: tidak ada blok member", () => {
+    expect(printedText(encodeReceipt(contoh, 58))).not.toContain("Member");
+  });
+});

@@ -42,6 +42,8 @@ interface POSCartProps {
   onCheckout: () => void;
   /** Ditampilkan di keranjang kosong — dipakai untuk struk terakhir. */
   emptyExtra?: React.ReactNode;
+  /** Member yang ditempelkan ke transaksi, di atas daftar barang. */
+  memberSlot?: React.ReactNode;
 }
 
 export function POSCart({
@@ -53,6 +55,7 @@ export function POSCart({
   onClearCart,
   onCheckout,
   emptyExtra,
+  memberSlot,
 }: POSCartProps) {
   const handleCheckoutClick = () => {
     if (items.length === 0) {
@@ -88,6 +91,8 @@ export function POSCart({
             </button>
           )}
         </div>
+
+        {memberSlot && <div className="mt-3">{memberSlot}</div>}
 
         {/* Cart Item List */}
         <div className="mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1">
