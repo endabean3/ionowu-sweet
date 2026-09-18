@@ -1,17 +1,19 @@
 # Struktur Repositori
 
-> **Status:** 🟡 Usulan — **butuh konfirmasi Anda** pada §1
+> **Status:** 🟡 Draft — §1 (monorepo) **✅ final**, dikonfirmasi pemilik 2026-09-18. §2 belum
+> dicocokkan ulang dengan isi repo.
 > **Urutan baca:** dokumen **ke-1** dari 15-development
 
 ---
 
-## 1. ⚠️ Keputusan yang Perlu Dikonfirmasi: Monorepo
+## 1. ✅ Keputusan: Monorepo
 
-**Usulan: satu repositori untuk semuanya**, termasuk dokumentasi ini.
+**Satu repositori untuk semuanya**, termasuk dokumentasi ini. Dikonfirmasi final oleh pemilik
+pada 2026-09-18 — repo `ionowu-sweet` sudah berjalan dalam bentuk ini sejak awal kode.
 
 | Opsi | Kelebihan | Kekurangan |
 |---|---|---|
-| **Monorepo** *(usulan)* | Satu PR bisa mengubah API + klien + dokumen sekaligus; kontrak selalu sinkron; satu CI | Repo lebih besar; butuh path filter di CI |
+| **Monorepo** ✅ *(dipilih)* | Satu PR bisa mengubah API + klien + dokumen sekaligus; kontrak selalu sinkron; satu CI | Repo lebih besar; butuh path filter di CI |
 | Repo terpisah per layanan | Batas tegas; CI lebih ringan | **Perubahan kontrak API butuh 2–3 PR terkoordinasi** — sumber ketidaksinkronan yang mahal |
 
 Alasan utama memilih monorepo di proyek ini: `openapi.yaml` adalah kontrak antara Go dan
@@ -20,10 +22,9 @@ TypeScript, dan rumus perhitungan uang **sengaja diduplikasi** di kedua sisi
 klien–server ([TESTING-STRATEGY](../60-quality/TESTING-STRATEGY.md) §3A) **hanya bisa
 berjalan di satu CI bila keduanya ada di repo yang sama.**
 
-> **Konsekuensi untuk dokumen ini:** folder `docs-UMKM Intelligence` saat ini berdiri sendiri
-> dan **belum berupa repositori git**. Bila monorepo disetujui, seluruh isinya pindah ke
-> `docs/` di dalam repo kode. Dokumen yang hidup terpisah dari kode akan basi — dan
-> dokumentasi basi lebih berbahaya daripada tidak ada dokumentasi.
+> **Konsekuensi untuk dokumen ini:** dokumentasi hidup di `docs/` di dalam repo kode, bukan
+> di folder terpisah. Dokumen yang hidup terpisah dari kode akan basi — dan dokumentasi basi
+> lebih berbahaya daripada tidak ada dokumentasi.
 
 ---
 

@@ -66,7 +66,7 @@ membuang waktu.
 | **Mutex stok = kunci baris Postgres**, bukan Redis | REDIS-STRATEGY §5 |
 | **Backup: Cloudflare R2** (penyedia berbeda dari VPS) | TECH-STACK §8 |
 | **Analytics produk: tabel Postgres sendiri**, bukan PostHog | TECH-STACK §7 |
-| **Monorepo** (usulan, menunggu konfirmasi user) | REPOSITORY.md §1 |
+| **Monorepo** (final, dikonfirmasi pemilik 2026-09-18) | REPOSITORY.md §1 |
 | **Seluruh toolchain di Dev Container** — Mac tidak perlu Go/Node/Python | `.devcontainer/` · LOCAL-SETUP §1 |
 
 > **Status host per 2026-08-28.** Mac ini sengaja dibersihkan agar seluruh proses

@@ -4,6 +4,16 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.16.1] — 2026-09-18
+
+### Diubah
+* **Monorepo kini keputusan final** (dikonfirmasi pemilik). [REPOSITORY](./15-development/REPOSITORY.md)
+  §1 tidak lagi berstatus usulan; catatan tentang folder `docs-UMKM Intelligence` yang terpisah
+  dihapus karena dokumentasi sudah lama berada di `docs/`. `CLAUDE.md` §4 disamakan.
+* `CLAUDE.md` §7 disamakan dengan isi repo dan status produksi.
+
+---
+
 ## [1.16.0] — 2026-09-18
 
 Ditemukan saat menjalankan daftar periksa pasca-deploy (runbook `deploy-pertama` §5) terhadap
