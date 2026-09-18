@@ -4,6 +4,50 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.17.0] — 2026-09-18
+
+Layar kasir diperiksa pada lebar 360 px (Redmi 9A) lewat transaksi sungguhan di Playwright,
+bukan dari membaca kode.
+
+### Diperbaiki — cetak struk
+* **Struk tidak bisa dicetak lagi setelah toast hilang.** Satu-satunya tombol "Cetak Struk" ada
+  di dalam toast yang hilang sendiri beberapa detik setelah bayar. Kini ada bar **Struk
+  terakhir** yang tetap ada sampai transaksi berikutnya.
+* **Struk tercetak dua kali.** Koneksi Bluetooth butuh 2–5 detik tanpa tanda apa pun, jadi kasir
+  mengetuk lagi. Kini ada status "Mencetak…" dan penjaga ketukan ganda. Uji E2E-nya terbukti
+  menjaga: tanpa penjaga, cetakan tercatat 3 kali.
+* **Kegagalan cetak hilang sendiri.** Toast gagal kini bertahan dengan **Coba lagi** dan
+  **Ganti printer**. Struk yang gagal langsung tercetak di printer yang baru dipilih.
+* **Printer hanya bisa diatur lewat struk yang gagal.** Header APK kini punya tombol printer.
+  Pengaturannya memuat lebar kertas (langsung berlaku), cetak otomatis (bawaan mati), dan
+  **Cetak uji** dengan penggaris angka untuk membuktikan lebar kertasnya benar.
+* Plugin native mengirim byte per 512 byte, bukan sekaligus: buffer printer murah bisa
+  kehilangan ekor struk panjang, yaitu bagian total dan kembalian.
+
+### Diperbaiki — tampilan ponsel
+* Header melebihi lebar layar 360 px (tombol tema terpotong, halaman bisa digeser ke samping).
+* Nama produk dipotong jadi satu baris: "Bibit Parfum Vanilla" dan "Bibit Parfum Ocean"
+  sama-sama tampil "Bibit Parfum…". Kini dua baris.
+* Akhiran "- Default" tidak lagi muncul pada produk bervarian tunggal, di kartu, keranjang, dan struk.
+* Label diganti ke bahasa Indonesia ("Sinkron", "N belum terkirim"). Petunjuk papan ketik
+  ("Enter", "F2") hanya tampil di layar lebar, dan chip kategori yang isinya hanya "Semua" disembunyikan.
+* Toast bayar kini menampilkan **kembalian**.
+
+### Diperbaiki — CI
+* **Gerbang E2E merah karena rate limit #31.** Setiap uji E2E mendaftar dan login dari satu IP
+  runner. Dengan uji printer baru jumlahnya melewati 10/menit, sehingga server menjawab
+  `429 RATE_LIMITED`. Kini batasnya diatur lewat `IONOWU_SWEET_AUTH_RATE_PER_MINUTE` (bawaan
+  10, CI 1000). Nilai 0, negatif, atau bukan angka ditolak saat start. 3 uji Go.
+
+### Terverifikasi
+* vitest 44/44 (termasuk 2 uji baru untuk halaman cetak uji), tsc, dan biome bersih.
+* Playwright 14/14 di Chromium dan Mobile Chrome, termasuk `printer-bluetooth.spec.ts` baru yang
+  menjalankan jalur APK lewat jembatan native Capacitor palsu.
+* **Belum diuji:** printer sungguhan dan kompilasi Java. Kompilasi Java akan diuji gerbang
+  `android-build.yml` di CI; printer sungguhan lewat runbook deploy §5 D.
+
+---
+
 ## [1.16.1] — 2026-09-18
 
 ### Diubah

@@ -2,6 +2,7 @@
 
 import { playPop } from "@/lib/audio/haptics";
 import { isCurah } from "@/lib/catalog/quantity";
+import Decimal from "decimal.js";
 import { AlertTriangle, Package, PackageX } from "lucide-react";
 import React from "react";
 
@@ -47,6 +48,12 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
   };
 
   const formattedPrice = Number(product.price).toLocaleString("id-ID");
+  // Stok dari Decimal, bukan Number: "25000.000" gram tampil "25.000", dan
+  // pecahan ml tidak berubah jadi 4999.999999.
+  const stokTampil = new Decimal(product.stock || 0)
+    .toDecimalPlaces(product.uomPrecision)
+    .toNumber()
+    .toLocaleString("id-ID", { maximumFractionDigits: product.uomPrecision });
   const level = stockLevel(product.stock, product.minStockAlert);
   const curah = isCurah(product.uomPrecision);
 
@@ -59,22 +66,32 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
           ? `${product.name}, isi jumlah dalam ${product.uom}`
           : `Tambah ${product.name} ke keranjang`
       }
-      className="mochi-button flex flex-col justify-between rounded-squircle-sm border-2 border-card-border bg-card p-4 text-left shadow-hard transition-all hover:bg-sweet-custard/30 pos-touch-target"
+      className="mochi-button flex flex-col justify-between rounded-squircle-sm border-2 border-card-border bg-card p-3 text-left shadow-hard transition-all hover:bg-sweet-custard/30 pos-touch-target sm:p-4"
     >
-      <div className="flex items-start justify-between">
-        <span className="flex h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-base">
-          <Package className="h-5 w-5 text-main" strokeWidth={2} aria-hidden="true" />
+      {/* Ikon kotak dekoratif dihapus: di layar 360px ia merebut ruang dari
+         lencana stok, yang lalu patah dua baris. */}
+      <span
+        className={`flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-pill border border-card-border px-2 py-0.5 font-sans text-xs font-bold text-main ${level.badge}`}
+      >
+        {level.Icon ? (
+          <level.Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+        ) : (
+          <Package className="h-3 w-3 shrink-0" aria-hidden="true" />
+        )}
+        <span className="truncate">
+          {level.label} · {stokTampil}
+          {curah ? ` ${product.uom}` : ""}
         </span>
-        <span
-          className={`flex items-center gap-1 rounded-pill border border-card-border px-2 py-0.5 font-mono text-xs font-semibold text-main ${level.badge}`}
-        >
-          {level.Icon && <level.Icon className="h-3 w-3" aria-hidden="true" />}
-          {level.label} · {product.stock}
-        </span>
-      </div>
+      </span>
 
       <div className="mt-3">
-        <h3 className="font-sans text-sm font-bold text-main line-clamp-1">{product.name}</h3>
+        {/* DUA baris, bukan satu: "Bibit Parfum Vanilla" dan "Bibit Parfum
+           Ocean" sama-sama terpotong jadi "Bibit Parfum…" di satu baris —
+           kasir tidak bisa membedakan dua produk yang harganya berbeda.
+           min-h menjaga harga semua kartu tetap sejajar. */}
+        <h3 className="min-h-[2.5rem] font-sans text-sm font-bold leading-5 text-main line-clamp-2">
+          {product.name}
+        </h3>
         <p className="mt-1 font-mono text-base font-extrabold tabular-nums text-main">
           Rp {formattedPrice}
           {curah && (

@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey ed25519.PrivateKey, allowedOrigins []string) http.Handler {
+func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey ed25519.PrivateKey, allowedOrigins []string, authPerMinute int) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
@@ -45,7 +45,7 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 	// seluruh kasir satu toko berbagi satu IP NAT, dan refresh yang ditolak
 	// berarti kasir terlempar keluar saat jam ramai. Refresh butuh token yang
 	// valid, jadi ia bukan jalur menebak kata sandi.
-	authLimit := NewRateLimiter(10)
+	authLimit := NewRateLimiter(authPerMinute)
 	r.With(authLimit.Middleware).Post("/auth/register", authHandler.PostRegister)
 	r.With(authLimit.Middleware).Post("/auth/login", authHandler.PostLogin)
 	r.Post("/auth/refresh", authHandler.PostRefresh)

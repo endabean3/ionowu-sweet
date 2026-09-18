@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -16,6 +17,7 @@ type Config struct {
 	JWTPublicKey   ed25519.PublicKey
 	JWTPrivateKey  ed25519.PrivateKey // dibutuhkan oleh AuthHandler untuk signing
 	AllowedOrigins []string           // CORS — lihat Load() untuk alasan wajib diisi
+	AuthPerMinute  int                // rate limit /auth/login & /auth/register per IP
 }
 
 // Load membaca konfigurasi dari environment.
@@ -83,11 +85,26 @@ func Load() (Config, error) {
 		origins[i] = strings.TrimSpace(o)
 	}
 
+	// Rate limit auth (API-GUIDELINES §6). Bawaan 10/menit per IP. Bisa
+	// dinaikkan HANYA untuk CI: uji E2E mendaftarkan tenant + login untuk
+	// setiap uji dari satu IP runner, dan 14 uji melewati 10/menit. Tidak ada
+	// nilai "mati" — 0 atau negatif ditolak, supaya salah ketik di panel
+	// Dokploy tidak diam-diam membuka brute-force di produksi.
+	authPerMinute := 10
+	if raw := os.Getenv("IONOWU_SWEET_AUTH_RATE_PER_MINUTE"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			return Config{}, fmt.Errorf("IONOWU_SWEET_AUTH_RATE_PER_MINUTE harus bilangan bulat > 0, dapat %q", raw)
+		}
+		authPerMinute = n
+	}
+
 	return Config{
 		DatabaseURL:    dbURL,
 		Port:           port,
 		JWTPublicKey:   ed25519.PublicKey(pubBytes),
 		JWTPrivateKey:  ed25519.PrivateKey(privBytes),
 		AllowedOrigins: origins,
+		AuthPerMinute:  authPerMinute,
 	}, nil
 }

@@ -305,6 +305,10 @@ Ulangi untuk origin web:
 - [ ] **Login dari APK di ponsel sungguhan** (bukan hanya browser) — inilah satu-satunya bukti CORS APK benar
 - [ ] Tambah **dua** produk (produk kedua membuktikan perbaikan barcode NULL)
 - [ ] Untuk toko curah: buat produk **Pecahan**, jual 30 ml, pastikan struk berbunyi `30 ml`
+- [ ] Di APK dengan printer sungguhan: header → **Pilih printer** → pilih printer → **Cetak uji**.
+      Penggaris angka harus muat **tepat satu baris**; bila patah, lebar kertasnya salah
+- [ ] Matikan printer lalu ketuk **Cetak** di bar struk terakhir → muncul "Gagal mencetak" dengan
+      **Coba lagi**; nyalakan printer, ketuk Coba lagi → struk keluar **satu kali**
 
 ### E. Uji asap lengkap
 

@@ -2,6 +2,7 @@
 
 import { type CartLine, POSCart } from "@/components/pos/cart";
 import { POSHeader } from "@/components/pos/header";
+import { LastReceipt } from "@/components/pos/last-receipt";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
 import { PrinterPicker } from "@/components/pos/printer-picker";
 import { QtyKeypad } from "@/components/pos/qty-keypad";
@@ -14,13 +15,7 @@ import { isCurah } from "@/lib/catalog/quantity";
 import { db } from "@/lib/db";
 import { calculateCart } from "@/lib/money/calc";
 import { barBawah } from "@/lib/motion/tokens";
-import {
-  type SavedPrinter,
-  isBluetoothPrintingAvailable,
-  loadSavedPrinter,
-  printReceiptBluetooth,
-  printerErrorMessage,
-} from "@/lib/printer/bluetooth";
+import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -48,7 +43,7 @@ export default function KasirPage() {
   // kasir boleh langsung melayani pembeli berikutnya sambil struk sebelumnya
   // masih bisa dicetak — "kasir tidak boleh menunggu" (CLAUDE.md §5).
   const [lastReceipt, setLastReceipt] = useState<ReceiptData | null>(null);
-  const [printerPickerOpen, setPrinterPickerOpen] = useState(false);
+  const printer = useReceiptPrinter();
 
   // Dialog jumlah untuk barang curah (parfum per ml, bahan kue per gram).
   // `line` terisi hanya saat mengubah baris yang sudah ada di keranjang.
@@ -106,11 +101,21 @@ export default function KasirPage() {
   const products: MacaronProduct[] = React.useMemo(() => {
     if (!dbProducts || !dbVariants) return [];
 
+    const variantPerProduk = new Map<string, number>();
+    for (const v of dbVariants) {
+      variantPerProduk.set(v.product_id, (variantPerProduk.get(v.product_id) ?? 0) + 1);
+    }
+
     return dbVariants.map((v) => {
       const product = dbProducts.find((p) => p.id === v.product_id);
+      const namaProduk = product?.name || "Tanpa nama";
       return {
         id: v.id,
-        name: `${product?.name || "Unknown"} - ${v.name}`,
+        // Nama varian hanya berguna bila ada pilihan. Produk bervarian
+        // tunggal ("Default", "Regular") tadinya tampil "Mentega - Default"
+        // di kartu, keranjang, DAN struk pembeli.
+        name:
+          (variantPerProduk.get(v.product_id) ?? 0) > 1 ? `${namaProduk} - ${v.name}` : namaProduk,
         category: "Kategori", // TODO: Ambil nama kategori jika sudah ada db.categories
         price: v.price,
         stock: v.stock_quantity,
@@ -291,32 +296,6 @@ export default function KasirPage() {
     });
   };
 
-  // Satu pintu untuk "Cetak Struk". Di APK: ESC/POS ke printer Bluetooth
-  // (WebView Android mengabaikan window.print). Di browser/PWA: dialog cetak
-  // sistem lewat <Receipt>. Kegagalan cetak tidak pernah menyentuh transaksi —
-  // penjualannya sudah tersimpan sebelum tombol ini bisa ditekan.
-  const cetakStruk = async (
-    data: ReceiptData,
-    printer: SavedPrinter | null = loadSavedPrinter(),
-  ) => {
-    if (!isBluetoothPrintingAvailable()) {
-      window.print();
-      return;
-    }
-    if (!printer) {
-      setPrinterPickerOpen(true);
-      return;
-    }
-    try {
-      await printReceiptBluetooth(printer, data);
-    } catch (err) {
-      toast.error(`Struk gagal dicetak ke ${printer.name}`, {
-        description: printerErrorMessage(err),
-        action: { label: "Ganti printer", onClick: () => setPrinterPickerOpen(true) },
-      });
-    }
-  };
-
   const processPayment = async (
     method: string,
     appliedAmount: number,
@@ -400,13 +379,22 @@ export default function KasirPage() {
       setLastReceipt(struk);
 
       playSuccessChord();
-      toast.success(`Transaksi berhasil disimpan! (ULID: ${txId.slice(-6)})`, {
-        description: "Tersimpan aman di IndexedDB & siap disinkronisasi.",
+      if (printer.bluetooth && printer.autoPrint && printer.printer) {
+        // Toko yang selalu memberi struk: langsung cetak. Hook menampilkan
+        // "Mencetak…" lalu hasilnya, jadi tidak perlu toast kedua di sini.
+        void printer.cetak(struk);
+      } else {
         // Cetak ditawarkan, tidak dipaksakan: pembeli warung sering tidak
-        // meminta struk, dan modal wajib-tutup di tiap transaksi menambah satu
-        // ketukan pada jalur tersibuk kasir.
-        action: { label: "Cetak Struk", onClick: () => void cetakStruk(struk) },
-      });
+        // meminta struk. Tombolnya juga tetap ada di bar "Struk terakhir",
+        // jadi toast yang hilang sendiri tidak lagi berarti struk hilang.
+        toast.success(`Lunas · Rp ${Number(breakdown.grandTotal).toLocaleString("id-ID")}`, {
+          description:
+            struk.changeAmount > 0
+              ? `Kembalian Rp ${struk.changeAmount.toLocaleString("id-ID")}`
+              : "Tersimpan di perangkat, dikirim otomatis saat online.",
+          action: { label: "Cetak Struk", onClick: () => void printer.cetak(struk) },
+        });
+      }
 
       setCartItems([]);
       setIsCheckingOut(false);
@@ -428,20 +416,25 @@ export default function KasirPage() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-base p-4 pb-32 md:p-6 lg:pb-6">
-      <POSHeader outletId={activeShift?.outlet_id} />
+      <POSHeader
+        outletId={activeShift?.outlet_id}
+        printer={printer.bluetooth ? printer : undefined}
+      />
 
       <div className="mt-4 grid flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Kiri: Katalog */}
         <div className="flex flex-col gap-4 lg:col-span-7 xl:col-span-8">
           <div className="milky-glass flex items-center gap-3 rounded-squircle p-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-custard shadow-hard-sm">
+            <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-custard shadow-hard-sm sm:flex">
               <Barcode className="h-5 w-5 text-main" />
             </div>
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <input
                 ref={barcodeInputRef}
                 type="text"
-                placeholder="Scan barcode / cari nama produk... (F2)"
+                placeholder="Cari produk / scan barcode"
+                aria-label="Cari produk atau scan barcode (pintasan F2)"
+                aria-keyshortcuts="F2"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pos-touch-target w-full rounded-pill border-2 border-card-border bg-card px-4 py-2 font-sans text-base font-bold text-main placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sweet-strawberry"
@@ -458,7 +451,11 @@ export default function KasirPage() {
             </Link>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          {/* Disembunyikan selama hanya ada "Semua": satu chip yang tidak
+             bisa memilih apa pun hanya memakan satu baris layar ponsel. */}
+          <div
+            className={`flex gap-2 overflow-x-auto pb-1 ${categories.length > 1 ? "" : "hidden"}`}
+          >
             {categories.map((cat) => (
               <button
                 type="button"
@@ -513,6 +510,17 @@ export default function KasirPage() {
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
             onCheckout={() => setIsCheckingOut(true)}
+            emptyExtra={
+              lastReceipt && (
+                <div className="hidden rounded-squircle-sm border-2 border-card-border bg-card p-3 lg:block">
+                  <LastReceipt
+                    data={lastReceipt}
+                    printing={printer.printing}
+                    onPrint={() => void printer.cetak(lastReceipt)}
+                  />
+                </div>
+              )
+            }
           />
         </div>
       </div>
@@ -564,6 +572,25 @@ export default function KasirPage() {
         </m.div>
       )}
 
+      {/* Pasangan bar ringkasan di atas untuk keranjang KOSONG: struk
+         terakhir tetap satu ketukan jauhnya di ponsel, tempat keranjang
+         berada jauh di bawah katalog. Keduanya tidak pernah tampil bersamaan. */}
+      {cartItems.length === 0 && lastReceipt && (
+        <m.div
+          key="bar-struk"
+          variants={barBawah}
+          initial="sembunyi"
+          animate="tampil"
+          className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden"
+        >
+          <LastReceipt
+            data={lastReceipt}
+            printing={printer.printing}
+            onPrint={() => void printer.cetak(lastReceipt)}
+          />
+        </m.div>
+      )}
+
       {qtyTarget && (
         <QtyKeypad
           key="modal-jumlah"
@@ -597,15 +624,7 @@ export default function KasirPage() {
       {/* Tak terlihat di layar; hanya muncul di hasil cetak. */}
       {lastReceipt && <Receipt data={lastReceipt} />}
 
-      {printerPickerOpen && (
-        <PrinterPicker
-          onClose={() => setPrinterPickerOpen(false)}
-          onSelected={(printer) => {
-            setPrinterPickerOpen(false);
-            if (lastReceipt) void cetakStruk(lastReceipt, printer);
-          }}
-        />
-      )}
+      {printer.pickerOpen && <PrinterPicker rp={printer} />}
     </div>
   );
 }
