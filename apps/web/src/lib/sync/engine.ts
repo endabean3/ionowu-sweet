@@ -29,9 +29,19 @@ interface SyncPullVariant {
   stock_uom?: string;
 }
 
+interface SyncPullCustomer {
+  id: string;
+  name?: string;
+  phone: string;
+  member_code: string;
+  social_handle?: string;
+  merchandise_given_at: string | null;
+}
+
 interface SyncPullResponse {
   products: SyncPullProduct[];
   variants: SyncPullVariant[];
+  customers?: SyncPullCustomer[];
 }
 
 export async function pullCatalog(accessToken: string, deviceId: string, tenantId: string) {
@@ -93,6 +103,23 @@ export async function pullCatalog(accessToken: string, deviceId: string, tenantI
       }
     });
 
+    // Member: bulkPut, BUKAN clear + add. Member yang baru didaftarkan di
+    // perangkat ini dan belum terkirim tidak ada di jawaban server — clear
+    // akan menghapusnya, padahal kartunya mungkin sudah dipegang pelanggan.
+    if (data.customers && data.customers.length > 0) {
+      await db.customers.bulkPut(
+        data.customers.map((c) => ({
+          id: c.id,
+          tenant_id: tenantId,
+          name: c.name || undefined,
+          phone: c.phone,
+          member_code: c.member_code,
+          social_handle: c.social_handle || undefined,
+          merchandise_given_at: c.merchandise_given_at,
+        })),
+      );
+    }
+
     return true;
   } catch (error) {
     console.error("Sync pull error:", error);
@@ -112,6 +139,8 @@ interface SyncPushResponse {
 
 interface SyncPushPayload {
   device_id: string;
+  // Member DULUAN: penjualan di kiriman yang sama boleh merujuknya.
+  customers: Record<string, unknown>[];
   shifts_open: Record<string, unknown>[];
   sales: Record<string, unknown>[];
   stock_events: Record<string, unknown>[];
@@ -126,6 +155,7 @@ export async function pushQueue(accessToken: string, deviceId: string) {
 
   const payload: SyncPushPayload = {
     device_id: deviceId,
+    customers: [],
     shifts_open: [],
     sales: [],
     stock_events: [],
@@ -133,7 +163,8 @@ export async function pushQueue(accessToken: string, deviceId: string) {
   };
 
   for (const item of pendingItems) {
-    if (item.type === "shift_open") payload.shifts_open.push(item.payload);
+    if (item.type === "customer") payload.customers.push(item.payload);
+    else if (item.type === "shift_open") payload.shifts_open.push(item.payload);
     else if (item.type === "sale") payload.sales.push(item.payload);
     else if (item.type === "stock_event") payload.stock_events.push(item.payload);
     else if (item.type === "shift_close") payload.shifts_close.push(item.payload);

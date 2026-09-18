@@ -35,9 +35,17 @@ interface Form {
   receipt_footer: string;
   /** Teks di input; diubah ke angka saat simpan. */
   warranty_days: string;
+  social_handle: string;
 }
 
-const kosong: Form = { name: "", address: "", phone: "", receipt_footer: "", warranty_days: "0" };
+const kosong: Form = {
+  name: "",
+  address: "",
+  phone: "",
+  receipt_footer: "",
+  warranty_days: "0",
+  social_handle: "",
+};
 
 function keForm(o: OutletRow): Form {
   return {
@@ -46,6 +54,7 @@ function keForm(o: OutletRow): Form {
     phone: o.phone ?? "",
     receipt_footer: o.receipt_footer ?? "",
     warranty_days: String(o.warranty_days ?? 0),
+    social_handle: o.social_handle ?? "",
   };
 }
 
@@ -127,6 +136,7 @@ export default function PengaturanPage() {
       phone: form.phone.trim(),
       receipt_footer: form.receipt_footer.trim(),
       warranty_days: garansiHari,
+      social_handle: form.social_handle.trim().replace(/^@/, ""),
     };
     try {
       await patchOutlet(accessToken, outletId, rapi);
@@ -180,7 +190,7 @@ export default function PengaturanPage() {
       pending: false,
     };
     return printedText(encodeReceipt(contoh, kertas)).replace(/\n+$/, "");
-  }, [form, kertas, identitas?.name]);
+  }, [form, kertas, identitas?.name, garansiHari, garansiSah]);
 
   const keluar = async () => {
     if (
@@ -309,6 +319,15 @@ export default function PengaturanPage() {
                   max={365}
                   hint='Dicetak di nota: "Garansi 7 hari s/d <tanggal>". 0 = tanpa garansi.'
                   error={garansiSah ? undefined : "Isi 0–365 hari"}
+                />
+                <Input
+                  label="Akun TikTok toko"
+                  value={form.social_handle}
+                  onChange={ubah("social_handle")}
+                  maxLength={100}
+                  autoComplete="off"
+                  placeholder="@warungwangi"
+                  hint="Ditampilkan di form daftar member: calon member wajib follow akun ini."
                 />
               </fieldset>
 

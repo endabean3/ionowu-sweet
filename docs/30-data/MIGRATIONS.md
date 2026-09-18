@@ -45,7 +45,8 @@ kode biasa. Migrasi yang dihasilkan ORM menyembunyikan operasi berbahaya di bali
 ├── 00008_analytics.sql             ringkasan BI · prediksi
 ├── 00009_sop.sql                   template & eksekusi SOP
 ├── 00010_outlet_receipt_footer.sql  outlets.receipt_footer (penutup struk) — expand murni
-└── 00011_outlet_warranty.sql        outlets.warranty_days (garansi di nota) — expand murni
+├── 00011_outlet_warranty.sql        outlets.warranty_days (garansi di nota) — expand murni
+└── 00012_customer_member.sql        member: kode, akun sosmed, follow, merchandise — expand murni
 ```
 
 **47 tabel · 57 indeks · validasi dependensi FK lulus.**

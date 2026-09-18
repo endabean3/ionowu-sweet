@@ -111,6 +111,21 @@ export function Receipt({ data }: { data: ReceiptData }) {
           </div>
         )}
 
+        {data.member && (
+          <>
+            <div className="receipt-sep" />
+            <div className="receipt-center receipt-bold">
+              Member {data.member.code}
+              {data.member.name ? ` (${data.member.name})` : ""}
+            </div>
+            {data.member.bonuses.map((b) => (
+              <div key={b} className="receipt-center receipt-small">
+                Bonus: {b}
+              </div>
+            ))}
+          </>
+        )}
+
         <div className="receipt-sep" />
         <div className="receipt-center receipt-small">No. {data.transactionId}</div>
         {/* Ditandai terang-terangan: struk dari transaksi offline sudah sah bagi

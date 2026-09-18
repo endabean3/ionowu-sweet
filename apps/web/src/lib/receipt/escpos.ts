@@ -123,6 +123,19 @@ class EscPosBuilder {
     return this.cmd(ESC, 0x45, on ? 1 : 0);
   }
 
+  /**
+   * Barcode CODE128 digambar printer sendiri (GS k 73), di tengah, dengan
+   * teks terbaca di bawahnya (GS H 2). Tinggi 64 titik, modul 2 titik —
+   * kode member 8 huruf ±270 titik, muat di kertas 58 mm (384 titik).
+   * Printer tanpa dukungan barcode mengabaikan perintahnya; kodenya tetap
+   * tercetak sebagai teks di baris member.
+   */
+  barcode128(data: string): this {
+    const isi = Array.from(toPrinterText(data), (c) => c.charCodeAt(0));
+    const b = [0x7b, 0x42, ...isi]; // "{B" = code set B
+    return this.cmd(GS, 0x68, 64, GS, 0x77, 2, GS, 0x48, 2, GS, 0x6b, 73, b.length, ...b, LF);
+  }
+
   build(): Uint8Array {
     return Uint8Array.from(this.bytes);
   }
@@ -181,6 +194,17 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
       .bold(true)
       .lines(row("Kembali", rupiah(data.changeAmount), w))
       .bold(false);
+  }
+
+  if (data.member) {
+    const m = data.member;
+    out.line(sep).align("center");
+    out
+      .bold(true)
+      .lines(wrap(t(`Member ${m.code}${m.name ? ` (${m.name})` : ""}`), w))
+      .bold(false);
+    for (const bonus of m.bonuses) out.lines(wrap(t(`Bonus: ${bonus}`), w));
+    out.barcode128(m.code).align("left");
   }
 
   out.line(sep).align("center");
@@ -250,8 +274,18 @@ export function printedText(bytes: Uint8Array): string {
   let out = "";
   for (let i = 0; i < bytes.length; i++) {
     if (bytes[i] === ESC) i += bytes[i + 1] === 0x40 ? 1 : 2;
-    else if (bytes[i] === GS) i += 3;
-    else out += String.fromCharCode(bytes[i]);
+    else if (bytes[i] === GS) {
+      const cmd = bytes[i + 1];
+      if (cmd === 0x6b) {
+        // GS k 73 n {B <data>: tampilkan sebagai penanda barcode di pratinjau.
+        const n = bytes[i + 3];
+        const isi = String.fromCharCode(...bytes.slice(i + 6, i + 4 + n));
+        out += `||| ${isi} |||`;
+        i += 3 + n;
+      } else if (cmd === 0x56)
+        i += 3; // GS V B n
+      else i += 2; // GS h/w/H n
+    } else out += String.fromCharCode(bytes[i]);
   }
   return out;
 }

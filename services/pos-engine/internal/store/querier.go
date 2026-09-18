@@ -82,6 +82,9 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (string, error)
 	CreateUserOutletAssignment(ctx context.Context, arg CreateUserOutletAssignmentParams) error
 	CreateVariant(ctx context.Context, arg CreateVariantParams) (string, error)
+	// Foreign key hanya menjamin pelanggan ADA, bukan milik tenant yang sama.
+	// Tanpa pemeriksaan ini, penjualan tenant A bisa merujuk pelanggan tenant B.
+	CustomerBelongsToTenant(ctx context.Context, arg CustomerBelongsToTenantParams) (bool, error)
 	// SINKRONISASI OFFLINE. Stok BOLEH menjadi negatif.
 	//
 	// Barang sudah keluar secara fisik, pelanggan sudah pergi, uang sudah diterima.
@@ -155,6 +158,11 @@ type Querier interface {
 	// buka laci tanpa transaksi, akses break-glass platform admin.
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertCashMovement(ctx context.Context, arg InsertCashMovementParams) (string, error)
+	// Member didaftarkan di PERANGKAT (bisa offline) dengan ULID klien — id
+	// adalah kunci idempotensi: kiriman ulang yang sama menghasilkan 0 baris
+	// (duplicate), bukan galat. Tabrakan nomor WA / kode member tetap galat
+	// unik (idx_customers_phone / idx_customers_member_code) dan DITOLAK.
+	InsertCustomerFromSync(ctx context.Context, arg InsertCustomerFromSyncParams) (int64, error)
 	// Ditulis dalam TRANSAKSI YANG SAMA dengan penjualan.
 	//
 	// Postgres dan Redis tidak berbagi transaksi: bila Redis mati setelah COMMIT,
@@ -178,6 +186,10 @@ type Querier interface {
 	InsertStockOpname(ctx context.Context, arg InsertStockOpnameParams) (string, error)
 	InsertStockOpnameItem(ctx context.Context, arg InsertStockOpnameItemParams) (InsertStockOpnameItemRow, error)
 	ListCatalogForSync(ctx context.Context, arg ListCatalogForSyncParams) ([]ListCatalogForSyncRow, error)
+	// Yang dikirim ke perangkat kasir HANYA nama, WA, kode member, akun sosial
+	// media, dan status merchandise — bukan email/tanggal lahir/catatan
+	// (DATA-MODEL §5 "jangan simpan email & tanggal lahir di perangkat").
+	ListCustomersForSync(ctx context.Context, tenantID string) ([]ListCustomersForSyncRow, error)
 	ListOutlets(ctx context.Context, tenantID string) ([]ListOutletsRow, error)
 	// MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
 	// ini, GET /outlets mengembalikan SELURUH outlet tenant ke siapa pun yang
@@ -191,6 +203,10 @@ type Querier interface {
 	// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)
 	LookupVariantByBarcode(ctx context.Context, arg LookupVariantByBarcodeParams) (LookupVariantByBarcodeRow, error)
+	// Dipanggil di transaksi penjualan yang sama. merchandise_given_at hanya
+	// diisi SEKALI — pada transaksi pertama member — dan tidak pernah ditimpa.
+	// Mengembalikan apakah transaksi ini yang pertama.
+	MarkCustomerPurchase(ctx context.Context, arg MarkCustomerPurchaseParams) (bool, error)
 	// Indeks unik parsial mencegah dua shift terbuka untuk kasir yang sama.
 	// Bila terjadi konflik, itu bug klien — bukan kondisi yang perlu ditangani diam-diam.
 	OpenShift(ctx context.Context, arg OpenShiftParams) (OpenShiftRow, error)

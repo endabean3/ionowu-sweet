@@ -85,18 +85,22 @@ type Category struct {
 }
 
 type Customer struct {
-	ID           string             `db:"id" json:"id"`
-	TenantID     string             `db:"tenant_id" json:"tenant_id"`
-	Name         *string            `db:"name" json:"name"`
-	Phone        *string            `db:"phone" json:"phone"`
-	Email        *string            `db:"email" json:"email"`
-	BirthDate    pgtype.Date        `db:"birth_date" json:"birth_date"`
-	Notes        *string            `db:"notes" json:"notes"`
-	FirstSeenAt  pgtype.Timestamptz `db:"first_seen_at" json:"first_seen_at"`
-	LastSeenAt   pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
-	MergedIntoID *string            `db:"merged_into_id" json:"merged_into_id"`
-	IsActive     bool               `db:"is_active" json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID                 string             `db:"id" json:"id"`
+	TenantID           string             `db:"tenant_id" json:"tenant_id"`
+	Name               *string            `db:"name" json:"name"`
+	Phone              *string            `db:"phone" json:"phone"`
+	Email              *string            `db:"email" json:"email"`
+	BirthDate          pgtype.Date        `db:"birth_date" json:"birth_date"`
+	Notes              *string            `db:"notes" json:"notes"`
+	FirstSeenAt        pgtype.Timestamptz `db:"first_seen_at" json:"first_seen_at"`
+	LastSeenAt         pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	MergedIntoID       *string            `db:"merged_into_id" json:"merged_into_id"`
+	IsActive           bool               `db:"is_active" json:"is_active"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MemberCode         *string            `db:"member_code" json:"member_code"`
+	SocialHandle       *string            `db:"social_handle" json:"social_handle"`
+	FollowsStoreSocial bool               `db:"follows_store_social" json:"follows_store_social"`
+	MerchandiseGivenAt pgtype.Timestamptz `db:"merchandise_given_at" json:"merchandise_given_at"`
 }
 
 type CustomerConsent struct {
@@ -225,6 +229,7 @@ type Outlet struct {
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
+	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 }
 
 type OutletPriceOverride struct {

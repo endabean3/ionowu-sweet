@@ -60,11 +60,23 @@ type syncVariant struct {
 	IsActive      bool   `json:"is_active"`
 }
 
+type syncCustomer struct {
+	ID                 string  `json:"id"`
+	Name               string  `json:"name,omitempty"`
+	Phone              string  `json:"phone"`
+	MemberCode         string  `json:"member_code"`
+	SocialHandle       string  `json:"social_handle,omitempty"`
+	MerchandiseGivenAt *string `json:"merchandise_given_at"`
+}
+
 type syncPullResponse struct {
-	Products          []syncProduct `json:"products"`
-	Variants          []syncVariant `json:"variants"`
-	CheckpointEventID string        `json:"checkpoint_event_id"`
-	HasMore           bool          `json:"has_more"`
+	Products []syncProduct `json:"products"`
+	Variants []syncVariant `json:"variants"`
+	// Member untuk dicari/dipindai kasir saat offline. Hanya kolom yang
+	// memang dibutuhkan kasir — lihat ListCustomersForSync.
+	Customers         []syncCustomer `json:"customers"`
+	CheckpointEventID string         `json:"checkpoint_event_id"`
+	HasMore           bool           `json:"has_more"`
 }
 
 func (h *SyncHandler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
@@ -155,6 +167,30 @@ func (h *SyncHandler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res.HasMore = false
+	custs, err := q.ListCustomersForSync(ctx, tenantID)
+	if err != nil {
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memuat member")
+		return
+	}
+	res.Customers = make([]syncCustomer, 0, len(custs))
+	deref := func(s *string) string {
+		if s == nil {
+			return ""
+		}
+		return *s
+	}
+	for _, c := range custs {
+		var merch *string
+		if c.MerchandiseGivenAt.Valid {
+			s := c.MerchandiseGivenAt.Time.UTC().Format(time.RFC3339)
+			merch = &s
+		}
+		res.Customers = append(res.Customers, syncCustomer{
+			ID: c.ID, Name: deref(c.Name), Phone: deref(c.Phone), MemberCode: deref(c.MemberCode),
+			SocialHandle: deref(c.SocialHandle), MerchandiseGivenAt: merch,
+		})
+	}
+
 	res.CheckpointEventID = "cp_" + time.Now().Format("20060102150405")
 	RespondJSON(w, http.StatusOK, res)
 }
@@ -164,7 +200,10 @@ func (h *SyncHandler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type syncPushRequest struct {
-	DeviceID    string                   `json:"device_id"`
+	DeviceID string `json:"device_id"`
+	// Member diproses PALING AWAL: penjualan di kiriman yang sama boleh
+	// merujuk member yang baru didaftarkan offline.
+	Customers   []map[string]interface{} `json:"customers"`
 	ShiftsOpen  []map[string]interface{} `json:"shifts_open"`
 	Sales       []map[string]interface{} `json:"sales"`
 	StockEvents []map[string]interface{} `json:"stock_events"`
@@ -218,6 +257,11 @@ func (h *SyncHandler) PostSyncPush(w http.ResponseWriter, r *http.Request) {
 	// langsung dengan invarian #4 CLAUDE.md ("transaksi offline selalu
 	// diterima"). Ditemukan lewat uji checkout end-to-end nyata di browser,
 	// bukan asumsi dari nama fungsi yang terlihat benar.
+	for _, item := range req.Customers {
+		id, _ := item["id"].(string)
+		status, detail := h.applyCustomer(ctx, q, tenantID, item)
+		res.Results = append(res.Results, syncPushResult{ClientID: id, Status: status, Detail: detail})
+	}
 	for _, item := range req.ShiftsOpen {
 		id, _ := item["id"].(string)
 		status, detail := h.applyShiftOpen(ctx, q, tenantID, item)
@@ -313,6 +357,8 @@ type syncSalePayload struct {
 	Discount   decimal.Decimal          `json:"discount"`
 	Tax        decimal.Decimal          `json:"tax"`
 	OccurredAt time.Time                `json:"occurred_at"`
+	// Member yang ditempelkan kasir (opsional — kasir tidak pernah dipaksa).
+	CustomerID *string `json:"customer_id,omitempty"`
 }
 
 // applySale menulis satu transaksi offline. Beda dari CheckoutHandler.PostSale
@@ -389,10 +435,30 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op setelah Commit berhasil
 	qtx := q.WithTx(tx)
 
+	// Member HARUS milik tenant ini — foreign key hanya menjamin ia ada.
+	// Member tak dikenal (mis. pendaftarannya ditolak karena WA ganda) TIDAK
+	// menggagalkan penjualan: transaksi tetap diterima tanpa member
+	// (invarian #4), dan alasannya dilaporkan.
+	var customerID *string
+	catatanMember := ""
+	if p.CustomerID != nil && *p.CustomerID != "" {
+		ok, err := qtx.CustomerBelongsToTenant(ctx, store.CustomerBelongsToTenantParams{
+			TenantID: tenantID, ID: *p.CustomerID,
+		})
+		if err != nil {
+			return "rejected", "gagal memeriksa member"
+		}
+		if ok {
+			customerID = p.CustomerID
+		} else {
+			catatanMember = "member tidak dikenal — transaksi diterima tanpa member"
+		}
+	}
+
 	receiptNumber := p.OccurredAt.UTC().Format("20060102150405") + "-" + p.ID[max(0, len(p.ID)-6):]
 	sale, err := qtx.CreateSaleIdempotent(ctx, store.CreateSaleIdempotentParams{
 		ID: p.ID, TenantID: tenantID, OutletID: p.OutletID, CashierID: cashierID,
-		ShiftID: &p.ShiftID, ReceiptNumber: receiptNumber,
+		ShiftID: &p.ShiftID, CustomerID: customerID, ReceiptNumber: receiptNumber,
 		Subtotal: calc.Subtotal, DiscountTotal: calc.DiscountTotal, TaxTotal: p.Tax, GrandTotal: grandTotal,
 		PaymentStatus:       "paid",
 		OfflineCreatedAt:    toTimestamptz(p.OccurredAt),
@@ -454,6 +520,14 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 		}
 	}
 
+	if customerID != nil {
+		if _, err := qtx.MarkCustomerPurchase(ctx, store.MarkCustomerPurchaseParams{
+			TenantID: tenantID, ID: *customerID, At: toTimestamptz(p.OccurredAt),
+		}); err != nil {
+			return "rejected", "gagal mencatat kunjungan member"
+		}
+	}
+
 	payload, _ := json.Marshal(map[string]any{"sale_id": sale.ID, "outlet_id": p.OutletID, "grand_total": grandTotal})
 	if _, err := qtx.InsertOutboxEvent(ctx, store.InsertOutboxEventParams{
 		ID: ulid.Make().String(), TenantID: tenantID, EventType: "sale.created",
@@ -465,7 +539,7 @@ func (h *SyncHandler) applySale(ctx context.Context, q *store.Queries, tenantID,
 	if err := tx.Commit(ctx); err != nil {
 		return "rejected", "gagal menyimpan transaksi: " + err.Error()
 	}
-	return "accepted", ""
+	return "accepted", catatanMember
 }
 
 type syncStockEventPayload struct {

@@ -4,6 +4,48 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.21.0] — 2026-09-19
+
+Permintaan pemilik Warung Wangi: member ber-barcode yang didaftarkan lewat form, dengan bonus
+**tester di setiap pembelian** dan **merchandise di pembelian pertama**.
+
+### Ditambahkan
+* **Daftar member di kasir** (tombol 👤 Member): nomor WA wajib, nama dan akun media sosial
+  opsional, dan centang wajib **"Sudah follow TikTok @akun-toko"**. Akun toko diatur di
+  **Pengaturan → Akun TikTok toko**. WA dibakukan ke `62…` (0812…, +62 812…, 812… = orang yang
+  sama) dengan aturan identik di klien dan server; WA ganda ditolak dan kasir ditawari member
+  yang sudah ada.
+* **Kode member `M-XXXXXX`** dibuat di perangkat dari ULID-nya, sehingga **bisa didaftarkan
+  offline**; keunikannya dijaga indeks unik per tenant.
+* **Scan kode member** (nota/kartu) ke kolom cari langsung menempelkan member. Enter dari
+  scanner ditahan sesaat agar tidak membuka pembayaran.
+* **Nota:** "Member M-XXXXXX", "Bonus: 1 tester", "Bonus: merchandise perdana" (hanya pembelian
+  pertama), dan **barcode CODE128** digambar printer termal (ESC/POS `GS k`). Kasir mendapat
+  pengingat bonus 12 detik setelah bayar.
+* Server: `customers` di `/sync/push` (diproses paling awal), `customer_id` pada penjualan sync,
+  daftar member di `/sync/pull` (tanpa email/tanggal lahir). Migrasi **`00012_customer_member`**
+  (expand murni).
+
+### Diperbaiki
+* **Penjualan tidak terkirim otomatis selama toko online.** Antrean hanya dikirim saat aplikasi
+  dibuka, saat kembali online, atau saat "Sinkron" ditekan. Kini item baru dikirim tiap 20 detik
+  selama online; item yang ditolak server tidak diulang otomatis.
+* `useMemo` pratinjau Pengaturan kekurangan dependensi garansi (Biome).
+
+### Keamanan
+* **Isolasi tenant:** foreign key hanya menjamin pelanggan ADA. Penjualan yang merujuk member
+  tenant lain **diterima tanpa member**, dan member itu tidak pernah ikut terkirim. Diuji langsung.
+* Nomor WA tidak pernah masuk log atau pesan galat (invarian #6); diperiksa di log server uji.
+
+### Terverifikasi
+* Go: `normalizeWA` (paritas dengan TS), validasi member (5 penolakan), `go test`/lint/`sqlc vet`.
+* Uji langsung server: daftar + jual pertama (merchandise tercatat), jual kedua (tanggal tetap),
+  WA ganda ditolak, kiriman ulang = duplicate, belum follow ditolak, tenant lain → tanpa member.
+* Web: vitest 72/72 (paritas WA, kode member, blok member + barcode di nota). Playwright
+  **18/18**, termasuk `e2e/member.spec.ts` baru. Nyata di 360px: member, penjualan, dan bonus
+  sampai ke server **lewat kirim otomatis** tanpa menekan Sinkron.
+
+---
 ## [1.20.0] — 2026-09-19
 
 ### Ditambahkan

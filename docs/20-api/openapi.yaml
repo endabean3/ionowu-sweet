@@ -648,6 +648,7 @@ paths:
                 phone: { type: string, maxLength: 50 }
                 receipt_footer: { type: string, maxLength: 200, description: "Teks penutup struk; kosong = \"Terima kasih\"" }
                 warranty_days: { type: integer, minimum: 0, maximum: 365, description: "Garansi (hari) yang dicetak di nota; 0 = tanpa garansi" }
+                social_handle: { type: string, maxLength: 100, description: "Akun TikTok toko; \"@\" di depan dibuang" }
                 timezone: { type: string }
                 business_day_start: { type: string, example: "00:00" }
                 is_active: { type: boolean, description: "Owner saja" }
@@ -715,6 +716,23 @@ paths:
               required: [device_id]
               properties:
                 device_id: { $ref: "#/components/schemas/ULID" }
+                customers:
+                  type: array
+                  description: >
+                    Member yang didaftarkan di perangkat (bisa offline). Diproses PALING AWAL
+                    agar penjualan di kiriman yang sama boleh merujuknya. Ditolak bila WA
+                    tidak valid/sudah terdaftar, kode member bentrok, atau belum follow akun toko.
+                  items:
+                    type: object
+                    required: [id, phone, member_code, follows_store_social]
+                    properties:
+                      id: { $ref: "#/components/schemas/ULID" }
+                      name: { type: string }
+                      phone: { type: string, description: "Dibakukan server ke 62xxxxxxxxxx" }
+                      member_code: { type: string, example: "M-433XJB", description: "Dicetak sebagai barcode CODE128 di nota" }
+                      social_handle: { type: string }
+                      follows_store_social: { type: boolean, description: "Wajib true" }
+                      created_at: { type: string, format: date-time }
                 shifts_open:
                   type: array
                   description: Shift yang dibuka saat perangkat offline (FR-45)
@@ -1016,6 +1034,7 @@ components:
         address: { type: string, nullable: true }
         phone: { type: string, nullable: true }
         receipt_footer: { type: string, nullable: true, description: "Teks penutup struk (migrasi 00010)" }
+        social_handle: { type: string, nullable: true, description: "Akun media sosial toko yang wajib di-follow calon member (migrasi 00012)" }
         warranty_days: { type: integer, description: "Garansi (hari) di nota; 0 = tanpa garansi (migrasi 00011)" }
         is_active: { type: boolean }
 

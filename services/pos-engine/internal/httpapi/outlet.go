@@ -191,6 +191,7 @@ func (h *OutletHandler) PatchOutlet(w http.ResponseWriter, r *http.Request) {
 		IsActive:         req.IsActive,
 		ReceiptFooter:    req.ReceiptFooter,
 		WarrantyDays:     req.WarrantyDays,
+		SocialHandle:     req.SocialHandle,
 	})
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
@@ -231,6 +232,8 @@ type patchOutletRequest struct {
 	ReceiptFooter    *string `json:"receipt_footer"`
 	// Lama garansi (hari) yang dicetak di nota; 0 = tanpa garansi.
 	WarrantyDays *int16 `json:"warranty_days"`
+	// Akun media sosial toko yang wajib di-follow calon member (mis. TikTok).
+	SocialHandle *string `json:"social_handle"`
 }
 
 // Batas panjang mengikuti kolom (outlets.name VARCHAR(200), phone
@@ -255,6 +258,10 @@ func (p *patchOutletRequest) normalize() string {
 	trim(p.Address)
 	trim(p.Phone)
 	trim(p.ReceiptFooter)
+	if p.SocialHandle != nil {
+		h := normalizeHandle(*p.SocialHandle)
+		p.SocialHandle = &h
+	}
 
 	if p.Name != nil && *p.Name == "" {
 		return "Nama toko tidak boleh kosong"
@@ -268,6 +275,7 @@ func (p *patchOutletRequest) normalize() string {
 		{p.Phone, maxOutletPhone, "Nomor telepon terlalu panjang"},
 		{p.Address, maxOutletAddr, "Alamat terlalu panjang (maks. 200 huruf)"},
 		{p.ReceiptFooter, maxOutletFooter, "Teks penutup struk terlalu panjang (maks. 200 huruf)"},
+		{p.SocialHandle, 100, "Akun media sosial terlalu panjang"},
 	}
 	for _, c := range checks {
 		if c.v != nil && utf8.RuneCountInString(*c.v) > c.max {

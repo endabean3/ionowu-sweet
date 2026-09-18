@@ -66,7 +66,7 @@ export interface SyncQueueEntry {
   id: string; // ULID
   tenant_id: string;
   outlet_id: string;
-  type: "sale" | "shift_open" | "shift_close" | "stock_event";
+  type: "sale" | "shift_open" | "shift_close" | "stock_event" | "customer";
   payload: Record<string, unknown>;
   status: "pending" | "syncing" | "synced" | "failed";
   retry_count: number;
@@ -96,6 +96,24 @@ export interface LocalOutlet {
   phone?: string | null;
   receipt_footer?: string | null;
   warranty_days?: number | null;
+  /** Akun media sosial toko yang wajib di-follow calon member. */
+  social_handle?: string | null;
+}
+
+/**
+ * Member pelanggan di perangkat — untuk dipindai/dicari saat OFFLINE.
+ * Hanya kolom yang kasir butuhkan: WA, nama, kode, akun sosial media.
+ * Email/tanggal lahir TIDAK pernah disimpan di sini (DATA-MODEL §5).
+ */
+export interface LocalCustomer {
+  id: string; // ULID, dibuat di perangkat saat didaftarkan
+  tenant_id: string;
+  name?: string;
+  phone: string; // bentuk baku 62xxxxxxxxxx
+  member_code: string;
+  social_handle?: string;
+  /** Terisi setelah transaksi pertama → merchandise sudah diberikan. */
+  merchandise_given_at?: string | null;
 }
 
 export class IonowuDB extends Dexie {
@@ -107,6 +125,7 @@ export class IonowuDB extends Dexie {
   syncQueue!: EntityTable<SyncQueueEntry, "id">;
   settings!: EntityTable<LocalSetting, "key">;
   outlets!: EntityTable<LocalOutlet, "id">;
+  customers!: EntityTable<LocalCustomer, "id">;
 
   constructor() {
     super("ionowu_pos_offline");
@@ -121,6 +140,10 @@ export class IonowuDB extends Dexie {
     });
     this.version(2).stores({
       outlets: "id, tenant_id",
+    });
+    // v3: member pelanggan. Menambah tabel baru saja — data lama tidak disentuh.
+    this.version(3).stores({
+      customers: "id, tenant_id, member_code, phone",
     });
   }
 }
