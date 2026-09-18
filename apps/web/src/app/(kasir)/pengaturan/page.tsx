@@ -33,9 +33,11 @@ interface Form {
   address: string;
   phone: string;
   receipt_footer: string;
+  /** Teks di input; diubah ke angka saat simpan. */
+  warranty_days: string;
 }
 
-const kosong: Form = { name: "", address: "", phone: "", receipt_footer: "" };
+const kosong: Form = { name: "", address: "", phone: "", receipt_footer: "", warranty_days: "0" };
 
 function keForm(o: OutletRow): Form {
   return {
@@ -43,6 +45,7 @@ function keForm(o: OutletRow): Form {
     address: o.address ?? "",
     phone: o.phone ?? "",
     receipt_footer: o.receipt_footer ?? "",
+    warranty_days: String(o.warranty_days ?? 0),
   };
 }
 
@@ -106,22 +109,30 @@ export default function PengaturanPage() {
 
   const asli = outlets?.find((o) => o.id === outletId);
   const berubah = asli ? JSON.stringify(keForm(asli)) !== JSON.stringify(form) : false;
-  const dapatSimpan = bolehUbah && !offline && berubah && form.name.trim() !== "" && !menyimpan;
+  const garansiHari = Number(form.warranty_days);
+  const garansiSah =
+    form.warranty_days.trim() !== "" &&
+    Number.isInteger(garansiHari) &&
+    garansiHari >= 0 &&
+    garansiHari <= 365;
+  const dapatSimpan =
+    bolehUbah && !offline && berubah && form.name.trim() !== "" && garansiSah && !menyimpan;
 
   const simpan = async () => {
     if (!accessToken || !dapatSimpan) return;
     setMenyimpan(true);
-    const rapi: Form = {
+    const rapi = {
       name: form.name.trim(),
       address: form.address.trim(),
       phone: form.phone.trim(),
       receipt_footer: form.receipt_footer.trim(),
+      warranty_days: garansiHari,
     };
     try {
       await patchOutlet(accessToken, outletId, rapi);
       const baru = (outlets ?? []).map((o) => (o.id === outletId ? { ...o, ...rapi } : o));
       setOutlets(baru);
-      setForm(rapi);
+      setForm({ ...rapi, warranty_days: String(rapi.warranty_days) });
       if (identitas?.tenant_id) await cacheOutlets(identitas.tenant_id, baru);
       toast.success("Pengaturan toko tersimpan", {
         description: "Struk berikutnya memakai data ini.",
@@ -148,6 +159,7 @@ export default function PengaturanPage() {
       outletAddress: form.address,
       outletPhone: form.phone,
       footer: form.receipt_footer,
+      warrantyDays: garansiSah ? garansiHari : 0,
       cashierName: identitas?.name ?? "Kasir",
       lines: [
         {
@@ -287,6 +299,17 @@ export default function PengaturanPage() {
                     "Terima kasih". {form.receipt_footer.length}/{MAKS}
                   </p>
                 </div>
+                <Input
+                  label="Garansi (hari)"
+                  value={form.warranty_days}
+                  onChange={ubah("warranty_days")}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={365}
+                  hint='Dicetak di nota: "Garansi 7 hari s/d <tanggal>". 0 = tanpa garansi.'
+                  error={garansiSah ? undefined : "Isi 0–365 hari"}
+                />
               </fieldset>
 
               {bolehUbah && !offline && (

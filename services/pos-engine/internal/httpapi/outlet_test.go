@@ -41,3 +41,17 @@ func TestPatchOutletNormalize(t *testing.T) {
 		t.Fatalf("200 huruf beraksen ditolak: %s", msg)
 	}
 }
+
+func TestPatchOutletGaransi(t *testing.T) {
+	hari := func(n int16) *int16 { return &n }
+	for _, sah := range []int16{0, 7, 365} {
+		if msg := (&patchOutletRequest{WarrantyDays: hari(sah)}).normalize(); msg != "" {
+			t.Errorf("%d hari ditolak: %s", sah, msg)
+		}
+	}
+	for _, salah := range []int16{-1, 366} {
+		if msg := (&patchOutletRequest{WarrantyDays: hari(salah)}).normalize(); msg == "" {
+			t.Errorf("%d hari diterima", salah)
+		}
+	}
+}

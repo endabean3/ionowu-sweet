@@ -247,3 +247,22 @@ describe("toPrinterText — nama produk nyata Warung Wangi", () => {
     expect(toPrinterText("Wangi 🌸")).toBe("Wangi ?");
   });
 });
+
+describe("garansi di nota", () => {
+  const cetak = (d: ReceiptData) => printedText(encodeReceipt(d, 58));
+
+  it("garansi 7 hari: tanggal beli + 7 hari tercetak sebelum penutup", () => {
+    const d: ReceiptData = { ...contoh, occurredAt: "2026-09-19T03:00:00.000Z", warrantyDays: 7 };
+    const baris = cetak(d).split("\n");
+    const i = baris.findIndex((b) => b.startsWith("Garansi 7 hari s/d"));
+    expect(i).toBeGreaterThan(-1);
+    expect(baris[i]).toContain("26/09/2026");
+    // Garansi di atas teks penutup.
+    expect(baris.findIndex((b) => b.startsWith("Terima kasih"))).toBeGreaterThan(i);
+  });
+
+  it("0 atau kosong: tidak ada baris garansi", () => {
+    expect(cetak({ ...contoh, warrantyDays: 0 })).not.toContain("Garansi");
+    expect(cetak({ ...contoh, warrantyDays: null })).not.toContain("Garansi");
+  });
+});

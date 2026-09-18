@@ -190,6 +190,7 @@ func (h *OutletHandler) PatchOutlet(w http.ResponseWriter, r *http.Request) {
 		BusinessDayStart: bdStart,
 		IsActive:         req.IsActive,
 		ReceiptFooter:    req.ReceiptFooter,
+		WarrantyDays:     req.WarrantyDays,
 	})
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
@@ -228,6 +229,8 @@ type patchOutletRequest struct {
 	BusinessDayStart *string `json:"business_day_start"`
 	IsActive         *bool   `json:"is_active"`
 	ReceiptFooter    *string `json:"receipt_footer"`
+	// Lama garansi (hari) yang dicetak di nota; 0 = tanpa garansi.
+	WarrantyDays *int16 `json:"warranty_days"`
 }
 
 // Batas panjang mengikuti kolom (outlets.name VARCHAR(200), phone
@@ -270,6 +273,10 @@ func (p *patchOutletRequest) normalize() string {
 		if c.v != nil && utf8.RuneCountInString(*c.v) > c.max {
 			return c.msg
 		}
+	}
+	// Batas sama dengan CHECK di migrasi 00011.
+	if p.WarrantyDays != nil && (*p.WarrantyDays < 0 || *p.WarrantyDays > 365) {
+		return "Lama garansi harus 0–365 hari"
 	}
 	return ""
 }

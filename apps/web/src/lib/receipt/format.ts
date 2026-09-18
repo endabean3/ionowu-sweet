@@ -30,6 +30,8 @@ export interface ReceiptData {
   outletAddress?: string | null;
   outletPhone?: string | null;
   footer?: string | null;
+  /** Lama garansi (hari) dari Pengaturan; 0/kosong = tidak dicetak. */
+  warrantyDays?: number | null;
   cashierName: string;
   lines: ReceiptLine[];
   subtotal: string;
@@ -79,4 +81,22 @@ export function formatWaktu(iso: string): string {
 /** Penutup struk: isian pemilik, atau "Terima kasih" bila kosong. */
 export function receiptFooter(data: Pick<ReceiptData, "footer">): string {
   return data.footer?.trim() || "Terima kasih";
+}
+
+/**
+ * "Garansi s/d 26/09/2026" — tanggal beli + N hari, dalam zona waktu
+ * perangkat (sama dengan jam di nota). null bila tanpa garansi.
+ */
+export function warrantyLine(
+  data: Pick<ReceiptData, "occurredAt" | "warrantyDays">,
+): string | null {
+  const hari = data.warrantyDays ?? 0;
+  if (!Number.isInteger(hari) || hari <= 0) return null;
+  const sampai = new Date(new Date(data.occurredAt).getTime() + hari * 86_400_000);
+  const tgl = sampai.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `Garansi ${hari} hari s/d ${tgl}`;
 }

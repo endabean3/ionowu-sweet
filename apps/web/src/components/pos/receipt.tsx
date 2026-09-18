@@ -9,6 +9,7 @@ import {
   lineGross,
   receiptFooter,
   rupiah,
+  warrantyLine,
 } from "@/lib/receipt/format";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
@@ -118,6 +119,9 @@ export function Receipt({ data }: { data: ReceiptData }) {
             terasa seperti kehilangan uang. */}
         {data.pending && (
           <div className="receipt-center receipt-small">(belum tersinkronisasi)</div>
+        )}
+        {warrantyLine(data) && (
+          <div className="receipt-center receipt-bold">{warrantyLine(data)}</div>
         )}
         <div className="receipt-center receipt-small">{receiptFooter(data)}</div>
       </div>

@@ -224,6 +224,7 @@ type Outlet struct {
 	IsActive         bool               `db:"is_active" json:"is_active"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
+	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
 }
 
 type OutletPriceOverride struct {

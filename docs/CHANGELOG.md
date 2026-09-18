@@ -4,6 +4,23 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.20.0] — 2026-09-19
+
+### Ditambahkan
+* **Garansi di nota.** Setiap nota mencetak **"Garansi 7 hari s/d <tanggal beli + 7>"** (tebal,
+  di atas teks penutup), di kertas termal maupun cetak browser. Lamanya diatur di **Pengaturan →
+  Garansi (hari)**; 0 = tanpa garansi, jadi perilaku tenant lain tidak berubah. Tanggal dihitung
+  di perangkat dari waktu transaksi, sehingga tetap tercetak saat offline.
+* Migrasi **`00011_outlet_warranty`**: `outlets.warranty_days SMALLINT NOT NULL DEFAULT 0`
+  (0–365). Expand murni. **Wajib dijalankan sebelum `api` baru.**
+* `PATCH /outlets/{id}` menerima `warranty_days` (422 bila di luar 0–365).
+
+### Terverifikasi
+* Go (validasi 0–365), vitest 57/57 (garansi 7 hari → +7 hari; 0/kosong → tidak dicetak).
+* Nyata di 360px: Pengaturan → Garansi 7 → Simpan → pratinjau dan nota transaksi memuat
+  "Garansi 7 hari s/d 25/09/2026".
+
+---
 ## [1.19.0] — 2026-09-18
 
 ### Ditambahkan

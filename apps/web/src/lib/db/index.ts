@@ -95,6 +95,7 @@ export interface LocalOutlet {
   address?: string | null;
   phone?: string | null;
   receipt_footer?: string | null;
+  warranty_days?: number | null;
 }
 
 export class IonowuDB extends Dexie {
