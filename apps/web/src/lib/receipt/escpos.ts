@@ -178,3 +178,35 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
 
   return out.build();
 }
+
+/**
+ * Halaman cetak uji: membuktikan printer tersambung DAN lebar kertasnya
+ * benar sebelum pembeli pertama menunggu.
+ *
+ * Penggaris angka selebar tepat satu baris adalah intinya. Bila lebar yang
+ * dipilih lebih besar dari kertas sebenarnya (80 mm pada printer 58 mm),
+ * penggaris patah ke baris kedua — dan setiap struk nanti akan berantakan
+ * dengan cara yang sama. Kasir melihatnya di sini, bukan di depan pembeli.
+ */
+export function encodeTestPage(paper: PaperWidth, printerName: string): Uint8Array {
+  const w = COLUMNS[paper];
+  const ruler = Array.from({ length: w }, (_, i) => String((i + 1) % 10)).join("");
+  const out = new EscPosBuilder();
+
+  out.cmd(ESC, 0x40);
+  out.align("center").bold(true).line("CETAK UJI").bold(false);
+  out.lines(wrap(toPrinterText(printerName), w));
+  out.line(`Kertas ${paper} mm - ${w} kolom`);
+  out.align("left").line("-".repeat(w));
+  out.line(ruler);
+  out.line("-".repeat(w));
+  out.lines(
+    wrap(
+      "Angka di atas harus muat TEPAT satu baris. Bila patah ke baris kedua, pilih lebar kertas yang lebih kecil.",
+      w,
+    ),
+  );
+  out.cmd(ESC, 0x64, 4);
+  out.cmd(GS, 0x56, 0x42, 0x00);
+  return out.build();
+}

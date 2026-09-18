@@ -58,6 +58,18 @@ public class ThermalPrinterPlugin extends Plugin {
      */
     private static final long DRAIN_MS = 800;
 
+    /**
+     * Byte dikirim per potongan, bukan sekaligus. Printer termal murah punya
+     * buffer penerima kecil (sering 2–4 KB) dan tidak semuanya menjalankan
+     * kontrol aliran dengan benar: struk panjang yang ditulis dalam satu
+     * write() bisa kehilangan ekornya — total dan kembalian, bagian yang
+     * justru paling penting. Jeda singkat antar-potongan memberi printer
+     * waktu mencetak sebagian isi buffernya. Untuk struk biasa (±1 KB) ini
+     * hanya menambah beberapa puluh milidetik.
+     */
+    private static final int CHUNK_BYTES = 512;
+    private static final long CHUNK_PAUSE_MS = 20;
+
     /** Satu utas: dua ketukan "Cetak" beruntun tidak membuka dua soket ke printer yang sama. */
     private final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -188,8 +200,12 @@ public class ThermalPrinterPlugin extends Plugin {
         BluetoothSocket socket = connect(device);
         try {
             OutputStream out = socket.getOutputStream();
-            out.write(bytes);
-            out.flush();
+            for (int offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
+                int length = Math.min(CHUNK_BYTES, bytes.length - offset);
+                out.write(bytes, offset, length);
+                out.flush();
+                if (offset + length < bytes.length) Thread.sleep(CHUNK_PAUSE_MS);
+            }
             Thread.sleep(DRAIN_MS);
         } finally {
             closeQuietly(socket);

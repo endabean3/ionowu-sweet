@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginViaUI, provisionTenant, type TenantFixture } from "./helpers";
+import { type TenantFixture, loginViaUI, provisionTenant } from "./helpers";
 
 /**
  * Kasir tidak bisa berjualan sebelum shift dibuka — modal ini adalah gerbang

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COLUMNS, encodeReceipt, row, toPrinterText, wrap } from "./escpos";
+import { COLUMNS, encodeReceipt, encodeTestPage, row, toPrinterText, wrap } from "./escpos";
 import { type ReceiptData, rupiah } from "./format";
 
 const ESC = 0x1b;
@@ -139,5 +139,34 @@ describe("encodeReceipt", () => {
     const { commands } = decode(encodeReceipt(contoh, 58));
     expect(commands[0]).toBe("ESC @");
     expect(commands.slice(-2)).toEqual(["ESC d 4", "GS V"]);
+  });
+});
+
+describe("encodeTestPage", () => {
+  // Teks yang benar-benar tercetak: perintah ESC (3 byte) dan GS V (4 byte)
+  // dilompati, karena argumennya bisa berupa byte cetak seperti 'a' atau 'E'.
+  const teks = (bytes: Uint8Array) => {
+    let out = "";
+    for (let i = 0; i < bytes.length; i++) {
+      if (bytes[i] === 0x1b) i += 2;
+      else if (bytes[i] === 0x1d) i += 3;
+      else out += String.fromCharCode(bytes[i]);
+    }
+    return out;
+  };
+
+  it.each([58, 80] as const)("penggaris %i mm tepat selebar satu baris", (paper) => {
+    const baris = teks(encodeTestPage(paper, "RPP02N")).split("\n");
+    const penggaris = baris.find((b) => /^[0-9]+$/.test(b));
+    expect(penggaris).toHaveLength(COLUMNS[paper]);
+    // Tidak ada baris yang melebihi lebar kertas — kalau ada, printer
+    // membungkusnya sendiri dan uji ini justru menipu kasir.
+    for (const b of baris) expect(b.length).toBeLessThanOrEqual(COLUMNS[paper]);
+  });
+
+  it("dimulai dengan reset dan diakhiri dorong + potong kertas", () => {
+    const bytes = encodeTestPage(58, "Printer");
+    expect(Array.from(bytes.slice(0, 2))).toEqual([0x1b, 0x40]);
+    expect(Array.from(bytes.slice(-7))).toEqual([0x1b, 0x64, 4, 0x1d, 0x56, 0x42, 0x00]);
   });
 });

@@ -8,7 +8,7 @@ import { naikMasukTegas } from "@/lib/motion/tokens";
 import Decimal from "decimal.js";
 import { AnimatePresence, m } from "framer-motion";
 import { Minus, Pencil, Plus, ShoppingBag, Trash2, Zap } from "lucide-react";
-import React from "react";
+import type React from "react";
 import { toast } from "sonner";
 
 export interface CartLine {
@@ -40,6 +40,8 @@ interface POSCartProps {
   onRemoveItem: (variantId: string) => void;
   onClearCart: () => void;
   onCheckout: () => void;
+  /** Ditampilkan di keranjang kosong — dipakai untuk struk terakhir. */
+  emptyExtra?: React.ReactNode;
 }
 
 export function POSCart({
@@ -50,6 +52,7 @@ export function POSCart({
   onRemoveItem,
   onClearCart,
   onCheckout,
+  emptyExtra,
 }: POSCartProps) {
   const handleCheckoutClick = () => {
     if (items.length === 0) {
@@ -79,7 +82,7 @@ export function POSCart({
                 playPop();
                 onClearCart();
               }}
-              className="font-sans text-xs font-bold text-muted hover:text-red-500"
+              className="flex h-11 items-center px-2 font-sans text-sm font-bold text-main underline decoration-2 underline-offset-4 hover:text-red-700"
             >
               Kosongkan
             </button>
@@ -89,16 +92,19 @@ export function POSCart({
         {/* Cart Item List */}
         <div className="mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ShoppingBag
-                className="h-10 w-10 text-muted/50"
-                strokeWidth={1.75}
-                aria-hidden="true"
-              />
-              <p className="mt-2 font-sans text-sm font-semibold text-muted">
-                Belum ada item dipilih
-              </p>
-              <p className="text-xs text-muted/70">Scan barcode atau klik menu di sebelah kiri</p>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <ShoppingBag
+                  className="h-10 w-10 text-muted/50"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+                <p className="mt-2 font-sans text-sm font-semibold text-main">
+                  Belum ada barang di keranjang
+                </p>
+                <p className="text-sm text-main">Ketuk produk atau scan barcode</p>
+              </div>
+              {emptyExtra}
             </div>
           ) : (
             <AnimatePresence initial={false}>
@@ -242,7 +248,12 @@ export function POSCart({
           className="mt-4 w-full gap-2 text-xl shadow-hard"
         >
           <Zap className="h-5 w-5" fill="currentColor" aria-hidden="true" />
-          Bayar Sekarang (Enter)
+          Bayar Sekarang
+          {/* Petunjuk papan ketik hanya untuk layar lebar: di ponsel tidak
+             ada tombol Enter fisik, dan labelnya jadi patah dua baris. */}
+          <kbd className="hidden rounded-md border border-card-border px-1.5 font-mono text-xs lg:inline">
+            Enter
+          </kbd>
         </Button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { type PaperWidth, encodeReceipt } from "@/lib/receipt/escpos";
+import { type PaperWidth, encodeReceipt, encodeTestPage } from "@/lib/receipt/escpos";
 import type { ReceiptData } from "@/lib/receipt/format";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
@@ -71,14 +71,39 @@ export async function listPairedDevices(): Promise<PairedDevice[]> {
   return devices;
 }
 
-export async function printReceiptBluetooth(
-  printer: SavedPrinter,
-  data: ReceiptData,
-): Promise<void> {
-  const bytes = encodeReceipt(data, printer.paper);
+// Cetak otomatis sesudah bayar. Bawaan MATI: pembeli warung sering tidak
+// meminta struk, dan kertas termal yang terbuang adalah ongkos pemilik.
+// Toko yang selalu memberi struk menyalakannya sekali di pengaturan printer.
+const AUTO_PRINT_KEY = "ionowu.printer.otomatis";
+
+export function loadAutoPrint(): boolean {
+  try {
+    return localStorage.getItem(AUTO_PRINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveAutoPrint(on: boolean): void {
+  try {
+    localStorage.setItem(AUTO_PRINT_KEY, on ? "1" : "0");
+  } catch {
+    // Sama seperti savePrinter: berlaku untuk sesi ini saja.
+  }
+}
+
+async function sendBytes(printer: SavedPrinter, bytes: Uint8Array): Promise<void> {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   await ThermalPrinter.print({ address: printer.address, data: btoa(binary) });
+}
+
+export function printReceiptBluetooth(printer: SavedPrinter, data: ReceiptData): Promise<void> {
+  return sendBytes(printer, encodeReceipt(data, printer.paper));
+}
+
+export function printTestPageBluetooth(printer: SavedPrinter): Promise<void> {
+  return sendBytes(printer, encodeTestPage(printer.paper, printer.name));
 }
 
 /** Pesan dari plugin sudah berbahasa Indonesia dan ditujukan ke kasir. */

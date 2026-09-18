@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { bukaShiftBilaPerlu, loginViaUI, provisionTenant, type TenantFixture } from "./helpers";
+import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
 
 /**
  * Klaim inti produk: "kasir tetap bisa berjualan meski VPS, Redis, internet,
@@ -30,7 +30,7 @@ test.describe("Offline Checkout & Sync", () => {
 
     // Baru sekarang koneksi diputus.
     await context.setOffline(true);
-    await expect(page.getByText("Offline (Tersimpan Lokal)")).toBeVisible();
+    await expect(page.getByText("Offline · tersimpan")).toBeVisible();
 
     await kartuProduk.click();
 
@@ -49,6 +49,6 @@ test.describe("Offline Checkout & Sync", () => {
 
     // Inti pengujian: transaksi diterima saat offline dan mendarat di antrean,
     // bukan hilang atau ditolak.
-    await expect(page.getByText(/\d+ antrean/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/\d+ transaksi belum terkirim/)).toBeVisible({ timeout: 10000 });
   });
 });

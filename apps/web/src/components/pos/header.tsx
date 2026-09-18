@@ -3,10 +3,11 @@
 import { useAuth } from "@/lib/auth/context";
 import { db } from "@/lib/db";
 import { naikMasukTegas } from "@/lib/motion/tokens";
+import type { ReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { useSync } from "@/lib/sync/provider";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { Moon, RefreshCw, Sun, Wifi, WifiOff } from "lucide-react";
+import { Moon, Printer, RefreshCw, Sun, Wifi, WifiOff } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -23,9 +24,12 @@ interface HeaderProps {
    * (diisi ShiftModal), bukan dihardcode. Undefined berarti belum ada shift
    * terbuka, header tetap menampilkan identitas kasir tanpa nama outlet. */
   outletId?: string;
+  /** Hanya diisi di APK (printer Bluetooth). Di browser, cetak lewat dialog
+   *  sistem dan tidak ada yang perlu diatur di sini. */
+  printer?: ReceiptPrinter;
 }
 
-export function POSHeader({ outletId }: HeaderProps) {
+export function POSHeader({ outletId, printer }: HeaderProps) {
   const { user } = useAuth();
   const { isSyncing, syncNow, lastSyncedAt } = useSync();
   // null = BELUM diketahui. Status jaringan hanya ada di klien, jadi server
@@ -133,25 +137,28 @@ export function POSHeader({ outletId }: HeaderProps) {
       </div>
 
       {/* Status Badges & Controls */}
-      <div className="flex items-center gap-3">
+      {/* flex-wrap: di layar 360px deretan ini tadinya melebihi lebar layar —
+         tombol tema terpotong di tepi kanan dan halaman bisa digeser ke samping. */}
+      <div className="flex flex-wrap items-center gap-2">
         {/* Sync trigger button */}
         <button
           type="button"
           onClick={() => syncNow()}
           disabled={!isOnline || isSyncing}
-          className="mochi-button h-11 rounded-pill border-2 border-card-border bg-surface px-4 font-sans text-xs font-bold text-main shadow-hard-sm disabled:opacity-50"
+          className="mochi-button flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-surface px-3 font-sans text-xs font-bold text-main shadow-hard-sm disabled:opacity-50"
           aria-label={
             lastSyncedAt
               ? `Sinkronkan sekarang. Terakhir sync ${lastSyncedAt.toLocaleTimeString("id-ID")}`
               : "Sinkronkan sekarang. Belum pernah sync"
           }
         >
-          {isSyncing ? "Syncing..." : "Sync Now"}
+          <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} aria-hidden="true" />
+          {isSyncing ? "Mengirim…" : "Sinkron"}
         </button>
 
         {/* Offline/Online Indicator */}
         <div
-          className={`flex items-center gap-2 rounded-pill border-2 border-card-border px-3 py-1.5 font-sans text-xs font-bold shadow-hard-sm ${
+          className={`flex h-11 items-center gap-2 whitespace-nowrap rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold shadow-hard-sm ${
             isOnline === null
               ? "bg-card text-muted"
               : isOnline
@@ -172,7 +179,7 @@ export function POSHeader({ outletId }: HeaderProps) {
           ) : (
             <>
               <WifiOff className="h-4 w-4" aria-hidden="true" />
-              <span>Offline (Tersimpan Lokal)</span>
+              <span>Offline · tersimpan</span>
             </>
           )}
         </div>
@@ -187,14 +194,36 @@ export function POSHeader({ outletId }: HeaderProps) {
             initial="sembunyi"
             animate="tampil"
             aria-live="polite"
-            className="flex items-center gap-1.5 rounded-pill border-2 border-card-border bg-sweet-custard px-3 py-1.5 font-mono text-xs font-bold text-main shadow-hard-sm"
+            className="flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-sweet-custard px-3 font-sans text-xs font-bold text-main shadow-hard-sm"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
               aria-hidden="true"
             />
-            <span>{pendingCount} antrean menunggu kirim</span>
+            <span>
+              {pendingCount} <span className="sr-only">transaksi </span>belum terkirim
+            </span>
           </m.div>
+        )}
+
+        {printer && (
+          <button
+            type="button"
+            onClick={printer.bukaPicker}
+            aria-label={
+              printer.printer
+                ? `Pengaturan printer. Terpasang: ${printer.printer.name}, kertas ${printer.printer.paper} mm`
+                : "Pengaturan printer. Belum ada printer dipilih"
+            }
+            className={`mochi-button flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold text-main shadow-hard-sm ${
+              printer.printer ? "bg-base" : "bg-sweet-custard"
+            }`}
+          >
+            <Printer className="h-4 w-4" aria-hidden="true" />
+            {/* Nama printer tidak ditampilkan (bisa panjang dan patah); yang
+               penting bagi kasir: sudah siap atau belum. */}
+            {printer.printer ? "Printer" : "Pilih printer"}
+          </button>
         )}
 
         {/* Dark/Light Toggle */}

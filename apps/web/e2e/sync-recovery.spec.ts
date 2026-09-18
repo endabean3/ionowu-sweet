@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { bukaShiftBilaPerlu, loginViaUI, provisionTenant, type TenantFixture } from "./helpers";
+import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
 
 /**
  * Transaksi offline tidak boleh cuma "diterima" — ia harus benar-benar sampai
@@ -26,7 +26,7 @@ test.describe("Sync Recovery", () => {
     await bukaShiftBilaPerlu(page, "100000");
 
     await context.setOffline(true);
-    await expect(page.getByText("Offline (Tersimpan Lokal)")).toBeVisible();
+    await expect(page.getByText("Offline · tersimpan")).toBeVisible();
 
     await kartuProduk.click();
     await page.locator('button:has-text("Bayar Sekarang")').first().click();
@@ -35,14 +35,14 @@ test.describe("Sync Recovery", () => {
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
 
-    const badgeAntrean = page.getByText(/\d+ antrean/);
+    const badgeAntrean = page.getByText(/\d+ transaksi belum terkirim/);
     await expect(badgeAntrean).toBeVisible({ timeout: 10000 });
 
     // Koneksi pulih.
     await context.setOffline(false);
     await expect(page.getByText("Online")).toBeVisible({ timeout: 15000 });
 
-    await page.click('button:has-text("Sync Now")');
+    await page.click('button:has-text("Sinkron")');
 
     // Antrean habis = transaksi benar-benar mendarat di server.
     await expect(badgeAntrean).toBeHidden({ timeout: 20000 });
