@@ -38,12 +38,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             // Base
             "w-full px-4 py-3 rounded-[22px] text-base outline-none transition-all",
             // Background & border
-            "bg-surface/60 backdrop-blur-sm border border-surface/40",
+            // Garis tepi berwarna tinta, bukan putih transparan: di atas kartu
+            // putih, border-surface/40 tidak terlihat sama sekali dan kolom yang
+            // belum difokus tampak seperti bukan kolom isian.
+            "bg-surface/60 text-main backdrop-blur-sm border-2 border-card-border/25",
             "shadow-[0_1px_3px_rgba(45,35,30,0.08)]",
             // Focus — ring matcha. Warna literal, bukan token+opacity: lihat
             // catatan di login/page.tsx soal keterbatasan opacity-modifier
             // pada warna yang didefinisikan sebagai var(--x) di tailwind.config.
-            "focus:border-[#A2E8CE] focus:ring-2 focus:ring-[rgba(162,232,206,0.3)]",
+            "focus:border-card-border focus:ring-4 focus:ring-[rgba(162,232,206,0.6)]",
             // Error
             error && "border-red-400 focus:border-red-500 focus:ring-red-200",
             // Placeholder

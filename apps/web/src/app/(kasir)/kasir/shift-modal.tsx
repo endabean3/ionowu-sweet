@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useAuth } from "@/lib/auth/context";
 import { profilTerakhir } from "@/lib/auth/profile";
 import { db } from "@/lib/db";
@@ -235,26 +236,17 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
         )}
 
         <div className="mt-8 text-left">
-          <label
-            htmlFor="modal_awal"
-            className="font-sans text-xs font-bold uppercase tracking-wider text-muted"
-          >
-            Modal Awal Kasir (Uang Kembalian Laci)
+          <label htmlFor="modal_awal" className="font-sans text-sm font-bold text-main">
+            Modal awal di laci
           </label>
-          <div className="mt-2 flex gap-2">
-            <span className="flex items-center rounded-l-xl border-2 border-r-0 border-card-border bg-base px-4 font-mono font-bold">
-              Rp
-            </span>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
-              className="flex-1 rounded-r-xl border-2 border-card-border bg-surface p-3 font-mono text-lg font-bold outline-none focus:ring-2 focus:ring-sweet-strawberry"
-              id="modal_awal"
-              placeholder="100000"
-            />
-          </div>
+          <p className="font-sans text-xs text-main">Uang kembalian yang ada sebelum toko buka.</p>
+          <MoneyInput
+            id="modal_awal"
+            className="mt-2"
+            value={openingCash}
+            onChange={(e) => setOpeningCash(e.target.value)}
+            placeholder="100000"
+          />
         </div>
 
         <div className="mt-8 grid gap-3">
