@@ -8,7 +8,7 @@ Sumber kebenaran untuk **bentuk data**, terpisah dari arsitektur sistem.
 | 2 | [MIGRATIONS.md](./MIGRATIONS.md) | Tooling, expand–contract, migrasi klien | 🟡 Draft |
 | 3 | [OFFLINE-SYNC-SPEC.md](./OFFLINE-SYNC-SPEC.md) | Resolusi konflik & kasus tepi | 🟡 Draft |
 | 4 | [RETENTION.md](./RETENTION.md) | Masa simpan, arsip, penghapusan | 🟡 Draft |
-| 5 | [migrations/](./migrations/) | **Berkas SQL aktual — 12 migrasi, 47 tabel** | ✅ Ditulis |
+| 5 | [migrations/](./migrations/) | **Berkas SQL aktual — 13 migrasi, 47 tabel** | ✅ Ditulis |
 | 6 | [sqlc.yaml](../../30-data/sqlc.yaml) | Konfigurasi generate Go + **aturan `sqlc vet`** | ✅ Ditulis |
 | 7 | [queries/](./queries/) | **Kueri SQL — 23 kueri, jalur checkout** | ✅ Ditulis |
 

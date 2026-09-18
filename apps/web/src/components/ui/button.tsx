@@ -51,6 +51,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
+        // `type` WAJIB diteruskan. Sebelumnya ia diambil dari props (bawaan
+        // "button") lalu dibuang, sehingga setiap <Button> di dalam <form>
+        // menjadi tombol submit HTML: pintasan jumlah di keypad kasir langsung
+        // memasukkan barang ke keranjang, dan tombol tambah varian di form
+        // produk ikut mengirim form.
+        type={type}
         onClick={handleClick}
         className={twMerge(
           clsx(

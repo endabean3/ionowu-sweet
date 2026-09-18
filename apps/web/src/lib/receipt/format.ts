@@ -39,6 +39,8 @@ export interface ReceiptData {
   footer?: string | null;
   /** Member yang ditempelkan kasir; kosong = transaksi tanpa member. */
   member?: ReceiptMember | null;
+  /** Persen bibit racikan (Pengaturan); 0/kosong = tabel takaran tidak dicetak. */
+  recipePercent?: number | null;
   /** Lama garansi (hari) dari Pengaturan; 0/kosong = tidak dicetak. */
   warrantyDays?: number | null;
   cashierName: string;
@@ -108,4 +110,9 @@ export function warrantyLine(
     year: "numeric",
   });
   return `Garansi ${hari} hari s/d ${tgl}`;
+}
+
+/** Tabel takaran hanya relevan bila nota memuat bibit yang dijual per ml. */
+export function adaBibitMl(data: Pick<ReceiptData, "lines">): boolean {
+  return data.lines.some((l) => l.uom === "ml");
 }

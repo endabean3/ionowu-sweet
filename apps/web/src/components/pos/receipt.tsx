@@ -1,9 +1,11 @@
 "use client";
 
+import { code128Bars } from "@/lib/barcode/code128";
 import { formatQuantity } from "@/lib/catalog/quantity";
 import {
   METHOD_LABEL,
   type ReceiptData,
+  adaBibitMl,
   formatWaktu,
   lineDiscount,
   lineGross,
@@ -11,6 +13,7 @@ import {
   rupiah,
   warrantyLine,
 } from "@/lib/receipt/format";
+import { ml, takaranRacikan } from "@/lib/receipt/recipe";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -111,6 +114,23 @@ export function Receipt({ data }: { data: ReceiptData }) {
           </div>
         )}
 
+        {adaBibitMl(data) && takaranRacikan(data.recipePercent).length > 0 && (
+          <>
+            <div className="receipt-sep" />
+            <div className="receipt-center receipt-bold">
+              Racikan {data.recipePercent}% bibit : {100 - (data.recipePercent ?? 0)}% pelarut
+            </div>
+            {takaranRacikan(data.recipePercent).map((t) => (
+              <div key={t.botol} className="receipt-row receipt-small">
+                <span>Botol {t.botol} ml</span>
+                <span>
+                  {ml(t.bibit)} + {ml(t.pelarut)} ml
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+
         {data.member && (
           <>
             <div className="receipt-sep" />
@@ -123,6 +143,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
                 Bonus: {b}
               </div>
             ))}
+            <BarcodeMember kode={data.member.code} />
           </>
         )}
 
@@ -142,5 +163,36 @@ export function Receipt({ data }: { data: ReceiptData }) {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Barcode CODE128 kode member untuk nota browser/PWA — printer termal
+ * menggambar barcode sendiri (ESC/POS), jalur ini untuk semua cetakan lain,
+ * supaya pelanggan selalu bisa memindai kodenya dari nota.
+ * Zona tenang 10 modul di kiri-kanan: tanpa itu banyak pemindai gagal membaca.
+ */
+function BarcodeMember({ kode }: { kode: string }) {
+  let hasil: ReturnType<typeof code128Bars>;
+  try {
+    hasil = code128Bars(kode);
+  } catch {
+    return null; // kode aneh: teks "Member …" di atas tetap tercetak
+  }
+  const tenang = 10;
+  const lebar = hasil.total + tenang * 2;
+  return (
+    <svg
+      className="receipt-barcode"
+      viewBox={`0 0 ${lebar} 40`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={`Barcode member ${kode}`}
+    >
+      <rect x="0" y="0" width={lebar} height="40" fill="#fff" />
+      {hasil.bars.map((b) => (
+        <rect key={b.x} x={b.x + tenang} y="0" width={b.w} height="40" fill="#000" />
+      ))}
+    </svg>
   );
 }

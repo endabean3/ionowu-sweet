@@ -98,6 +98,8 @@ export interface LocalOutlet {
   warranty_days?: number | null;
   /** Akun media sosial toko yang wajib di-follow calon member. */
   social_handle?: string | null;
+  /** Persen bibit racikan parfum; 0 = tanpa racikan (migrasi 00013). */
+  bibit_percent?: number | null;
 }
 
 /**

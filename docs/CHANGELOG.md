@@ -4,6 +4,34 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.22.0] — 2026-09-19
+
+### Ditambahkan
+* **Racikan parfum 65% bibit : 35% pelarut** (permintaan pemilik Warung Wangi). **Pengaturan →
+  Racikan: % bibit**; pelarut = sisanya; 0 = mati.
+  * **Nota** yang memuat bibit per ml mencetak tabel takaran untuk botol **10, 15, 20, 30, 50, 100 ml**
+    (mis. 30 ml = 19,5 + 10,5 ml), di printer termal maupun browser. Bibit dibulatkan 1 desimal
+    (Decimal, half-up), pelarut = botol − bibit, jadi selalu pas satu botol.
+  * **Keypad kasir** untuk bibit: pintasan "Botol 30 ml → 19,5 ml" mengisi jumlah bibit untuk
+    ukuran botol yang diminta pembeli.
+  * Migrasi **`00013_outlet_recipe`**: `outlets.bibit_percent` (0–100, expand murni).
+* **Barcode member di SEMUA nota**, termasuk cetak browser/PWA. Encoder CODE128 B ditulis sendiri
+  (tanpa pustaka tambahan), dengan zona tenang 10 modul. **Terbukti terbaca pemindai sungguhan**:
+  `zbarimg` membaca `M-ZX38FR` dari gambar barcode maupun dari nota cetak utuh.
+
+### Diperbaiki
+* **`<Button>` mengabaikan prop `type`.** Setiap tombol di dalam `<form>` menjadi tombol submit.
+  Akibatnya pintasan jumlah di keypad kasir langsung memasukkan barang ke keranjang tanpa
+  konfirmasi, dan tombol tambah varian di **Tambah Produk** ikut mengirim form. Semua tombol submit
+  memang sudah menulis `type="submit"` eksplisit, jadi perbaikannya tidak mengubah form lain.
+
+### Terverifikasi
+* Go (validasi 0–100), vitest **86/86** (takaran 6 ukuran, jumlah pas, tabel muat 58/80 mm,
+  CODE128 107 pola × 11 modul, checksum), Playwright **18/18**.
+* Nyata di 360px: Pengaturan (racikan 65, TikTok `warungwangidongko`) → member baru → bibit via
+  "Botol 30 ml" (19,5 ml, Rp 39.000) → nota berisi racikan, member, bonus, barcode, garansi.
+
+---
 ## [1.21.0] — 2026-09-19
 
 Permintaan pemilik Warung Wangi: member ber-barcode yang didaftarkan lewat form, dengan bonus
