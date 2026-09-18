@@ -142,23 +142,55 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 ## 7. Kondisi Saat Ini
 
 ```
-88 dokumen .md · 11 folder · 7 ADR diterima
-9 migrasi · 47 tabel · 57 indeks · 32 kueri SQL
-Audit: nol error (link · §seksi · penanda basi · yatim ·
-        kontradiksi · heading · tabel · blok kode · FK · tenant-scope)
+93 dokumen .md di docs/ · 11 folder · 11 ADR diterima (0001–0011)
+9 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
 ```
 
-**Kode aplikasi bertumbuh nyata.** `services/pos-engine` (Go) memiliki backend chi + sqlc + JWT EdDSA + checkout/shift + seeder 2-tenant. `apps/web` (Next.js 15 + Dexie + Serwist + Tailwind) telah di-bootstrap dengan token *Sweet Creamy Spatial Luxe*, layar POS kasir offline-first, IndexedDB queue, dan modul uang TypeScript (`src/lib/money/`) yang **100% lulus uji paritas terhadap fixture JSON Go**.
+> Angka dihitung ulang 2026-09-18 langsung dari repo. Audit dokumen menyeluruh
+> (§seksi, yatim, kontradiksi, FK, tenant-scope) belum diulang sejak angka lama.
 
-**Belum digarap, jangan diasumsikan ada:** `/sync/pull`, `/sync/push`, refund HTTP endpoint, void, opname, transfer stok, CRM, analytics, SOP, jalur principal platform/distributor (RBAC-MODEL.md §5), dan test Playwright offline (§3C TESTING-STRATEGY.md).
+### Produksi sudah hidup (deploy pertama 2026-09-17)
 
-**Aturan pembulatan uang belum resmi.** `internal/money` (Go) dan `src/lib/money/` (TS) memakai round-half-up sebagai ASUMSI implementasi — belum ada ADR atau keputusan produk yang menetapkannya.
+* `https://sweet.ionowu.com` (web) dan `https://api.sweet.ionowu.com` (pos-engine), di
+  Dokploy, image dari ghcr.io, `api` dan `web` masing-masing 2 replika.
+* Runbook [deploy-pertama](./docs/50-operations/runbooks/deploy-pertama.md) §5 **A–C lolos**
+  pada 2026-09-18 (TLS, `/health/ready` = 200, CORS APK + web). **§5 D–E belum**: login dari
+  APK di ponsel sungguhan, jual curah 30 ml, uji Wi-Fi mati di tengah transaksi.
+* [GO-LIVE](./docs/50-operations/GO-LIVE.md) masih hampir seluruhnya belum dicentang —
+  terutama **restore backup belum pernah diuji**, alarm, uptime monitor, `app_readonly`.
+* Sejak ada data nyata di produksi, invarian §6 #9 (migrasi hanya maju) berlaku sungguhan.
+
+### Yang sudah ada
+
+* **`pos-engine`**: auth (register/login/refresh/logout, JWT EdDSA), `/sync/pull` +
+  `/sync/push`, checkout `/sales`, refund `/sales/{id}/refund`, shift (buka/tutup/kas
+  masuk-keluar), katalog + impor CSV, outlet, stok (level, event, opname), `GET
+  /analytics/dashboard`, health live/ready + subperintah `healthcheck`.
+* **`apps/web`**: login/daftar, layar kasir offline-first (antrean IndexedDB + mesin sync),
+  jual per ml/gram, dashboard, katalog (tambah, impor CSV), printer Bluetooth, modul uang
+  TS yang lulus uji paritas terhadap fixture Go.
+* **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.
+* **CI**: build → ghcr.io (ADR-0004), gerbang keamanan, Playwright E2E offline
+  (`apps/web/e2e/`, dijalankan di `ci.yml`).
+* **Rate limit** hanya `/auth/login` + `/auth/register`, in-process per replika (PR #31) —
+  endpoint lain belum dibatasi. Lihat [API-GUIDELINES](./docs/20-api/API-GUIDELINES.md) §6.
+
+### Belum digarap — jangan diasumsikan ada
+
+Void transaksi (refund ada, void tidak), transfer stok antar-outlet, CRM/pelanggan, SOP,
+layanan Python (ADR-0006), rate limit berbasis Redis (pos-engine belum punya klien Redis),
+jalur principal platform/distributor (RBAC-MODEL.md §5 — `TenantMiddleware` menolaknya
+eksplisit), dan skenario uji [OFFLINE-SYNC-SPEC](./docs/30-data/OFFLINE-SYNC-SPEC.md) di luar
+yang sudah ada di `e2e/` (mis. 10.000 transaksi, offline 7 hari, jam mundur).
+
+**Aturan pembulatan uang belum resmi.** `internal/money` (Go) dan `src/lib/money/` (TS) memakai round-half-up sebagai ASUMSI implementasi — belum ada ADR atau keputusan produk yang menetapkannya. Kini ada transaksi produksi yang dihitung dengan aturan ini, jadi mengubahnya nanti lebih mahal.
 
 ### Langkah berikutnya yang paling masuk akal
-1. Jalur `/sync/pull` + `/sync/push` (kontrak sudah lengkap di `openapi.yaml`)
-2. Pengujian Playwright skenario offline (`make test-offline`)
-3. Workflow GitHub Actions build → ghcr.io (ADR-0004)
-4. ADR untuk aturan pembulatan uang
+1. Selesaikan runbook deploy §5 D–E di ponsel sungguhan (butuh pemilik, bukan kode)
+2. Uji restore backup R2 sekali dan catat waktunya (GO-LIVE §3) — sebelum toko percontohan
+3. Alarm kritis + uptime monitor eksternal (GO-LIVE §5)
+4. ADR aturan pembulatan uang
+5. Void transaksi dengan PIN manager (RBAC-MODEL §"Void transaksi")
 
 ### Yang memblokir, dan bukan pekerjaan teknis
 * **Vendor QRIS** (arah sub-merchant disetujui; Midtrans dievaluasi lebih dulu) — memblokir FR-23
