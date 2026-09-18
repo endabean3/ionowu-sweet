@@ -223,6 +223,7 @@ type Outlet struct {
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
 	IsActive         bool               `db:"is_active" json:"is_active"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 }
 
 type OutletPriceOverride struct {

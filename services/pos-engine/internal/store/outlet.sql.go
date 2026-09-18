@@ -14,7 +14,7 @@ import (
 const insertOutlet = `-- name: InsertOutlet :one
 INSERT INTO outlets (id, tenant_id, name, address, phone, timezone, business_day_start)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start
+RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer
 `
 
 type InsertOutletParams struct {
@@ -36,6 +36,7 @@ type InsertOutletRow struct {
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	Timezone         string             `db:"timezone" json:"timezone"`
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
+	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 }
 
 func (q *Queries) InsertOutlet(ctx context.Context, arg InsertOutletParams) (InsertOutletRow, error) {
@@ -58,12 +59,14 @@ func (q *Queries) InsertOutlet(ctx context.Context, arg InsertOutletParams) (Ins
 		&i.CreatedAt,
 		&i.Timezone,
 		&i.BusinessDayStart,
+		&i.ReceiptFooter,
 	)
 	return i, err
 }
 
 const listOutlets = `-- name: ListOutlets :many
-SELECT id, tenant_id, name, address, phone, is_active, created_at, timezone, business_day_start
+SELECT id, tenant_id, name, address, phone, is_active, created_at, timezone, business_day_start,
+       receipt_footer
 FROM outlets
 WHERE tenant_id = $1
 ORDER BY created_at ASC
@@ -79,6 +82,7 @@ type ListOutletsRow struct {
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	Timezone         string             `db:"timezone" json:"timezone"`
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
+	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 }
 
 func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutletsRow, error) {
@@ -100,6 +104,7 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 			&i.CreatedAt,
 			&i.Timezone,
 			&i.BusinessDayStart,
+			&i.ReceiptFooter,
 		); err != nil {
 			return nil, err
 		}
@@ -113,7 +118,7 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 
 const listOutletsForUser = `-- name: ListOutletsForUser :many
 SELECT o.id, o.tenant_id, o.name, o.address, o.phone, o.is_active, o.created_at,
-       o.timezone, o.business_day_start
+       o.timezone, o.business_day_start, o.receipt_footer
 FROM outlets o
 JOIN user_outlet_assignments uoa ON uoa.outlet_id = o.id
 WHERE uoa.tenant_id = $1 AND uoa.user_id = $2
@@ -135,6 +140,7 @@ type ListOutletsForUserRow struct {
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	Timezone         string             `db:"timezone" json:"timezone"`
 	BusinessDayStart pgtype.Time        `db:"business_day_start" json:"business_day_start"`
+	ReceiptFooter    *string            `db:"receipt_footer" json:"receipt_footer"`
 }
 
 // MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
@@ -162,6 +168,7 @@ func (q *Queries) ListOutletsForUser(ctx context.Context, arg ListOutletsForUser
 			&i.CreatedAt,
 			&i.Timezone,
 			&i.BusinessDayStart,
+			&i.ReceiptFooter,
 		); err != nil {
 			return nil, err
 		}
@@ -173,7 +180,7 @@ func (q *Queries) ListOutletsForUser(ctx context.Context, arg ListOutletsForUser
 	return items, nil
 }
 
-const updateOutlet = `-- name: UpdateOutlet :exec
+const updateOutlet = `-- name: UpdateOutlet :execrows
 UPDATE outlets
 SET
     name = COALESCE($3, name),
@@ -181,7 +188,8 @@ SET
     phone = COALESCE($5, phone),
     timezone = COALESCE($6, timezone),
     business_day_start = COALESCE($7, business_day_start),
-    is_active = COALESCE($8, is_active)
+    is_active = COALESCE($8, is_active),
+    receipt_footer = COALESCE($9, receipt_footer)
 WHERE tenant_id = $1 AND id = $2
 `
 
@@ -194,10 +202,13 @@ type UpdateOutletParams struct {
 	Timezone         *string     `db:"timezone" json:"timezone"`
 	BusinessDayStart pgtype.Time `db:"business_day_start" json:"business_day_start"`
 	IsActive         *bool       `db:"is_active" json:"is_active"`
+	ReceiptFooter    *string     `db:"receipt_footer" json:"receipt_footer"`
 }
 
-func (q *Queries) UpdateOutlet(ctx context.Context, arg UpdateOutletParams) error {
-	_, err := q.db.Exec(ctx, updateOutlet,
+// :execrows, bukan :exec — id yang salah atau milik tenant lain harus
+// menjadi 404, bukan "Outlet diupdate" yang tidak mengubah apa pun.
+func (q *Queries) UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateOutlet,
 		arg.TenantID,
 		arg.ID,
 		arg.Name,
@@ -206,6 +217,10 @@ func (q *Queries) UpdateOutlet(ctx context.Context, arg UpdateOutletParams) erro
 		arg.Timezone,
 		arg.BusinessDayStart,
 		arg.IsActive,
+		arg.ReceiptFooter,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

@@ -9,6 +9,7 @@ import {
   Activity,
   ArrowLeft,
   DollarSign,
+  Settings,
   ShieldCheck,
   ShoppingBag,
   Store,
@@ -84,6 +85,12 @@ export default function DashboardPage() {
             <Button variant="primary" size="sm" className="gap-2 shadow-hard-sm">
               <ShoppingBag className="h-4 w-4" />
               <span>Master Katalog</span>
+            </Button>
+          </Link>
+          <Link href="/pengaturan">
+            <Button variant="ghost" size="sm" className="gap-2 pos-touch-target">
+              <Settings className="h-4 w-4" aria-hidden="true" />
+              <span>Pengaturan</span>
             </Button>
           </Link>
           <h1 className="font-display text-xl font-black text-main sm:text-2xl">

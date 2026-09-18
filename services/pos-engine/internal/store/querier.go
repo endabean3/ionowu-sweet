@@ -212,7 +212,9 @@ type Querier interface {
 	// Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
 	// baru lewat money.RemainingRefundable sebelum refund ini disimpan.
 	SumRefundsForTransaction(ctx context.Context, arg SumRefundsForTransactionParams) (decimal.Decimal, error)
-	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) error
+	// :execrows, bukan :exec — id yang salah atau milik tenant lain harus
+	// menjadi 404, bukan "Outlet diupdate" yang tidak mengubah apa pun.
+	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int64, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) error
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) error
 	// Telemetri perangkat ikut bersama sync. storage_used_pct adalah peringatan dini

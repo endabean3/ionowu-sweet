@@ -6,6 +6,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { useAuth } from "@/lib/auth/context";
 import { profilTerakhir } from "@/lib/auth/profile";
 import { db } from "@/lib/db";
+import { type OutletRow, cacheOutlets } from "@/lib/outlet/api";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { Clock, Coffee, Lock, Store } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -13,11 +14,6 @@ import { toast } from "sonner";
 import { ulid } from "ulid";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-interface OutletRow {
-  id: string;
-  name: string;
-}
 
 export function ShiftModal({ onClose }: { onClose: () => void }) {
   const [openingCash, setOpeningCash] = useState("");
@@ -72,11 +68,7 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
         if (rows.length === 1) {
           setSelectedOutletId(rows[0].id);
         }
-        if (rows.length > 0 && identitas?.tenant_id) {
-          await db.outlets.bulkPut(
-            rows.map((o) => ({ id: o.id, tenant_id: identitas.tenant_id, name: o.name })),
-          );
-        }
+        if (identitas?.tenant_id) await cacheOutlets(identitas.tenant_id, rows);
       } catch {
         if (cancelled) return;
         const cached = identitas?.tenant_id

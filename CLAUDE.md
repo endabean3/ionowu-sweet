@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 93 dokumen .md di docs/ · 11 folder · 11 ADR diterima (0001–0011)
-9 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
+10 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
 ```
 
 > Angka dihitung ulang 2026-09-18 langsung dari repo. Audit dokumen menyeluruh
@@ -167,8 +167,11 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   masuk-keluar), katalog + impor CSV, outlet, stok (level, event, opname), `GET
   /analytics/dashboard`, health live/ready + subperintah `healthcheck`.
 * **`apps/web`**: login/daftar, layar kasir offline-first (antrean IndexedDB + mesin sync),
-  jual per ml/gram, dashboard, katalog (tambah, impor CSV), printer Bluetooth, modul uang
+  jual per ml/gram, dashboard, katalog (tambah, impor CSV), printer Bluetooth, halaman
+  **Pengaturan** (profil toko & penutup struk, pratinjau struk, printer, akun), modul uang
   TS yang lulus uji paritas terhadap fixture Go.
+* **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
+  menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.
 * **CI**: build → ghcr.io (ADR-0004), gerbang keamanan, Playwright E2E offline
   (`apps/web/e2e/`, dijalankan di `ci.yml`).

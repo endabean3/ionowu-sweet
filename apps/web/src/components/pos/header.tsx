@@ -7,8 +7,9 @@ import type { ReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { useSync } from "@/lib/sync/provider";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { Moon, Printer, RefreshCw, Sun, Wifi, WifiOff } from "lucide-react";
+import { Moon, Printer, RefreshCw, Settings, Sun, Wifi, WifiOff } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import React, { useEffect, useState } from "react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -225,6 +226,14 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
             {printer.printer ? "Printer" : "Pilih printer"}
           </button>
         )}
+
+        <Link
+          href="/pengaturan"
+          aria-label="Pengaturan toko, struk, printer, dan akun"
+          className="mochi-button flex h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-base text-main shadow-hard-sm"
+        >
+          <Settings className="h-4 w-4" aria-hidden="true" />
+        </Link>
 
         {/* Dark/Light Toggle */}
         <button

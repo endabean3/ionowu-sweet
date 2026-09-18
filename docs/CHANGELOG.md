@@ -4,6 +4,49 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.18.0] — 2026-09-18
+
+Fokus Warung Wangi Dongko. Diverifikasi di 360px dengan katalog nyata (162 produk) di
+database lokal.
+
+### Ditambahkan
+* **Halaman Pengaturan** (`/pengaturan`, dari tombol ⚙️ di header kasir dan dari dasbor):
+  * **Profil toko & struk:** nama, alamat, telepon/WA, dan teks penutup struk (maks. 200 huruf).
+    Tersimpan di server (`PATCH /outlets/{id}`) dan di-cache ke IndexedDB, sehingga struk yang
+    dicetak **offline** tetap lengkap. Saat offline, form tampil hanya-baca dengan alasannya.
+  * **Pratinjau struk** disusun dari byte ESC/POS yang sama persis dengan yang dikirim ke
+    printer, termasuk lipatan baris 58/80 mm.
+  * **Printer** (APK) dan **Akun** (nama, peran, Keluar).
+* Migrasi **`00010_outlet_receipt_footer`**: `outlets.receipt_footer VARCHAR(200)`. Expand murni,
+  aman dijalankan sebelum kode baru. **Wajib dijalankan di produksi sebelum `api` baru dideploy.**
+
+### Diubah
+* **PPN 11% dihapus dari kasir.** Warung Wangi bukan PKP; sebelumnya setiap transaksi ditagih
+  11% di atas label harga. Rincian Subtotal/Pajak di keranjang dan struk hanya muncul bila ada
+  pajak.
+* Struk: alamat dan "Telp/WA" di bawah nama toko; penutup dari Pengaturan (bawaan "Terima
+  kasih"); kata "pcs" tidak dicetak ("1 x Rp 4.000"), satuan curah tetap ("30 ml x …").
+
+### Diperbaiki
+* **Kasir bisa mengubah nama dan alamat toko, dan menambah outlet.** `PATCH`/`POST /outlets`
+  tidak memeriksa peran. Kini: owner semua outlet, manager hanya outlet yang ditugaskan dan
+  tidak bisa menonaktifkan outlet, peran lain 403. Baris baru di RBAC-MODEL.
+* **`PATCH /outlets` menjawab 200 untuk id yang salah atau milik tenant lain**, dan menerima
+  nama kosong. Kini 404 `OUTLET_NOT_FOUND` dan 422 `VALIDATION_ERROR`.
+* **Nama "Tutup ①…⑨" tercetak "Tutup ?"** di printer termal. `toPrinterText` kini memakai NFKD
+  (① → 1) dan memetakan tanda pisah, kutip, dan ½ ke ASCII.
+* `VALIDATION_ERROR` sudah dipakai di 25 tempat tetapi tak pernah tercatat di ERROR-CATALOG.
+  Kini tercatat, bersama `OUTLET_NOT_FOUND`.
+
+### Terverifikasi
+* Go: uji + lint + `sqlc vet`. Uji langsung `PATCH /outlets` dengan token owner/manager/kasir:
+  200 / 200 / 403, manager menonaktifkan 403, tenant lain 404, nama kosong 422, kasir `POST` 403.
+* Web: vitest 55/55 (termasuk profil struk, `printedText`, NFKD); Playwright 14/14.
+* Alur nyata di 360px: isi Pengaturan → simpan → pratinjau → jual "Botol Slim" → struk memuat
+  alamat, telepon, dan penutup; total Rp 4.000 tanpa PPN.
+
+---
+
 ## [1.17.2] — 2026-09-18
 
 ### Diperbaiki
