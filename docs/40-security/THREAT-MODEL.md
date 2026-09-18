@@ -81,7 +81,7 @@ Aset yang dilindungi, berurutan menurut kerugian bila jebol:
 
 | Ancaman | Kontrol | Sisa risiko |
 |---|---|---|
-| Banjir permintaan | Rate limit Redis | ✅ |
+| Banjir permintaan | Rate limit — **hanya `/auth/login` & `/auth/register`**, in-process per replika ([API-GUIDELINES](../20-api/API-GUIDELINES.md) §6) | ⚠️ Endpoint lain belum dibatasi; versi Redis belum ada |
 | Satu tenant menghabiskan sumber daya | Batas per outlet | ⚠️ Worker bisa menguras pool DB → [INTELLIGENCE-WORKER](../10-architecture/INTELLIGENCE-WORKER.md) §6 |
 | VPS mati | — | ✅ **Offline-first menyerapnya** |
 | IndexedDB penuh | Peringatan bertingkat | 🔴 Satu-satunya jalur ke kegagalan total |

@@ -58,6 +58,31 @@ describe("klasifikasi kegagalan apiFetch", () => {
     expect(err).not.toBeInstanceOf(JaringanError);
   });
 
+  it("429 → Error biasa berisi pesan server; dibatasi bukan berarti ditolak", async () => {
+    // Seluruh kasir satu toko berbagi satu IP. Bila 429 dianggap penolakan
+    // auth, satu orang yang salah ketik kata sandi berulang kali bisa
+    // menghapus sesi kasir lain di toko yang sama.
+    stubFetch(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "RATE_LIMITED",
+              message: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
+            },
+          }),
+          { status: 429, headers: { "Retry-After": "6" } },
+        ),
+      ),
+    );
+    const err = await apiRefresh("rt").catch((e) => e);
+    expect(err).not.toBeInstanceOf(AuthDitolakError);
+    expect(err).not.toBeInstanceOf(JaringanError);
+    expect((err as Error).message).toBe(
+      "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
+    );
+  });
+
   it("200 → sesi dikembalikan apa adanya", async () => {
     const sesi = { access_token: "a", refresh_token: "b", expires_in: 900, user: { id: "u" } };
     stubFetch(() => Promise.resolve(new Response(JSON.stringify(sesi), { status: 200 })));

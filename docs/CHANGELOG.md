@@ -4,6 +4,27 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.16.0] — 2026-09-18
+
+Ditemukan saat menjalankan daftar periksa pasca-deploy (runbook `deploy-pertama` §5) terhadap
+produksi: TLS, health, dan CORS lolos, tetapi 12 percobaan login salah berturut-turut ke
+`api.sweet.ionowu.com` semuanya dijawab `401` — tidak pernah `429`.
+
+### Diperbaiki
+* **`pos-engine` tidak punya rate limit sama sekali**, padahal THREAT-MODEL menandai "banjir
+  permintaan" ✅ dan NETWORK-HARDENING menulis rate limiting "sudah ditangani di level API".
+  Dengan produksi publik, kata sandi owner bisa ditebak tanpa batas.
+  * Kini `/auth/login` dan `/auth/register` dibatasi 10/menit per IP (token bucket in-process),
+    menjawab `429 RATE_LIMITED` + `Retry-After`. Batas efektif = 10 × jumlah replika.
+  * IP diambil dari entri **paling kanan** `X-Forwarded-For`; `/auth/refresh` sengaja tidak
+    dibatasi. Alasan keduanya di [API-GUIDELINES](./20-api/API-GUIDELINES.md) §6.
+  * Terverifikasi pada API lokal: 10× `401` → `429` dengan `Retry-After: 6`; IP lain tetap
+    dilayani; refresh tak terdampak. 4 uji Go + 1 uji web (429 tidak menghapus sesi).
+* THREAT-MODEL, NETWORK-HARDENING, dan API-GUIDELINES kini menyebut cakupan sebenarnya:
+  endpoint kasir dan reporting **belum** dibatasi.
+
+---
+
 ## [1.15.1] — 2026-09-17
 
 ### Diperbaiki

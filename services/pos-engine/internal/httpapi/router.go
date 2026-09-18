@@ -39,8 +39,15 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 	r.Get("/healthz", health.Live)
 
 	authHandler := NewAuthHandler(pool, jwtPrivateKey)
-	r.Post("/auth/register", authHandler.PostRegister)
-	r.Post("/auth/login", authHandler.PostLogin)
+
+	// API-GUIDELINES §6 — 10/menit per IP untuk login & daftar (brute-force
+	// kata sandi, spam tenant). /auth/refresh sengaja TIDAK dibatasi di sini:
+	// seluruh kasir satu toko berbagi satu IP NAT, dan refresh yang ditolak
+	// berarti kasir terlempar keluar saat jam ramai. Refresh butuh token yang
+	// valid, jadi ia bukan jalur menebak kata sandi.
+	authLimit := NewRateLimiter(10)
+	r.With(authLimit.Middleware).Post("/auth/register", authHandler.PostRegister)
+	r.With(authLimit.Middleware).Post("/auth/login", authHandler.PostLogin)
 	r.Post("/auth/refresh", authHandler.PostRefresh)
 	r.Post("/auth/logout", authHandler.PostLogout)
 

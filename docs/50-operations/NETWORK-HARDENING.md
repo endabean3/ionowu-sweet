@@ -108,7 +108,7 @@ ss -tulpn | grep -v '127.0.0.1'
   jadi **siapa pun yang bisa masuk ke UI Dokploy secara efektif memiliki root di VPS ini.**
   Itulah alasan sebenarnya UI Dokploy tidak boleh terbuka ke publik.
 * **Docker API TCP (2375/2376):** tidak boleh diaktifkan. Ini jalur pembajakan server yang klasik.
-* **Perlindungan lapisan aplikasi:** rate limiting sudah ditangani di level API
+* **Perlindungan lapisan aplikasi:** rate limiting di level API — baru untuk login & daftar
   ([API-GUIDELINES.md](../20-api/API-GUIDELINES.md) §6). Firewall tidak menggantikannya —
   keduanya melindungi hal yang berbeda.
 

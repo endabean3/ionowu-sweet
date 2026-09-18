@@ -114,3 +114,22 @@ Untuk menjaga kestabilan sistem kasir dari spam atau serangan DoS:
 * **Kasir POS Endpoints (`/v1/sales/*`, `/v1/sync/*`):** `120 request / menit` per outlet (sangat lega untuk operasional kasir).
 * **Autentikasi (`/v1/auth/login`, `/v1/auth/register`):** `10 request / menit` per IP (mencegah brute-force password/PIN).
 * **Public & Reporting Endpoints:** `60 request / menit`.
+
+### Status implementasi (2026-09-18)
+
+| Kelompok | Status |
+|---|---|
+| Autentikasi (`/auth/login`, `/auth/register`) | ✅ 10/menit per IP — **in-process** (`internal/httpapi/ratelimit.go`), bukan Redis |
+| Kasir POS, Public & Reporting | ❌ Belum dibatasi |
+
+* **Batas efektif = 10 × jumlah replika `api`** (produksi: 2 → ±20/menit per IP), karena
+  tiap replika menghitung sendiri. Tetap memangkas tebakan kata sandi dari tak terbatas.
+  Versi Redis ([REDIS-STRATEGY](../10-architecture/REDIS-STRATEGY.md) §3) menyatukan
+  hitungannya; `pos-engine` belum punya klien Redis.
+* **IP klien = entri paling kanan `X-Forwarded-For`** (yang ditulis Traefik). Entri paling
+  kiri dikirim klien dan bisa dipalsukan untuk mendapat kuota baru tiap permintaan.
+* **`/auth/refresh` sengaja tidak dibatasi.** Seluruh kasir satu toko berbagi satu IP NAT;
+  refresh yang ditolak melempar kasir keluar saat jam ramai. Refresh butuh token sah, jadi
+  bukan jalur menebak kata sandi.
+* Klien web memperlakukan `429` sebagai error biasa, **bukan** penolakan auth — sesi
+  perangkat tidak dihapus (`apps/web/src/lib/auth/api.test.ts`).
