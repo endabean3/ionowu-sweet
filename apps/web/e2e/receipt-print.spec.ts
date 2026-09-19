@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
+import {
+  type TenantFixture,
+  bukaShiftBilaPerlu,
+  klikBayar,
+  loginViaUI,
+  provisionTenant,
+} from "./helpers";
 
 /**
  * Struk harus bisa dicetak SAAT OFFLINE — justru itu saat ia paling
@@ -22,10 +28,12 @@ test.describe("Cetak Struk", () => {
     await bukaShiftBilaPerlu(page);
 
     await context.setOffline(true);
-    await expect(page.getByText("Offline · tersimpan")).toBeVisible();
+    await expect(
+      page.getByText("Offline · tersimpan").filter({ visible: true }).first(),
+    ).toBeVisible();
 
     await kartuProduk.click();
-    await page.locator('button:has-text("Bayar Sekarang")').first().click();
+    await klikBayar(page);
     await page.click("text=Tunai");
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();

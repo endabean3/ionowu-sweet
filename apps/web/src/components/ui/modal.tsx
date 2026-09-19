@@ -1,9 +1,9 @@
 "use client";
 
 import { latarModal, panelModal } from "@/lib/motion/tokens";
-import { m } from "framer-motion";
+import { type PanInfo, m, useDragControls } from "framer-motion";
 import { X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useId, useRef } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 const FOKUSABEL =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -23,7 +23,17 @@ export interface ModalProps {
    */
   dismissible?: boolean;
   size?: "md" | "lg";
+  /**
+   * Isi yang MENEMPEL di dasar panel, di luar area gulir — mis. tombol
+   * konfirmasi. Di ponsel dengan papan ketik terbuka, tombol di ujung isi
+   * yang panjang terdorong ke bawah papan ketik; di sini ia selalu terlihat.
+   */
+  footer?: ReactNode;
 }
+
+/** Jarak (px) atau kecepatan (px/s) tarikan ke bawah yang menutup panel. */
+const TARIK_TUTUP_JARAK = 110;
+const TARIK_TUTUP_KECEPATAN = 600;
 
 /**
  * Dialog bersama untuk seluruh aplikasi.
@@ -58,7 +68,21 @@ export function Modal({
   ariaLabel,
   dismissible = true,
   size = "lg",
+  footer,
 }: ModalProps) {
+  const dragControls = useDragControls();
+  // Tarik-untuk-menutup hanya di ponsel, tempat panel menempel ke tepi bawah
+  // seperti bottom sheet. Di layar lebar panel mengambang di tengah dan
+  // menyeret judulnya dengan tetikus tidak lazim.
+  const [ponsel, setPonsel] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    setPonsel(mq.matches);
+    const ubah = (e: MediaQueryListEvent) => setPonsel(e.matches);
+    mq.addEventListener("change", ubah);
+    return () => mq.removeEventListener("change", ubah);
+  }, []);
+  const bisaTarik = ponsel && dismissible;
   const panelRef = useRef<HTMLDivElement>(null);
   const pemicuRef = useRef<Element | null>(null);
   const judulId = useId();
@@ -136,12 +160,38 @@ export function Modal({
         aria-label={title ? undefined : ariaLabel}
         aria-labelledby={title ? judulId : undefined}
         variants={panelModal}
+        // Seret HANYA dari pegangan/judul (dragListener=false): menyeret isi
+        // harus tetap menggulir daftar, bukan menutup panel.
+        drag={bisaTarik ? "y" : false}
+        dragListener={false}
+        dragControls={dragControls}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.8 }}
+        onDragEnd={(_e: unknown, info: PanInfo) => {
+          if (info.offset.y > TARIK_TUTUP_JARAK || info.velocity.y > TARIK_TUTUP_KECEPATAN) {
+            tutup();
+          }
+        }}
         className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[32px] border-2 border-card-border bg-base shadow-hard-lg outline-none sm:rounded-[32px] ${
           size === "md" ? "sm:max-w-md" : "sm:max-w-lg"
         }`}
       >
+        {bisaTarik && (
+          <div
+            onPointerDown={(e) => dragControls.start(e)}
+            className="flex shrink-0 cursor-grab touch-none justify-center bg-surface pb-1 pt-2.5 active:cursor-grabbing"
+            aria-hidden="true"
+          >
+            <span className="h-1.5 w-12 rounded-pill bg-main/30" />
+          </div>
+        )}
         {title && (
-          <div className="flex shrink-0 items-center justify-between border-b-2 border-card-border bg-surface px-6 py-4">
+          <div
+            onPointerDown={bisaTarik ? (e) => dragControls.start(e) : undefined}
+            className={`flex shrink-0 items-center justify-between border-b-2 border-card-border bg-surface px-5 sm:px-6 sm:py-4 ${
+              bisaTarik ? "touch-none pb-3 pt-1" : "py-4"
+            }`}
+          >
             <h2 id={judulId} className="font-display text-xl font-bold text-main">
               {title}
             </h2>
@@ -149,6 +199,9 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
+                // Jangan memulai seret dari tombol tutup — ketukannya harus
+                // tetap menjadi klik biasa.
+                onPointerDown={(e) => e.stopPropagation()}
                 aria-label={`Tutup ${title}`}
                 className="pos-touch-target -mr-2 flex items-center justify-center rounded-pill px-2 text-main hover:bg-black/5"
               >
@@ -161,9 +214,18 @@ export function Modal({
            ke tepi layar, tepat di tempat gesture bar Android/iOS berada, dan
            tombol terakhir dialog jatuh di bawah jari sistem. Di layar lebar
            panel mengambang di tengah dan tidak butuh ini. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)] sm:pb-0">
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${
+            footer ? "" : "pb-[env(safe-area-inset-bottom)] sm:pb-0"
+          }`}
+        >
           {children}
         </div>
+        {footer && (
+          <div className="shrink-0 border-t-2 border-card-border bg-base px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">
+            {footer}
+          </div>
+        )}
       </m.div>
     </m.div>
   );

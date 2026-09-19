@@ -97,3 +97,16 @@ export async function bukaShiftBilaPerlu(page: Page, modal = "150000") {
     await tombol.waitFor({ state: "hidden" });
   }
 }
+
+/**
+ * Klik tombol bayar yang TERLIHAT. Layar lebar: "Bayar Sekarang" di keranjang
+ * samping. Ponsel (< lg): "Bayar" di bar bawah — keranjang samping
+ * disembunyikan dan hanya muncul sebagai panel bawah.
+ */
+export async function klikBayar(page: Page) {
+  await page
+    .getByRole("button", { name: /^Bayar/ })
+    .filter({ visible: true })
+    .first()
+    .click();
+}

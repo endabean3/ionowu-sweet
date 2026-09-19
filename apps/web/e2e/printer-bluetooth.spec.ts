@@ -1,5 +1,11 @@
 import { type Page, expect, test } from "@playwright/test";
-import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
+import {
+  type TenantFixture,
+  bukaShiftBilaPerlu,
+  klikBayar,
+  loginViaUI,
+  provisionTenant,
+} from "./helpers";
 
 /**
  * Jalur cetak APK (printer termal Bluetooth), diuji di browser.
@@ -71,7 +77,7 @@ const cetakan = (page: Page) => page.evaluate(() => window.__printer.printed);
 
 async function jualSatu(page: Page, fx: TenantFixture) {
   await page.getByText(fx.productName).first().click();
-  await page.locator('button:has-text("Bayar Sekarang")').first().click();
+  await klikBayar(page);
   await page.click("text=Tunai");
   await page.fill("#given_amount", "50000");
   await page.locator('button:has-text("Selesaikan Pembayaran")').click();
@@ -167,7 +173,7 @@ test.describe("Printer Bluetooth (APK)", () => {
     await page.getByRole("button", { name: "Selesai" }).click();
 
     await page.getByText(fx.productName).first().click();
-    await page.locator('button:has-text("Bayar Sekarang")').first().click();
+    await klikBayar(page);
     await page.click("text=Tunai");
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
