@@ -138,7 +138,9 @@ SELECT
     v.id, v.product_id, p.category_id, p.name AS product_name, v.name AS variant_name,
     v.sku, v.barcode, v.item_type, v.uom, v.uom_precision,
     COALESCE(o.price, v.price) AS price, v.stock_quantity, v.min_stock_alert,
-    v.is_active, GREATEST(v.created_at, p.created_at) AS updated_at,
+    -- Produk nonaktif menonaktifkan SEMUA variannya di kasir: kasir hanya
+    -- menerima baris varian, tidak ada tempat lain untuk status produk.
+    COALESCE(v.is_active AND p.is_active, FALSE)::BOOLEAN AS is_active, GREATEST(v.created_at, p.created_at) AS updated_at,
     COALESCE(sc.to_uom, '')::VARCHAR AS stock_uom, COALESCE(sc.factor, 0)::DECIMAL AS stock_factor
 FROM variants v
 JOIN products p ON p.id = v.product_id AND p.tenant_id = v.tenant_id
@@ -382,7 +384,7 @@ func (q *Queries) SearchVariants(ctx context.Context, arg SearchVariantsParams) 
 	return items, nil
 }
 
-const updateProduct = `-- name: UpdateProduct :exec
+const updateProduct = `-- name: UpdateProduct :execrows
 UPDATE products
 SET
     name = COALESCE($3, name),
@@ -399,47 +401,61 @@ type UpdateProductParams struct {
 	IsActive    *bool   `db:"is_active" json:"is_active"`
 }
 
-func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) error {
-	_, err := q.db.Exec(ctx, updateProduct,
+func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateProduct,
 		arg.TenantID,
 		arg.ID,
 		arg.Name,
 		arg.Description,
 		arg.IsActive,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const updateVariant = `-- name: UpdateVariant :exec
+const updateVariant = `-- name: UpdateVariant :execrows
 UPDATE variants
 SET
     name = COALESCE($3, name),
     price = COALESCE($4, price),
-    sku = COALESCE($5, sku),
-    barcode = COALESCE($6, barcode),
-    is_active = COALESCE($7, is_active)
+    cost_price = COALESCE($5, cost_price),
+    min_stock_alert = COALESCE($6, min_stock_alert),
+    -- "" = KOSONGKAN (NULL), bukan "biarkan". NULL-lah yang dikecualikan
+    -- indeks unik parsial idx_variants_barcode; "" akan bentrok antar-varian.
+    sku = CASE WHEN $7::text = '' THEN NULL ELSE COALESCE($7, sku) END,
+    barcode = CASE WHEN $8::text = '' THEN NULL ELSE COALESCE($8, barcode) END,
+    is_active = COALESCE($9, is_active)
 WHERE tenant_id = $1 AND id = $2
 `
 
 type UpdateVariantParams struct {
-	TenantID string              `db:"tenant_id" json:"tenant_id"`
-	ID       string              `db:"id" json:"id"`
-	Name     *string             `db:"name" json:"name"`
-	Price    decimal.NullDecimal `db:"price" json:"price"`
-	Sku      *string             `db:"sku" json:"sku"`
-	Barcode  *string             `db:"barcode" json:"barcode"`
-	IsActive *bool               `db:"is_active" json:"is_active"`
+	TenantID      string              `db:"tenant_id" json:"tenant_id"`
+	ID            string              `db:"id" json:"id"`
+	Name          *string             `db:"name" json:"name"`
+	Price         decimal.NullDecimal `db:"price" json:"price"`
+	CostPrice     decimal.NullDecimal `db:"cost_price" json:"cost_price"`
+	MinStockAlert decimal.NullDecimal `db:"min_stock_alert" json:"min_stock_alert"`
+	Sku           *string             `db:"sku" json:"sku"`
+	Barcode       *string             `db:"barcode" json:"barcode"`
+	IsActive      *bool               `db:"is_active" json:"is_active"`
 }
 
-func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) error {
-	_, err := q.db.Exec(ctx, updateVariant,
+func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateVariant,
 		arg.TenantID,
 		arg.ID,
 		arg.Name,
 		arg.Price,
+		arg.CostPrice,
+		arg.MinStockAlert,
 		arg.Sku,
 		arg.Barcode,
 		arg.IsActive,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

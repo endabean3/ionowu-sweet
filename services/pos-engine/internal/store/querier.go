@@ -233,8 +233,8 @@ type Querier interface {
 	// :execrows, bukan :exec — id yang salah atau milik tenant lain harus
 	// menjadi 404, bukan "Outlet diupdate" yang tidak mengubah apa pun.
 	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int64, error)
-	UpdateProduct(ctx context.Context, arg UpdateProductParams) error
-	UpdateVariant(ctx context.Context, arg UpdateVariantParams) error
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)
+	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (int64, error)
 	// Telemetri perangkat ikut bersama sync. storage_used_pct adalah peringatan dini
 	// sebelum IndexedDB penuh — server bisa tampak sehat sempurna sementara sebuah
 	// perangkat kasir mendekati kegagalan total. (OBSERVABILITY §3)

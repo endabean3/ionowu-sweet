@@ -2,10 +2,12 @@ package httpapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
@@ -45,6 +47,10 @@ func (h *CatalogHandler) GetProducts(w http.ResponseWriter, r *http.Request) {
 // PostProduct menangani POST /products
 func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := r.Context().Value(tenantIDKey).(string)
+	if msg := bolehUbahKatalog(UserRole(r.Context()), false); msg != "" {
+		RespondError(w, http.StatusForbidden, "FORBIDDEN_ROLE", msg)
+		return
+	}
 
 	var req struct {
 		Name        string `json:"name"`
@@ -167,22 +173,146 @@ func (h *CatalogHandler) PostProduct(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// patchProductReq adalah isian PATCH /products/{id}; nil = tidak diubah.
+type patchProductReq struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	IsActive    *bool   `json:"is_active"`
+}
+
+// normalize merapikan isian dan mengembalikan pesan galat ("" = sah).
+func (p *patchProductReq) normalize() string {
+	if p.Name != nil {
+		n := strings.TrimSpace(*p.Name)
+		if n == "" {
+			return "Nama produk tidak boleh kosong"
+		}
+		if utf8.RuneCountInString(n) > 200 {
+			return "Nama produk maksimal 200 huruf"
+		}
+		p.Name = &n
+	}
+	if p.Description != nil {
+		d := strings.TrimSpace(*p.Description)
+		p.Description = &d
+	}
+	return ""
+}
+
+// patchVariantReq adalah isian PATCH /variants/{id}; nil = tidak diubah.
+// Angka dikirim sebagai STRING desimal (uang & stok tidak pernah float).
+type patchVariantReq struct {
+	Name          *string `json:"name"`
+	Price         *string `json:"price"`
+	CostPrice     *string `json:"cost_price"`
+	MinStockAlert *string `json:"min_stock_alert"`
+	SKU           *string `json:"sku"`
+	Barcode       *string `json:"barcode"`
+	IsActive      *bool   `json:"is_active"`
+
+	price, costPrice, minStock decimal.NullDecimal
+}
+
+// ubahHarga: harga jual atau HPP ikut diubah — hak owner saja (RBAC-MODEL
+// §Matriks "Ubah HPP & harga jual").
+func (p *patchVariantReq) ubahHarga() bool { return p.Price != nil || p.CostPrice != nil }
+
+func desimal(kolom, nilai string, skala int32) (decimal.NullDecimal, string) {
+	d, err := decimal.NewFromString(strings.TrimSpace(nilai))
+	if err != nil {
+		return decimal.NullDecimal{}, kolom + " harus berupa angka"
+	}
+	if d.IsNegative() {
+		return decimal.NullDecimal{}, kolom + " tidak boleh negatif"
+	}
+	if d.Exponent() < -skala {
+		return decimal.NullDecimal{}, fmt.Sprintf("%s maksimal %d angka di belakang koma", kolom, skala)
+	}
+	// DECIMAL(14,x): 14 digit total → bagian bulat maksimal 14-x digit.
+	if d.GreaterThanOrEqual(decimal.New(1, 14-skala)) {
+		return decimal.NullDecimal{}, kolom + " terlalu besar"
+	}
+	return decimal.NullDecimal{Decimal: d, Valid: true}, ""
+}
+
+// normalize merapikan isian dan mengembalikan pesan galat ("" = sah).
+// Sebelumnya harga yang tidak bisa dibaca DIABAIKAN diam-diam: "25.000"
+// (titik ribuan) menghasilkan 200 OK tanpa mengubah harga apa pun.
+func (p *patchVariantReq) normalize() string {
+	var msg string
+	if p.Name != nil {
+		n := strings.TrimSpace(*p.Name)
+		if utf8.RuneCountInString(n) > 200 {
+			return "Nama varian maksimal 200 huruf"
+		}
+		p.Name = &n
+	}
+	if p.Price != nil {
+		if p.price, msg = desimal("Harga jual", *p.Price, 2); msg != "" {
+			return msg
+		}
+	}
+	if p.CostPrice != nil {
+		if p.costPrice, msg = desimal("HPP", *p.CostPrice, 2); msg != "" {
+			return msg
+		}
+	}
+	if p.MinStockAlert != nil {
+		if p.minStock, msg = desimal("Batas stok menipis", *p.MinStockAlert, 3); msg != "" {
+			return msg
+		}
+	}
+	for kolom, v := range map[string]**string{"SKU": &p.SKU, "Barcode": &p.Barcode} {
+		if *v == nil {
+			continue
+		}
+		t := strings.TrimSpace(**v)
+		if utf8.RuneCountInString(t) > 100 {
+			return kolom + " maksimal 100 huruf"
+		}
+		*v = &t
+	}
+	return ""
+}
+
+// bolehUbahKatalog: RBAC-MODEL §Matriks "Tambah/ubah produk" = owner &
+// manager; "Ubah HPP & harga jual" = owner saja. Sebelumnya endpoint ini
+// tidak memeriksa peran — kasir bisa menurunkan harga lewat API.
+func bolehUbahKatalog(role string, ubahHarga bool) string {
+	switch role {
+	case "owner":
+		return ""
+	case "manager":
+		if ubahHarga {
+			return "Hanya owner yang boleh mengubah harga jual dan HPP"
+		}
+		return ""
+	default:
+		return "Hanya owner atau manager yang boleh mengubah katalog"
+	}
+}
+
 // PatchProduct menangani PATCH /products/{id}
 func (h *CatalogHandler) PatchProduct(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(tenantIDKey).(string)
+	ctx := r.Context()
+	tenantID, _ := ctx.Value(tenantIDKey).(string)
 	productID := chi.URLParam(r, "id")
 
-	var req struct {
-		Name        *string `json:"name"`
-		Description *string `json:"description"`
-		IsActive    *bool   `json:"is_active"`
-	}
+	var req patchProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error": "Payload tidak valid"}`, http.StatusBadRequest)
+		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Payload tidak valid")
+		return
+	}
+	if msg := req.normalize(); msg != "" {
+		RespondError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", msg)
+		return
+	}
+	if msg := bolehUbahKatalog(UserRole(ctx), false); msg != "" {
+		RespondError(w, http.StatusForbidden, "FORBIDDEN_ROLE", msg)
 		return
 	}
 
-	err := h.queries.UpdateProduct(r.Context(), store.UpdateProductParams{
+	n, err := h.queries.UpdateProduct(ctx, store.UpdateProductParams{
 		TenantID:    tenantID,
 		ID:          productID,
 		Name:        req.Name,
@@ -190,11 +320,12 @@ func (h *CatalogHandler) PatchProduct(w http.ResponseWriter, r *http.Request) {
 		IsActive:    req.IsActive,
 	})
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			http.Error(w, `{"error": "Not found"}`, http.StatusNotFound)
-			return
-		}
-		http.Error(w, `{"error": "Update gagal"}`, http.StatusInternalServerError)
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
+		return
+	}
+	if n == 0 {
+		// Id salah ATAU milik tenant lain — sengaja tidak dibedakan.
+		RespondError(w, http.StatusNotFound, "PRODUCT_NOT_FOUND", "Produk tidak ditemukan")
 		return
 	}
 
@@ -203,40 +334,45 @@ func (h *CatalogHandler) PatchProduct(w http.ResponseWriter, r *http.Request) {
 
 // PatchVariant menangani PATCH /variants/{id}
 func (h *CatalogHandler) PatchVariant(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(tenantIDKey).(string)
+	ctx := r.Context()
+	tenantID, _ := ctx.Value(tenantIDKey).(string)
 	variantID := chi.URLParam(r, "id")
 
-	var req struct {
-		Name     *string `json:"name"`
-		Price    *string `json:"price"`
-		SKU      *string `json:"sku"`
-		Barcode  *string `json:"barcode"`
-		IsActive *bool   `json:"is_active"`
-	}
+	var req patchVariantReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error": "Payload tidak valid"}`, http.StatusBadRequest)
+		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Payload tidak valid")
+		return
+	}
+	if msg := req.normalize(); msg != "" {
+		RespondError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", msg)
+		return
+	}
+	if msg := bolehUbahKatalog(UserRole(ctx), req.ubahHarga()); msg != "" {
+		RespondError(w, http.StatusForbidden, "FORBIDDEN_ROLE", msg)
 		return
 	}
 
-	var p decimal.NullDecimal
-	if req.Price != nil {
-		d, err := decimal.NewFromString(*req.Price)
-		if err == nil {
-			p = decimal.NullDecimal{Decimal: d, Valid: true}
-		}
-	}
-
-	err := h.queries.UpdateVariant(r.Context(), store.UpdateVariantParams{
-		TenantID: tenantID,
-		ID:       variantID,
-		Name:     req.Name,
-		Price:    p,
-		Sku:      req.SKU,
-		Barcode:  req.Barcode,
-		IsActive: req.IsActive,
+	n, err := h.queries.UpdateVariant(ctx, store.UpdateVariantParams{
+		TenantID:      tenantID,
+		ID:            variantID,
+		Name:          req.Name,
+		Price:         req.price,
+		CostPrice:     req.costPrice,
+		MinStockAlert: req.minStock,
+		Sku:           req.SKU,
+		Barcode:       req.Barcode,
+		IsActive:      req.IsActive,
 	})
 	if err != nil {
-		http.Error(w, `{"error": "Update gagal"}`, http.StatusInternalServerError)
+		if isPgError(err, "23505") {
+			RespondError(w, http.StatusConflict, "BARCODE_ALREADY_EXISTS", "Barcode sudah dipakai barang lain")
+			return
+		}
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
+		return
+	}
+	if n == 0 {
+		RespondError(w, http.StatusNotFound, "VARIANT_NOT_FOUND", "Varian tidak ditemukan")
 		return
 	}
 

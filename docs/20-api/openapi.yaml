@@ -200,6 +200,10 @@ paths:
     patch:
       tags: [products]
       summary: Ubah produk, termasuk soft-delete (is_active=false, FR-15)
+      description: >
+        Owner & manager (RBAC-MODEL "Tambah/ubah produk"). Produk nonaktif membuat
+        SEMUA variannya `is_active=false` di /sync/pull, jadi hilang dari kasir.
+        Id salah dan id milik tenant lain sama-sama 404.
       requestBody:
         required: true
         content:
@@ -210,7 +214,9 @@ paths:
           description: Produk diperbarui
           content:
             application/json: { schema: { $ref: "#/components/schemas/Product" } }
-        "404": { $ref: "#/components/responses/NotFound" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: PRODUCT_NOT_FOUND }
+        "422": { description: "VALIDATION_ERROR (nama kosong / > 200 huruf)" }
 
   /products/import:
     post:
@@ -305,17 +311,23 @@ paths:
       - { name: variantId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
     patch:
       tags: [variants]
-      summary: Ubah harga/cost/barcode varian
+      summary: Ubah harga/HPP/barcode/batas stok varian
+      description: >
+        Owner & manager; `price` dan `cost_price` hanya owner (RBAC-MODEL
+        "Ubah HPP & harga jual"). Kolom yang tidak dikirim tidak berubah.
+        `sku`/`barcode` = "" mengosongkan (NULL). Angka dikirim sebagai string
+        desimal; nilai yang tidak bisa dibaca DITOLAK 422, bukan diabaikan.
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: "#/components/schemas/VariantPatch" }
       responses:
-        "200":
-          description: Varian diperbarui
-          content:
-            application/json: { schema: { $ref: "#/components/schemas/Variant" } }
+        "200": { description: Varian diupdate }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: VARIANT_NOT_FOUND }
+        "409": { description: BARCODE_ALREADY_EXISTS }
+        "422": { description: "VALIDATION_ERROR (angka tidak sah/negatif/terlalu banyak desimal)" }
 
   /variants/lookup:
     get:
@@ -838,8 +850,7 @@ components:
       type: object
       properties:
         name: { type: string, minLength: 1, maxLength: 200 }
-        category: { type: string, nullable: true }
-        image_url: { type: string, format: uri, nullable: true }
+        description: { type: string }
         is_active: { type: boolean, description: "false = soft-delete, FR-15" }
 
     Variant:
@@ -869,10 +880,12 @@ components:
     VariantPatch:
       type: object
       properties:
-        name: { type: string, nullable: true }
-        barcode: { type: string, nullable: true }
-        price: { type: number, format: decimal, minimum: 0 }
-        cost: { type: number, format: decimal, minimum: 0 }
+        name: { type: string, maxLength: 200 }
+        sku: { type: string, maxLength: 100, description: "\"\" = kosongkan" }
+        barcode: { type: string, maxLength: 100, description: "\"\" = kosongkan" }
+        price: { type: string, format: decimal, example: "25000", description: "DECIMAL(14,2) ≥ 0; owner saja" }
+        cost_price: { type: string, format: decimal, description: "DECIMAL(14,2) ≥ 0; owner saja" }
+        min_stock_alert: { type: string, format: decimal, description: "DECIMAL(14,3) ≥ 0, dalam SATUAN STOK (ADR-0012)" }
         is_active: { type: boolean }
 
     SaleInput:
