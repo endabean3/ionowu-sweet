@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { naikMasukTegas } from "@/lib/motion/tokens";
 import type { ReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { useSync } from "@/lib/sync/provider";
+import { simpanTema, temaGelapTersimpan, terapkanTema } from "@/lib/theme";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
 import { Moon, Printer, RefreshCw, Settings, Sun, Wifi, WifiOff } from "lucide-react";
@@ -56,22 +57,10 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
     // benar-benar tersedia dan aman dibaca.
     setIsOnline(navigator.onLine);
 
-    // Tema dipulihkan dari pilihan TERAKHIR kasir. Sebelumnya setiap muat
-    // ulang kembali ke mode terang, jadi kasir yang bekerja di ruang remang
-    // harus menekan tombol ini setiap kali aplikasi dibuka.
-    //
-    // Sengaja TIDAK mengikuti prefers-color-scheme sistem: ponsel Android
-    // banyak yang menyalakan mode gelap otomatis di malam hari, sementara
-    // layar kasir justru paling sering dipakai di bawah silau — mode gelap
-    // yang menyala sendiri di etalase kaca membuat angka lebih sulit dibaca,
-    // bukan lebih mudah. Gelap hanya kalau kasir memintanya.
-    try {
-      if (localStorage.getItem("ionowu.tema") === "dark-cocoa") {
-        setIsDark(true);
-        document.documentElement.setAttribute("data-theme", "dark-cocoa");
-      }
-    } catch {
-      // Penyimpanan diblokir: tema jatuh ke mode terang bawaan.
+    // Tema dipulihkan dari pilihan TERAKHIR kasir (alasan di lib/theme.ts).
+    if (temaGelapTersimpan()) {
+      setIsDark(true);
+      terapkanTema(true);
     }
 
     const handleOnline = () => {
@@ -98,25 +87,21 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
   }, [syncNow]);
 
   const toggleTheme = () => {
-    const nextTheme = !isDark;
-    setIsDark(nextTheme);
-    if (nextTheme) {
-      document.documentElement.setAttribute("data-theme", "dark-cocoa");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
-    try {
-      localStorage.setItem("ionowu.tema", nextTheme ? "dark-cocoa" : "oat-milk");
-    } catch {
-      // Tema tetap berlaku untuk sesi ini meski tidak bisa disimpan.
-    }
+    setIsDark(!isDark);
+    simpanTema(!isDark);
   };
 
+  const labelStatus =
+    isOnline === null ? "Memeriksa koneksi" : isOnline ? "Online" : "Offline, transaksi tersimpan";
+
   return (
-    <header className="milky-glass flex flex-wrap items-center justify-between gap-4 rounded-squircle p-4">
+    // Ponsel 360 px (Redmi 9C): SATU baris setinggi ~56 px. Versi lama
+    // membungkus lima tombol berlabel jadi tiga baris dan memakan seperempat
+    // layar sebelum satu produk pun terlihat.
+    <header className="milky-glass flex items-center justify-between gap-2 rounded-squircle p-2 sm:flex-wrap sm:gap-4 sm:p-4">
       {/* Brand & Outlet */}
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-strawberry shadow-hard-sm">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none sm:gap-3">
+        <span className="flex h-9 w-9 shrink-0 sm:h-10 sm:w-10 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-strawberry shadow-hard-sm">
           <Image
             src="/icons/icon-mark.png"
             alt=""
@@ -126,12 +111,19 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
             className="h-[22px] w-auto"
           />
         </span>
-        <div>
-          <h1 className="font-display text-lg font-bold tracking-tight text-main">
+        <div className="min-w-0">
+          <h1 className="hidden font-display text-lg font-bold tracking-tight text-main sm:block">
             ionowu <span className="font-italic text-sweet-strawberry">sweet</span>
           </h1>
-          <p className="font-sans text-xs font-semibold text-muted">
-            {outlet?.name ?? "Memuat outlet..."} • {user?.name ?? "Kasir"}
+          {/* Di ponsel nama toko jadi judul, dipotong satu baris — nama toko
+             panjang ("Warung Wangi Dongko - Pusat") tidak boleh mendorong
+             tombol keluar layar. */}
+          <p className="truncate font-sans text-sm font-bold text-main sm:hidden">
+            {outlet?.name ?? "Memuat outlet…"}
+          </p>
+          <p className="truncate font-sans text-xs font-semibold text-muted">
+            <span className="hidden sm:inline">{outlet?.name ?? "Memuat outlet..."} • </span>
+            {user?.name ?? "Kasir"}
             {user?.role && ` (${ROLE_LABEL[user.role] ?? user.role})`}
           </p>
         </div>
@@ -140,13 +132,58 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
       {/* Status Badges & Controls */}
       {/* flex-wrap: di layar 360px deretan ini tadinya melebihi lebar layar —
          tombol tema terpotong di tepi kanan dan halaman bisa digeser ke samping. */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5 sm:flex-wrap sm:gap-2">
+        {/* PONSEL: status online + sinkron + antrean dalam SATU tombol. Warna
+           latar = koneksi, ikon = sedang/bisa sinkron, gelembung = transaksi
+           belum terkirim. Tiga pil berlabel tidak muat di 360 px. */}
+        <button
+          type="button"
+          onClick={() => syncNow()}
+          disabled={!isOnline || isSyncing}
+          className={`mochi-button relative flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold text-main shadow-hard-sm disabled:cursor-default sm:hidden ${
+            isOnline === null ? "bg-card" : isOnline ? "bg-sweet-matcha" : "bg-sweet-taro"
+          }`}
+        >
+          {isOnline === false ? (
+            <>
+              <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {/* Offline TETAP berupa teks: satu-satunya status yang
+                 mengubah cara kasir bekerja, jadi tidak boleh cuma warna. */}
+              <span>
+                Offline<span className="sr-only"> · tersimpan</span>
+              </span>
+            </>
+          ) : (
+            <>
+              <RefreshCw
+                className={`h-4 w-4 shrink-0 ${isSyncing ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              <span className="sr-only">{labelStatus}</span>
+            </>
+          )}
+          {pendingCount > 0 && (
+            <>
+              <span
+                aria-hidden="true"
+                className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-custard px-1 font-mono text-[11px] font-black leading-none"
+              >
+                {pendingCount > 99 ? "99+" : pendingCount}
+              </span>
+              <span className="sr-only" aria-live="polite">
+                {pendingCount} transaksi belum terkirim
+              </span>
+            </>
+          )}
+          <span className="sr-only">. Sinkronkan sekarang</span>
+        </button>
+
         {/* Sync trigger button */}
         <button
           type="button"
           onClick={() => syncNow()}
           disabled={!isOnline || isSyncing}
-          className="mochi-button flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-surface px-3 font-sans text-xs font-bold text-main shadow-hard-sm disabled:opacity-50"
+          className="mochi-button hidden h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-surface px-3 font-sans text-xs font-bold text-main shadow-hard-sm disabled:opacity-50 sm:flex"
           aria-label={
             lastSyncedAt
               ? `Sinkronkan sekarang. Terakhir sync ${lastSyncedAt.toLocaleTimeString("id-ID")}`
@@ -159,7 +196,7 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
 
         {/* Offline/Online Indicator */}
         <div
-          className={`flex h-11 items-center gap-2 whitespace-nowrap rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold shadow-hard-sm ${
+          className={`hidden h-11 items-center gap-2 whitespace-nowrap sm:flex rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold shadow-hard-sm ${
             isOnline === null
               ? "bg-card text-muted"
               : isOnline
@@ -195,7 +232,7 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
             initial="sembunyi"
             animate="tampil"
             aria-live="polite"
-            className="flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-sweet-custard px-3 font-sans text-xs font-bold text-main shadow-hard-sm"
+            className="hidden h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-sweet-custard sm:flex px-3 font-sans text-xs font-bold text-main shadow-hard-sm"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
@@ -216,14 +253,16 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
                 ? `Pengaturan printer. Terpasang: ${printer.printer.name}, kertas ${printer.printer.paper} mm`
                 : "Pengaturan printer. Belum ada printer dipilih"
             }
-            className={`mochi-button flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold text-main shadow-hard-sm ${
+            className={`mochi-button flex h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border px-3 font-sans text-xs font-bold text-main shadow-hard-sm ${
               printer.printer ? "bg-base" : "bg-sweet-custard"
             }`}
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
             {/* Nama printer tidak ditampilkan (bisa panjang dan patah); yang
                penting bagi kasir: sudah siap atau belum. */}
-            {printer.printer ? "Printer" : "Pilih printer"}
+            <span className="hidden sm:inline">
+              {printer.printer ? "Printer" : "Pilih printer"}
+            </span>
           </button>
         )}
 
@@ -235,13 +274,14 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
           <Settings className="h-4 w-4" aria-hidden="true" />
         </Link>
 
-        {/* Dark/Light Toggle */}
+        {/* Dark/Light Toggle — di ponsel pindah ke Pengaturan (jarang dipakai,
+           tidak layak merebut tempat di baris kepala 360 px). */}
         <button
           type="button"
           onClick={toggleTheme}
           aria-label={isDark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
           aria-pressed={isDark}
-          className="mochi-button flex h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-base text-main shadow-hard-sm"
+          className="mochi-button hidden h-11 w-11 items-center justify-center rounded-pill border-2 border-card-border bg-base text-main shadow-hard-sm sm:flex"
         >
           {isDark ? (
             <Sun className="h-4 w-4" aria-hidden="true" />

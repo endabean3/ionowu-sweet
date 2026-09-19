@@ -48,6 +48,10 @@ export const viewport: Viewport = {
   themeColor: "#FAF6F0",
   width: "device-width",
   initialScale: 1,
+  // Papan ketik ponsel MENGECILKAN viewport (bukan menimpanya), sehingga
+  // 100dvh dan panel bawah (Modal) ikut naik di atas papan ketik — tombol
+  // "Masukkan ke Keranjang" tetap terlihat saat mengetik jumlah.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

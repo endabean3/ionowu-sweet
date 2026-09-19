@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
+import {
+  type TenantFixture,
+  bukaShiftBilaPerlu,
+  klikBayar,
+  loginViaUI,
+  provisionTenant,
+} from "./helpers";
 
 /**
  * Klaim inti produk: "kasir tetap bisa berjualan meski VPS, Redis, internet,
@@ -30,12 +36,14 @@ test.describe("Offline Checkout & Sync", () => {
 
     // Baru sekarang koneksi diputus.
     await context.setOffline(true);
-    await expect(page.getByText("Offline · tersimpan")).toBeVisible();
+    await expect(
+      page.getByText("Offline · tersimpan").filter({ visible: true }).first(),
+    ).toBeVisible();
 
     await kartuProduk.click();
 
     // Ada dua pemicu: CTA keranjang (desktop) dan bar ringkas (mobile).
-    await page.locator('button:has-text("Bayar Sekarang")').first().click();
+    await klikBayar(page);
     await expect(page.getByRole("heading", { name: "Pembayaran" })).toBeVisible();
     await page.click("text=Tunai");
 
@@ -49,6 +57,11 @@ test.describe("Offline Checkout & Sync", () => {
 
     // Inti pengujian: transaksi diterima saat offline dan mendarat di antrean,
     // bukan hilang atau ditolak.
-    await expect(page.getByText(/\d+ transaksi belum terkirim/)).toBeVisible({ timeout: 10000 });
+    await expect(
+      page
+        .getByText(/\d+ transaksi belum terkirim/)
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 });

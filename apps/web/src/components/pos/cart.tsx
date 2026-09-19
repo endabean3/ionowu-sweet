@@ -44,6 +44,12 @@ interface POSCartProps {
   emptyExtra?: React.ReactNode;
   /** Member yang ditempelkan ke transaksi, di atas daftar barang. */
   memberSlot?: React.ReactNode;
+  /**
+   * true = dirender di dalam panel bawah (ponsel). Judul sudah ada di bilah
+   * panel, daftar ikut digulir panel, dan ringkasan+tombol bayar menempel di
+   * dasar supaya tetap terlihat sepanjang apa pun keranjangnya.
+   */
+  embedded?: boolean;
 }
 
 export function POSCart({
@@ -56,6 +62,7 @@ export function POSCart({
   onCheckout,
   emptyExtra,
   memberSlot,
+  embedded = false,
 }: POSCartProps) {
   const handleCheckoutClick = () => {
     if (items.length === 0) {
@@ -67,11 +74,25 @@ export function POSCart({
   };
 
   return (
-    <div className="milky-glass flex h-full flex-col justify-between rounded-squircle p-5">
+    <div
+      className={
+        embedded
+          ? "flex flex-col"
+          : "milky-glass flex h-full flex-col justify-between rounded-squircle p-5"
+      }
+    >
       {/* Cart Header */}
-      <div>
-        <div className="flex items-center justify-between border-b-2 border-card-border pb-3">
-          <div className="flex items-center gap-2 font-sans text-base font-bold text-main">
+      <div className={embedded ? "px-4" : ""}>
+        <div
+          className={`flex items-center justify-between ${
+            embedded ? "" : "border-b-2 border-card-border pb-3"
+          }`}
+        >
+          <div
+            className={`items-center gap-2 font-sans text-base font-bold text-main ${
+              embedded ? "hidden" : "flex"
+            }`}
+          >
             <ShoppingBag className="h-5 w-5 text-sweet-strawberry" />
             <span>Keranjang Belanja</span>
             <span className="rounded-pill border border-card-border bg-sweet-custard px-2 py-0.5 font-mono text-xs">
@@ -85,7 +106,7 @@ export function POSCart({
                 playPop();
                 onClearCart();
               }}
-              className="flex h-11 items-center px-2 font-sans text-sm font-bold text-main underline decoration-2 underline-offset-4 hover:text-red-700"
+              className="ml-auto flex h-11 items-center px-2 font-sans text-sm font-bold text-main underline decoration-2 underline-offset-4 hover:text-red-700"
             >
               Kosongkan
             </button>
@@ -95,7 +116,11 @@ export function POSCart({
         {memberSlot && <div className="mt-3">{memberSlot}</div>}
 
         {/* Cart Item List */}
-        <div className="mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1">
+        <div
+          className={
+            embedded ? "mt-2 space-y-2 pb-3" : "mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1"
+          }
+        >
           {items.length === 0 ? (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -191,7 +216,7 @@ export function POSCart({
                       )}
 
                       {/* Line Total */}
-                      <span className="w-20 text-right font-mono text-sm font-bold tabular-nums">
+                      <span className="min-w-20 flex-1 whitespace-nowrap text-right font-mono text-sm font-bold tabular-nums sm:flex-none">
                         Rp {lineTotal}
                       </span>
 
@@ -217,7 +242,13 @@ export function POSCart({
       </div>
 
       {/* Cart Summary & Checkout */}
-      <div className="mt-4 border-t-2 border-card-border pt-4">
+      <div
+        className={
+          embedded
+            ? "sticky bottom-0 border-t-2 border-card-border bg-base px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            : "mt-4 border-t-2 border-card-border pt-4"
+        }
+      >
         {/* Rincian Subtotal + pajak hanya bila ada pajak. Tanpa pajak,
            subtotal SAMA dengan total — dua angka kembar hanya menambah
            baris yang harus dibaca kasir. */}
@@ -243,7 +274,11 @@ export function POSCart({
            sebelumnya cuma teks polos tanpa blok sama sekali, dan payment-modal
            memakai custard 30% opacity, dua treatment berbeda untuk angka yang
            sama. */}
-        <div className="mt-3 flex items-center justify-between rounded-squircle-sm border-2 border-card-border bg-sweet-strawberry px-4 py-3">
+        <div
+          className={`flex items-center justify-between rounded-squircle-sm border-2 border-card-border bg-sweet-strawberry px-4 ${
+            embedded ? "py-2" : "mt-3 py-3"
+          }`}
+        >
           <span className="text-base font-extrabold text-main">Total Bayar</span>
           <span className="font-mono text-2xl font-black tabular-nums text-main">
             Rp {Number(totals.grandTotal.toString()).toLocaleString("id-ID")}
@@ -255,7 +290,7 @@ export function POSCart({
           onClick={handleCheckoutClick}
           size="pos-lg"
           variant="primary"
-          className="mt-4 w-full gap-2 text-xl shadow-hard"
+          className={`w-full gap-2 text-xl shadow-hard ${embedded ? "mt-3" : "mt-4"}`}
         >
           <Zap className="h-5 w-5" fill="currentColor" aria-hidden="true" />
           Bayar Sekarang

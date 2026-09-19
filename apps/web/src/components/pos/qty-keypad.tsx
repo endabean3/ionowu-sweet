@@ -12,7 +12,7 @@ import {
 } from "@/lib/catalog/quantity";
 import { ml, takaranRacikan } from "@/lib/receipt/recipe";
 import type Decimal from "decimal.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 /**
  * Memasukkan jumlah untuk barang curah — 30 ml parfum, 250 g bahan kue.
@@ -51,11 +51,13 @@ export function QtyKeypad({
   const [teks, setTeks] = useState(nilaiAwal ? nilaiAwal.replace(".", ",") : "");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
+  const formId = useId();
+  // Layar sentuh: papan ketik sistem menutup separuh layar 800 px, tepat di
+  // atas tombol "Botol 30 ml" yang justru paling sering diketuk. Jadi di
+  // ponsel kolom TIDAK difokus otomatis selama ada pintasan botol — kasir
+  // mengetuk kolomnya sendiri bila perlu angka lain. Keyboard fisik/pemindai
+  // (pointer halus) tetap langsung terfokus seperti sebelumnya.
+  const [sentuh, setSentuh] = useState(false);
 
   // Pratinjau harga dihitung dari nilai yang SAH saja. Angka setengah jadi
   // ("0,") tidak menampilkan total menyesatkan.
@@ -88,22 +90,52 @@ export function QtyKeypad({
         )
       : [];
   const pintasan = racikan.length > 0 ? [] : quickQuantities(uom);
+  const adaRacikan = racikan.length > 0;
+
+  useEffect(() => {
+    const kasar = window.matchMedia("(pointer: coarse)").matches;
+    setSentuh(kasar);
+    if (kasar && adaRacikan) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [adaRacikan]);
+
+  /** Setelah pintasan: fokus kembali ke kolom HANYA tanpa layar sentuh. */
+  const fokusBila = () => {
+    if (!sentuh) inputRef.current?.focus();
+  };
 
   return (
-    <Modal title="Jumlah" onClose={onClose} size="md">
+    <Modal
+      title="Jumlah"
+      onClose={onClose}
+      size="md"
+      footer={
+        <Button
+          type="submit"
+          form={formId}
+          size="pos-lg"
+          variant="primary"
+          className="w-full shadow-hard"
+        >
+          Masukkan ke Keranjang
+        </Button>
+      }
+    >
       <form
-        className="p-6"
+        id={formId}
+        className="px-4 py-4 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
           kirim();
         }}
       >
-        <p className="font-sans text-sm font-bold text-main">{namaProduk}</p>
+        <p className="line-clamp-2 font-sans text-sm font-bold text-main">{namaProduk}</p>
         <p className="font-mono text-xs text-muted">
           Rp {Number(hargaSatuan).toLocaleString("id-ID")} per {uom}
         </p>
 
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2 sm:mt-4">
           <input
             ref={inputRef}
             // decimal, bukan numeric: papan tik Android memunculkan tombol
@@ -120,7 +152,7 @@ export function QtyKeypad({
               setError(null);
             }}
             placeholder="0"
-            className="pos-touch-target w-full flex-1 rounded-2xl border-2 border-card-border bg-surface px-4 py-3 text-right font-mono text-3xl font-black tabular-nums text-main outline-none focus:ring-2 focus:ring-sweet-strawberry"
+            className="pos-touch-target w-full flex-1 rounded-2xl border-2 border-card-border bg-surface px-4 py-2 text-right font-mono text-3xl sm:py-3 font-black tabular-nums text-main outline-none focus:ring-2 focus:ring-sweet-strawberry"
           />
           <span className="font-sans text-lg font-bold text-main">{uom}</span>
         </div>
@@ -138,7 +170,7 @@ export function QtyKeypad({
         )}
 
         {racikan.length > 0 && (
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             <p className="mb-2 font-sans text-xs font-bold text-main">
               Bibit untuk botol ({racikanPersen}% bibit : {100 - (racikanPersen ?? 0)}% pelarut)
             </p>
@@ -154,7 +186,7 @@ export function QtyKeypad({
                   onClick={() => {
                     setTeks(ml(t.bibit));
                     setError(null);
-                    inputRef.current?.focus();
+                    fokusBila();
                   }}
                 >
                   <span className="font-sans text-xs">Botol {t.botol} ml</span>
@@ -177,7 +209,7 @@ export function QtyKeypad({
                 onClick={() => {
                   setTeks(q.replace(".", ","));
                   setError(null);
-                  inputRef.current?.focus();
+                  fokusBila();
                 }}
               >
                 {formatQuantity(q, uom)}
@@ -185,10 +217,6 @@ export function QtyKeypad({
             ))}
           </div>
         )}
-
-        <Button type="submit" size="pos-lg" variant="primary" className="mt-6 w-full shadow-hard">
-          Masukkan ke Keranjang
-        </Button>
       </form>
     </Modal>
   );

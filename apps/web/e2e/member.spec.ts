@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
+import {
+  type TenantFixture,
+  bukaShiftBilaPerlu,
+  klikBayar,
+  loginViaUI,
+  provisionTenant,
+} from "./helpers";
 
 /**
  * Member Warung Wangi: daftar lewat form (WA wajib + wajib follow TikTok
@@ -20,7 +26,7 @@ test.describe("Member pelanggan", () => {
 
   const jual = async (page: import("@playwright/test").Page) => {
     await page.getByText(fx.productName).first().click();
-    await page.locator('button:has-text("Bayar Sekarang")').first().click();
+    await klikBayar(page);
     await page.click("text=Tunai");
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();

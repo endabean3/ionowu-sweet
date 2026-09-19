@@ -4,6 +4,36 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.23.0] — 2026-09-19
+
+### Diubah
+* **Tata letak portrait ponsel 360 px** (keluhan pemilik di Redmi 9C, 360×800 CSS px). Di layar lebar
+  (≥ sm/lg) tampilan tidak berubah.
+  * **Header satu baris** (~56 px, sebelumnya tiga baris ±200 px): nama toko terpotong satu baris.
+    Status online + sinkron + antrean digabung jadi satu tombol: warna = koneksi, gelembung angka =
+    transaksi belum terkirim, dan **"Offline" tetap berupa teks**. Tombol tema pindah ke
+    **Pengaturan → Tampilan**.
+  * **Produk jadi daftar satu kolom**: nama bibit utuh dalam 2 baris, harga di kanan. Sebelumnya
+    kartu dua kolom memotong "Bibit Parfum Baccarat Rouge…".
+  * **Kolom cari/scan menempel** di atas saat daftar digulir.
+  * **Keranjang jadi panel bawah**, dibuka dengan mengetuk ringkasan di bar bawah atau mengusapnya ke
+    atas, dan ditutup dengan menarik pegangannya ke bawah. Total dan "Bayar Sekarang" menempel di
+    dasar panel. Sebelumnya keranjang ada di bawah seluruh katalog.
+  * **Semua dialog di ponsel** (`Modal`) punya pegangan tarik-untuk-menutup (hanya dari
+    pegangan/judul, jadi isi tetap bisa digulir) dan slot `footer` yang menempel di dasar.
+  * **Keypad jumlah**: "Masukkan ke Keranjang" menempel di dasar panel. Di layar sentuh, papan ketik
+    **tidak** muncul otomatis selama ada pintasan botol racikan, karena papan ketik menutupi tombol
+    "Botol 30 ml". `viewport.interactiveWidget = resizes-content` dan Android
+    `windowSoftInputMode=adjustResize` membuat panel naik di atas papan ketik.
+  * **Pengaturan**: judul dan tombol kembali lengket, Garansi dan Racikan berdampingan, tombol
+    Simpan menempel di bawah selama ada perubahan, serta kartu **Tampilan** (terang/gelap) baru.
+
+### Diuji
+* Playwright **22/22** (desktop + Mobile Chrome), termasuk `e2e/layout-ponsel.spec.ts` baru:
+  header < 80 px, tanpa geser samping, bayar lewat panel bawah. Selektor tombol bayar di uji lama
+  kini memilih tombol yang **terlihat** (`klikBayar`), karena di ponsel keranjang samping
+  disembunyikan. Vitest 86/86.
+
 ## [1.22.0] — 2026-09-19
 
 ### Ditambahkan

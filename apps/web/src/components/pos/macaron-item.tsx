@@ -62,6 +62,9 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
     .toLocaleString("id-ID", { maximumFractionDigits: presisiStok });
   const level = stockLevel(product.stock, product.minStockAlert);
   const curah = isCurah(product.uomPrecision);
+  const teksStok = `${level.label} · ${stokTampil}${
+    satuanStokBeda ? ` ${product.stockUom}` : curah ? ` ${product.uom}` : ""
+  }`;
 
   return (
     <button
@@ -72,39 +75,51 @@ export function MacaronItem({ product, onSelect }: MacaronItemProps) {
           ? `${product.name}, isi jumlah dalam ${product.uom}`
           : `Tambah ${product.name} ke keranjang`
       }
-      className="mochi-button flex flex-col justify-between rounded-squircle-sm border-2 border-card-border bg-card p-3 text-left shadow-hard transition-all hover:bg-sweet-custard/30 pos-touch-target sm:p-4"
+      // Ponsel (< sm): BARIS DAFTAR — nama selebar layar, harga di kanan.
+      // Dua kolom kartu di 360 px menyisakan ~130 px untuk nama, jadi
+      // "Bibit Parfum Baccarat Rouge 540" terpotong jadi "Bibit Parfum
+      // Baccarat Rouge…" dan kasir tidak bisa membedakan bibit yang mirip.
+      // Baris juga lebih pendek: ±9 produk per layar, bukan 6.
+      className="mochi-button pos-touch-target flex items-center gap-3 rounded-squircle-sm border-2 border-card-border bg-card px-3 py-2.5 text-left shadow-hard-sm transition-all hover:bg-sweet-custard/30 sm:flex-col sm:items-stretch sm:justify-between sm:p-4 sm:shadow-hard"
     >
-      {/* Ikon kotak dekoratif dihapus: di layar 360px ia merebut ruang dari
-         lencana stok, yang lalu patah dua baris. */}
-      <span
-        className={`flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-pill border border-card-border px-2 py-0.5 font-sans text-xs font-bold text-main ${level.badge}`}
-      >
-        {level.Icon ? (
-          <level.Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
-        ) : (
-          <Package className="h-3 w-3 shrink-0" aria-hidden="true" />
-        )}
-        <span className="truncate">
-          {level.label} · {stokTampil}
-          {satuanStokBeda ? ` ${product.stockUom}` : curah ? ` ${product.uom}` : ""}
+      <div className="min-w-0 flex-1 sm:flex-none">
+        {/* Ikon kotak dekoratif dihapus: di layar 360px ia merebut ruang dari
+           lencana stok, yang lalu patah dua baris. */}
+        <span
+          className={`hidden w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-pill border border-card-border px-2 py-0.5 font-sans text-xs font-bold text-main sm:flex ${level.badge}`}
+        >
+          {level.Icon ? (
+            <level.Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+          ) : (
+            <Package className="h-3 w-3 shrink-0" aria-hidden="true" />
+          )}
+          <span className="truncate">{teksStok}</span>
         </span>
-      </span>
 
-      <div className="mt-3">
         {/* DUA baris, bukan satu: "Bibit Parfum Vanilla" dan "Bibit Parfum
            Ocean" sama-sama terpotong jadi "Bibit Parfum…" di satu baris —
            kasir tidak bisa membedakan dua produk yang harganya berbeda.
-           min-h menjaga harga semua kartu tetap sejajar. */}
-        <h3 className="min-h-[2.5rem] font-sans text-sm font-bold leading-5 text-main line-clamp-2">
+           min-h (layar lebar) menjaga harga semua kartu tetap sejajar. */}
+        <h3 className="line-clamp-2 font-sans text-sm font-bold leading-5 text-main sm:mt-3 sm:min-h-[2.5rem]">
           {product.name}
         </h3>
-        <p className="mt-1 font-mono text-base font-extrabold tabular-nums text-main">
-          Rp {formattedPrice}
-          {curah && (
-            <span className="font-sans text-xs font-bold text-muted"> / {product.uom}</span>
-          )}
-        </p>
+
+        {/* Stok versi ponsel: teks kecil di bawah nama, dengan titik warna +
+           ikon + label — warna tetap tidak berdiri sendiri. */}
+        <span className="mt-0.5 flex items-center gap-1 font-sans text-xs font-semibold text-main sm:hidden">
+          <span
+            className={`h-2.5 w-2.5 shrink-0 rounded-pill border border-card-border ${level.badge}`}
+            aria-hidden="true"
+          />
+          {level.Icon && <level.Icon className="h-3 w-3 shrink-0" aria-hidden="true" />}
+          <span className="truncate">{teksStok}</span>
+        </span>
       </div>
+
+      <p className="shrink-0 text-right font-mono text-base font-extrabold tabular-nums text-main sm:mt-1 sm:text-left">
+        Rp {formattedPrice}
+        {curah && <span className="font-sans text-xs font-bold text-muted">/{product.uom}</span>}
+      </p>
     </button>
   );
 }

@@ -12,7 +12,8 @@ import { type OutletRow, cacheOutlets, fetchOutlets, patchOutlet } from "@/lib/o
 import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { COLUMNS, encodeReceipt, printedText } from "@/lib/receipt/escpos";
 import type { ReceiptData } from "@/lib/receipt/format";
-import { ArrowLeft, LogOut, Printer, Store } from "lucide-react";
+import { simpanTema, temaGelapTersimpan } from "@/lib/theme";
+import { ArrowLeft, LogOut, Moon, Printer, Store, Sun } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -223,13 +224,23 @@ export default function PengaturanPage() {
     router.replace("/login");
   };
 
+  // Tema pindah ke sini untuk ponsel: header kasir 360 px tidak punya ruang.
+  const [gelap, setGelap] = useState(false);
+  useEffect(() => setGelap(temaGelapTersimpan()), []);
+  const gantiTema = (g: boolean) => {
+    setGelap(g);
+    simpanTema(g);
+  };
+
   const ubah = (k: keyof Form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div className="min-h-[100dvh] bg-base p-4 pb-16 md:p-6">
-      <div className="mx-auto flex max-w-2xl flex-col gap-4">
-        <header className="flex items-center gap-3">
+    <div className="min-h-[100dvh] bg-base p-3 pb-16 sm:p-4 md:p-6">
+      <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:gap-4">
+        {/* Lengket: halaman ini panjang di ponsel, dan jalan kembali ke kasir
+           tidak boleh ada di ujung atas saja. */}
+        <header className="sticky top-0 z-30 -mx-3 -mt-3 flex items-center gap-3 bg-base/95 px-3 py-2 backdrop-blur sm:static sm:m-0 sm:bg-transparent sm:p-0">
           <Link
             href="/kasir"
             aria-label="Kembali ke kasir"
@@ -237,10 +248,10 @@ export default function PengaturanPage() {
           >
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
-          <h1 className="font-display text-2xl font-bold text-main">Pengaturan</h1>
+          <h1 className="font-display text-xl font-bold text-main sm:text-2xl">Pengaturan</h1>
         </header>
 
-        <Card variant="solid" className="p-5">
+        <Card variant="solid" className="p-4 sm:p-5">
           <h2 className="mb-1 flex items-center gap-2 font-sans text-lg font-bold">
             <Store className="h-5 w-5" aria-hidden="true" />
             Profil toko & struk
@@ -328,32 +339,40 @@ export default function PengaturanPage() {
                     "Terima kasih". {form.receipt_footer.length}/{MAKS}
                   </p>
                 </div>
-                <Input
-                  label="Garansi (hari)"
-                  value={form.warranty_days}
-                  onChange={ubah("warranty_days")}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={365}
-                  hint='Dicetak di nota: "Garansi 7 hari s/d <tanggal>". 0 = tanpa garansi.'
-                  error={garansiSah ? undefined : "Isi 0–365 hari"}
-                />
-                <Input
-                  label="Racikan: % bibit"
-                  value={form.bibit_percent}
-                  onChange={ubah("bibit_percent")}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={100}
-                  hint={
-                    racikanSah && racikan > 0
-                      ? `${racikan}% bibit : ${100 - racikan}% pelarut — takaran per ukuran botol dicetak di nota berisi bibit. 0 = tanpa racikan.`
-                      : "Mis. 65 → 65% bibit : 35% pelarut. 0 = tanpa racikan."
-                  }
-                  error={racikanSah ? undefined : "Isi 0–100"}
-                />
+                {/* Dua angka pendek berdampingan: masing-masing selebar layar
+                   hanya memanjangkan halaman di ponsel. */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Garansi (hari)"
+                    value={form.warranty_days}
+                    onChange={ubah("warranty_days")}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={365}
+                    hint="0 = tanpa garansi"
+                    error={garansiSah ? undefined : "Isi 0–365 hari"}
+                  />
+                  <Input
+                    label="Racikan % bibit"
+                    value={form.bibit_percent}
+                    onChange={ubah("bibit_percent")}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={100}
+                    hint={
+                      racikanSah && racikan > 0
+                        ? `${racikan} : ${100 - racikan} pelarut`
+                        : "0 = tanpa racikan"
+                    }
+                    error={racikanSah ? undefined : "Isi 0–100"}
+                  />
+                </div>
+                <p className="-mt-2 text-xs text-main">
+                  Di nota: "Garansi {garansiSah ? garansiHari : "N"} hari s/d &lt;tanggal&gt;" dan
+                  tabel takaran bibit per ukuran botol (hanya nota berisi bibit ml).
+                </p>
                 <Input
                   label="Akun TikTok toko"
                   value={form.social_handle}
@@ -366,7 +385,16 @@ export default function PengaturanPage() {
               </fieldset>
 
               {bolehUbah && !offline && (
-                <Button size="pos" variant="primary" disabled={!dapatSimpan} onClick={simpan}>
+                // Lengket di dasar layar selama ada perubahan: di ponsel tombol
+                // ini ada di bawah tujuh kolom, dan pemilik yang baru mengubah
+                // alamat tidak tahu harus menggulir ke mana untuk menyimpan.
+                <Button
+                  size="pos"
+                  variant="primary"
+                  disabled={!dapatSimpan}
+                  onClick={simpan}
+                  className={berubah ? "sticky bottom-3 z-20 shadow-hard" : ""}
+                >
                   {menyimpan ? "Menyimpan…" : berubah ? "Simpan" : "Tersimpan"}
                 </Button>
               )}
@@ -374,7 +402,7 @@ export default function PengaturanPage() {
           )}
         </Card>
 
-        <Card variant="solid" className="p-5">
+        <Card variant="solid" className="p-4 sm:p-5">
           <h2 className="mb-1 font-sans text-lg font-bold">Pratinjau struk</h2>
           <p className="mb-3 font-sans text-sm text-main">
             Persis seperti hasil cetak kertas {kertas} mm ({COLUMNS[kertas]} huruf per baris).
@@ -389,7 +417,7 @@ export default function PengaturanPage() {
           </div>
         </Card>
 
-        <Card variant="solid" className="p-5">
+        <Card variant="solid" className="p-4 sm:p-5">
           <h2 className="mb-1 flex items-center gap-2 font-sans text-lg font-bold">
             <Printer className="h-5 w-5" aria-hidden="true" />
             Printer
@@ -413,7 +441,35 @@ export default function PengaturanPage() {
           )}
         </Card>
 
-        <Card variant="solid" className="p-5">
+        <Card variant="solid" className="p-4 sm:p-5">
+          <h2 className="mb-3 font-sans text-lg font-bold">Tampilan</h2>
+          <fieldset className="grid grid-cols-2 gap-2">
+            <legend className="sr-only">Tema layar</legend>
+            {(
+              [
+                [false, "Terang", Sun],
+                [true, "Gelap", Moon],
+              ] as const
+            ).map(([g, label, Icon]) => (
+              <Button
+                key={label}
+                aria-pressed={gelap === g}
+                size="pos"
+                variant={gelap === g ? "custard" : "ghost"}
+                className={`gap-2 ${gelap === g ? "" : "border-card-border"}`}
+                onClick={() => gantiTema(g)}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {label}
+              </Button>
+            ))}
+          </fieldset>
+          <p className="mt-2 text-xs text-main">
+            Terang paling mudah dibaca di bawah sinar matahari. Berlaku di perangkat ini saja.
+          </p>
+        </Card>
+
+        <Card variant="solid" className="p-4 sm:p-5">
           <h2 className="mb-3 font-sans text-lg font-bold">Akun</h2>
           <p className="font-sans text-base font-bold text-main">{identitas?.name ?? "—"}</p>
           <p className="mb-4 font-sans text-sm text-main">

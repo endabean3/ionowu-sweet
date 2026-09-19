@@ -9,6 +9,7 @@ import { PrinterPicker } from "@/components/pos/printer-picker";
 import { QtyKeypad } from "@/components/pos/qty-keypad";
 import { Receipt, type ReceiptData } from "@/components/pos/receipt";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
 import { profilTerakhir } from "@/lib/auth/profile";
@@ -21,8 +22,8 @@ import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
-import { m } from "framer-motion";
-import { ArrowLeft, Barcode, Layers, Search, UserRound, Wallet, X } from "lucide-react";
+import { type PanInfo, m } from "framer-motion";
+import { ArrowLeft, Barcode, ChevronUp, Layers, Search, UserRound, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -41,10 +42,17 @@ export default function KasirPage() {
   // setelah bayar — member tidak "menempel" ke pembeli berikutnya.
   const [member, setMember] = useState<LocalCustomer | null>(null);
   const [memberPanelOpen, setMemberPanelOpen] = useState(false);
+  /** Panel bawah keranjang (ponsel). */
+  const [keranjangTerbuka, setKeranjangTerbuka] = useState(false);
   // Scanner mengetik kode lalu menekan Enter. Tanpa jeda ini, Enter itu
   // membuka pembayaran tepat setelah kartu member dipindai.
   const memberScanAt = useRef(0);
   const [cartItems, setCartItems] = useState<CartLine[]>([]);
+  // Keranjang kosong (dihapus satu-satu atau lunas) menutup panelnya, supaya
+  // barang berikutnya tidak membuka panel yang tertinggal terbuka.
+  useEffect(() => {
+    if (cartItems.length === 0) setKeranjangTerbuka(false);
+  }, [cartItems.length]);
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
   const [showShiftModal, setShowShiftModal] = useState<boolean>(true); // Tampilkan shift modal di awal
 
@@ -471,17 +479,48 @@ export default function KasirPage() {
     return matchesCat && matchesSearch;
   });
 
+  const memberSlot = member && (
+    <div className="flex items-center gap-2 rounded-2xl border-2 border-card-border bg-sweet-matcha px-3 py-2">
+      <UserRound className="h-4 w-4 shrink-0 text-main" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate font-sans text-sm font-bold text-main">
+        {member.member_code}
+        {member.name ? ` · ${member.name}` : ""}
+        {!member.merchandise_given_at && " · 🎁 pembelian pertama"}
+      </span>
+      <button
+        type="button"
+        onClick={() => setMember(null)}
+        aria-label="Lepas member dari transaksi ini"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-main hover:bg-card"
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+
+  // Panel bawah keranjang (ponsel): dibuka dengan mengetuk ringkasan ATAU
+  // mengusap bar ke atas. Tertutup sendiri saat keranjang kosong.
+  const bukaKeranjang = () => {
+    playPop();
+    setKeranjangTerbuka(true);
+  };
+  const usapBar = (_e: unknown, info: PanInfo) => {
+    if (info.offset.y < -40 || info.velocity.y < -400) bukaKeranjang();
+  };
+
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-base p-4 pb-32 md:p-6 lg:pb-6">
+    <div className="flex min-h-[100dvh] flex-col bg-base p-3 pb-28 sm:p-4 md:p-6 lg:pb-6">
       <POSHeader
         outletId={activeShift?.outlet_id}
         printer={printer.bluetooth ? printer : undefined}
       />
 
-      <div className="mt-4 grid flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
+      <div className="mt-3 grid flex-1 grid-cols-1 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-12">
         {/* Kiri: Katalog */}
-        <div className="flex flex-col gap-4 lg:col-span-7 xl:col-span-8">
-          <div className="milky-glass flex items-center gap-3 rounded-squircle p-3">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:col-span-7 xl:col-span-8">
+          {/* LENGKET di bawah lg: kasir yang sudah menggulir jauh ke bawah
+             daftar bibit tetap bisa mencari/scan tanpa menggulir balik. */}
+          <div className="milky-glass sticky top-2 z-30 flex items-center gap-2 rounded-squircle p-2 sm:gap-3 sm:p-3 lg:static">
             <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-pill border-2 border-card-border bg-sweet-custard shadow-hard-sm sm:flex">
               <Barcode className="h-5 w-5 text-main" />
             </div>
@@ -517,9 +556,9 @@ export default function KasirPage() {
                       });
                   }
                 }}
-                className="pos-touch-target w-full rounded-pill border-2 border-card-border bg-card px-4 py-2 font-sans text-base font-bold text-main placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sweet-strawberry"
+                className="pos-touch-target w-full rounded-pill border-2 border-card-border bg-card py-2 pl-4 pr-11 font-sans text-base font-bold text-main placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sweet-strawberry"
               />
-              <Search className="absolute right-4 top-3.5 h-5 w-5 text-muted pointer-events-none" />
+              <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
             </div>
             <button
               type="button"
@@ -572,7 +611,8 @@ export default function KasirPage() {
              scan-to-cart yang dijanjikan < 100ms (PERFORMANCE-BUDGET §3), dan
              daftarnya dirender ulang setiap kali kasir mengetik di kolom cari —
              stagger di sini berarti seluruh katalog berkedip di tiap huruf. */}
-          <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          {/* Ponsel: satu kolom baris daftar (lihat MacaronItem). */}
+          <div className="grid flex-1 grid-cols-1 content-start gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-4">
             {!mounted || !dbProducts || !dbVariants ? (
               // Teks statis, bukan skeleton shimmer — pages/kasir.md melarang
               // animasi dekoratif di layar ini.
@@ -593,8 +633,11 @@ export default function KasirPage() {
           </div>
         </div>
 
-        {/* Kanan: Keranjang */}
-        <div className="lg:col-span-5 xl:col-span-4">
+        {/* Kanan: Keranjang — hanya layar lebar. Di bawah lg keranjang
+           tampil sebagai panel bawah (lihat `keranjangSheet`); versi lama
+           menumpuknya di bawah SELURUH katalog, jadi kasir harus menggulir
+           melewati 160 bibit hanya untuk mengoreksi jumlah. */}
+        <div className="hidden lg:col-span-5 lg:block xl:col-span-4">
           <POSCart
             items={cartItems}
             totals={cartTotals}
@@ -603,26 +646,7 @@ export default function KasirPage() {
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
             onCheckout={() => setIsCheckingOut(true)}
-            memberSlot={
-              member && (
-                <div className="flex items-center gap-2 rounded-2xl border-2 border-card-border bg-sweet-matcha px-3 py-2">
-                  <UserRound className="h-4 w-4 shrink-0 text-main" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate font-sans text-sm font-bold text-main">
-                    {member.member_code}
-                    {member.name ? ` · ${member.name}` : ""}
-                    {!member.merchandise_given_at && " · 🎁 pembelian pertama"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setMember(null)}
-                    aria-label="Lepas member dari transaksi ini"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-main hover:bg-card"
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              )
-            }
+            memberSlot={memberSlot}
             emptyExtra={
               lastReceipt && (
                 <div className="hidden rounded-squircle-sm border-2 border-card-border bg-card p-3 lg:block">
@@ -661,17 +685,33 @@ export default function KasirPage() {
           variants={barBawah}
           initial="sembunyi"
           animate="tampil"
-          className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden"
+          onPanEnd={usapBar}
+          className="fixed inset-x-0 bottom-0 z-40 touch-none border-t-2 border-card-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden"
         >
+          {/* Pegangan: tanda bahwa bar ini bisa diusap ke atas. */}
+          <div className="-mt-1.5 mb-1.5 flex justify-center" aria-hidden="true">
+            <span className="h-1.5 w-10 rounded-pill bg-main/25" />
+          </div>
           <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-sans text-xs font-bold text-main">
-                {totalItemCount} item{member ? ` · Member ${member.member_code}` : ""}
+            <button
+              type="button"
+              onClick={bukaKeranjang}
+              aria-label={`Buka keranjang: ${totalItemCount} item, total Rp ${Number(
+                cartTotals.grandTotal.toString(),
+              ).toLocaleString("id-ID")}`}
+              aria-haspopup="dialog"
+              className="-my-1 -ml-2 min-w-0 flex-1 rounded-2xl px-2 py-1 text-left hover:bg-sweet-custard/30"
+            >
+              <p className="flex items-center gap-1 truncate font-sans text-xs font-bold text-main">
+                <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">
+                  {totalItemCount} item{member ? ` · ${member.member_code}` : ""} · lihat
+                </span>
               </p>
               <p className="truncate font-mono text-2xl font-black tabular-nums text-main">
                 Rp {Number(cartTotals.grandTotal.toString()).toLocaleString("id-ID")}
               </p>
-            </div>
+            </button>
             <Button
               size="pos-lg"
               variant="primary"
@@ -702,6 +742,29 @@ export default function KasirPage() {
             onPrint={() => void printer.cetak(lastReceipt)}
           />
         </m.div>
+      )}
+
+      {/* Panel bawah keranjang — hanya bisa dibuka dari bar di bawah lg. */}
+      {keranjangTerbuka && cartItems.length > 0 && (
+        <Modal title="Keranjang" onClose={() => setKeranjangTerbuka(false)}>
+          <POSCart
+            embedded
+            items={cartItems}
+            totals={cartTotals}
+            onUpdateQty={handleUpdateQty}
+            onEditQty={handleEditQty}
+            onRemoveItem={handleRemoveItem}
+            onClearCart={() => {
+              setKeranjangTerbuka(false);
+              handleClearCart();
+            }}
+            onCheckout={() => {
+              setKeranjangTerbuka(false);
+              setIsCheckingOut(true);
+            }}
+            memberSlot={memberSlot}
+          />
+        </Modal>
       )}
 
       {qtyTarget && (
