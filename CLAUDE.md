@@ -142,11 +142,11 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 ## 7. Kondisi Saat Ini
 
 ```
-93 dokumen .md di docs/ · 11 folder · 12 ADR diterima (0001–0012)
-13 migrasi · 47 tabel · 63 indeks · 61 kueri SQL
+95 dokumen .md di docs/ · 11 folder · 13 ADR diterima (0001–0013)
+14 migrasi · 47 tabel · 65 indeks · 68 kueri SQL
 ```
 
-> Angka dihitung ulang 2026-09-18 langsung dari repo. Audit dokumen menyeluruh
+> Angka dihitung ulang 2026-09-19 langsung dari repo. Audit dokumen menyeluruh
 > (§seksi, yatim, kontradiksi, FK, tenant-scope) belum diulang sejak angka lama.
 
 ### Produksi sudah hidup (deploy pertama 2026-09-17)
@@ -179,6 +179,13 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 * **Garansi di nota** (migrasi 00011): "Garansi N hari s/d <tanggal>", diatur di Pengaturan.
 * **Racikan parfum** (migrasi 00013): Pengaturan "% bibit" (Warung Wangi 65 → 65:35). Nota berisi
   bibit ml mencetak takaran botol 10–100 ml; keypad kasir menampilkan "Botol 30 ml → 19,5 ml".
+* **Nota publik lewat QR** (ADR-0013, migrasi 00014): nota mencetak QR ke
+  `<outlets.nota_web_url>/<tenant>/<nota>` (Warung Wangi: `warungwangi.ionowu.com/nota`, repo
+  terpisah `endabean3/warungwangi`). Halaman itu membaca **endpoint publik TANPA login**
+  `/public/v1/nota/...` dari server-nya untuk cek garansi & daftar member (1× per nota, ≤ 30 hari).
+  Ini satu-satunya permukaan tanpa login di pos-engine — **ubahan di `public_nota.go`/`.sql`
+  ditinjau sebagai perubahan keamanan**. Nomor di nota = id penjualan di server (dulu dua ULID
+  berbeda — bug itu sudah diperbaiki; jangan dipisah lagi).
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
   menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.

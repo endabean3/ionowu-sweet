@@ -1,6 +1,7 @@
 "use client";
 
 import { code128Bars } from "@/lib/barcode/code128";
+import { qrSvgPath } from "@/lib/barcode/qr";
 import { formatQuantity } from "@/lib/catalog/quantity";
 import {
   METHOD_LABEL,
@@ -9,6 +10,7 @@ import {
   formatWaktu,
   lineDiscount,
   lineGross,
+  notaQrJudul,
   receiptFooter,
   rupiah,
   warrantyLine,
@@ -147,6 +149,15 @@ export function Receipt({ data }: { data: ReceiptData }) {
           </>
         )}
 
+        {data.notaUrl && (
+          <>
+            <div className="receipt-sep" />
+            <div className="receipt-center receipt-bold">{notaQrJudul(data)}</div>
+            <div className="receipt-center receipt-small">Scan QR dengan kamera HP</div>
+            <QrNota url={data.notaUrl} />
+          </>
+        )}
+
         <div className="receipt-sep" />
         <div className="receipt-center receipt-small">No. {data.transactionId}</div>
         {/* Ditandai terang-terangan: struk dari transaksi offline sudah sah bagi
@@ -163,6 +174,28 @@ export function Receipt({ data }: { data: ReceiptData }) {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** QR halaman nota publik (ADR-0013) — matriks sama dengan versi printer. */
+function QrNota({ url }: { url: string }) {
+  let q: ReturnType<typeof qrSvgPath>;
+  try {
+    q = qrSvgPath(url);
+  } catch {
+    return null; // tautan terlalu panjang untuk QR: nota tetap tercetak
+  }
+  return (
+    <svg
+      className="receipt-qr"
+      viewBox={`0 0 ${q.size} ${q.size}`}
+      shapeRendering="crispEdges"
+      role="img"
+      aria-label="QR cek garansi dan daftar member"
+    >
+      <rect width={q.size} height={q.size} fill="#fff" />
+      <path d={q.d} fill="#000" />
+    </svg>
   );
 }
 

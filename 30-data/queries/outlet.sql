@@ -1,6 +1,6 @@
 -- name: ListOutlets :many
 SELECT id, tenant_id, name, address, phone, is_active, created_at, timezone, business_day_start,
-       receipt_footer, warranty_days, social_handle, bibit_percent
+       receipt_footer, warranty_days, social_handle, bibit_percent, nota_web_url
 FROM outlets
 WHERE tenant_id = $1
 ORDER BY created_at ASC;
@@ -13,7 +13,7 @@ ORDER BY created_at ASC;
 -- SELURUH outlet dan kasir hanya ke outlet utama, jadi join ini otomatis
 -- benar untuk semua peran tanpa cabang kasus khusus di kode Go.
 SELECT o.id, o.tenant_id, o.name, o.address, o.phone, o.is_active, o.created_at,
-       o.timezone, o.business_day_start, o.receipt_footer, o.warranty_days, o.social_handle, o.bibit_percent
+       o.timezone, o.business_day_start, o.receipt_footer, o.warranty_days, o.social_handle, o.bibit_percent, o.nota_web_url
 FROM outlets o
 JOIN user_outlet_assignments uoa ON uoa.outlet_id = o.id
 WHERE uoa.tenant_id = $1 AND uoa.user_id = $2
@@ -22,7 +22,7 @@ ORDER BY uoa.is_primary DESC, o.created_at ASC;
 -- name: InsertOutlet :one
 INSERT INTO outlets (id, tenant_id, name, address, phone, timezone, business_day_start)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer, warranty_days, social_handle, bibit_percent;
+RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer, warranty_days, social_handle, bibit_percent, nota_web_url;
 
 -- name: UpdateOutlet :execrows
 -- :execrows, bukan :exec — id yang salah atau milik tenant lain harus
@@ -38,5 +38,6 @@ SET
     receipt_footer = COALESCE(sqlc.narg('receipt_footer'), receipt_footer),
     warranty_days = COALESCE(sqlc.narg('warranty_days'), warranty_days),
     social_handle = COALESCE(sqlc.narg('social_handle'), social_handle),
-    bibit_percent = COALESCE(sqlc.narg('bibit_percent'), bibit_percent)
+    bibit_percent = COALESCE(sqlc.narg('bibit_percent'), bibit_percent),
+    nota_web_url = COALESCE(sqlc.narg('nota_web_url'), nota_web_url)
 WHERE tenant_id = $1 AND id = $2;

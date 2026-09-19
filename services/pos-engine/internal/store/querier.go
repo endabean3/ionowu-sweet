@@ -114,6 +114,13 @@ type Querier interface {
 	// HOT PATH — dipanggil di awal setiap checkout untuk memperoleh shift_id.
 	// Memakai indeks unik parsial idx_shifts_one_open.
 	GetOpenShift(ctx context.Context, arg GetOpenShiftParams) (GetOpenShiftRow, error)
+	// Halaman nota publik (ADR-0013). Dibaca TANPA login oleh server web toko,
+	// berbekal (tenant_id, id nota) dari QR di nota. Aturan emas tetap berlaku:
+	// setiap kueri memfilter tenant_id — id nota saja TIDAK cukup.
+	//
+	// Yang boleh keluar dari sini: data toko & isi nota. Yang TIDAK: identitas
+	// pelanggan, kasir, HPP, atau apa pun milik nota lain.
+	GetPublicNota(ctx context.Context, arg GetPublicNotaParams) (GetPublicNotaRow, error)
 	// Verifikasi refresh token. Kembalikan error bila sudah direvokasi atau expired.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
 	// Dipakai saat CreateSaleIdempotent mengembalikan 0 baris (idempotency hit,
@@ -158,6 +165,10 @@ type Querier interface {
 	// buka laci tanpa transaksi, akses break-glass platform admin.
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertCashMovement(ctx context.Context, arg InsertCashMovementParams) (string, error)
+	// Satu pendaftaran per nota ditegakkan idx_customers_signup_sale; nomor WA
+	// yang sudah terdaftar ditolak idx_customers_phone. Keduanya galat 23505
+	// yang dibedakan dari nama constraint-nya.
+	InsertCustomerFromNota(ctx context.Context, arg InsertCustomerFromNotaParams) (int64, error)
 	// Member didaftarkan di PERANGKAT (bisa offline) dengan ULID klien — id
 	// adalah kunci idempotensi: kiriman ulang yang sama menghasilkan 0 baris
 	// (duplicate), bukan galat. Tabrakan nomor WA / kode member tetap galat
@@ -199,6 +210,7 @@ type Querier interface {
 	// benar untuk semua peran tanpa cabang kasus khusus di kode Go.
 	ListOutletsForUser(ctx context.Context, arg ListOutletsForUserParams) ([]ListOutletsForUserRow, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	ListPublicNotaItems(ctx context.Context, arg ListPublicNotaItemsParams) ([]ListPublicNotaItemsRow, error)
 	// `uom` di sini adalah satuan STOK (satuan tempat stock_quantity dihitung):
 	// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)

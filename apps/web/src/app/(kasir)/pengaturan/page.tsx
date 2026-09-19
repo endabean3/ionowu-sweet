@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import { type OutletRow, cacheOutlets, fetchOutlets, patchOutlet } from "@/lib/outlet/api";
 import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { COLUMNS, encodeReceipt, printedText } from "@/lib/receipt/escpos";
-import type { ReceiptData } from "@/lib/receipt/format";
+import { type ReceiptData, notaWebLink } from "@/lib/receipt/format";
 import { simpanTema, temaGelapTersimpan } from "@/lib/theme";
 import { ArrowLeft, LogOut, Moon, Printer, Store, Sun } from "lucide-react";
 import Link from "next/link";
@@ -39,6 +39,7 @@ interface Form {
   social_handle: string;
   /** Teks di input; diubah ke angka saat simpan. */
   bibit_percent: string;
+  nota_web_url: string;
 }
 
 const kosong: Form = {
@@ -49,6 +50,7 @@ const kosong: Form = {
   warranty_days: "0",
   social_handle: "",
   bibit_percent: "0",
+  nota_web_url: "",
 };
 
 function keForm(o: OutletRow): Form {
@@ -60,6 +62,7 @@ function keForm(o: OutletRow): Form {
     warranty_days: String(o.warranty_days ?? 0),
     social_handle: o.social_handle ?? "",
     bibit_percent: String(o.bibit_percent ?? 0),
+    nota_web_url: o.nota_web_url ?? "",
   };
 }
 
@@ -132,7 +135,14 @@ export default function PengaturanPage() {
   const racikan = Number(form.bibit_percent);
   const racikanSah =
     form.bibit_percent.trim() !== "" && Number.isInteger(racikan) && racikan >= 0 && racikan <= 100;
+  // Sama dengan cekNotaWebURL di server: https, tanpa ?/#.
+  const notaUrlBersih = form.nota_web_url.trim().replace(/\/+$/, "");
+  const notaUrlSah =
+    notaUrlBersih === "" ||
+    (/^https:\/\/[^\s/?#@]+\.[^\s/?#@]+(\/[^\s?#]*)?$/.test(notaUrlBersih) &&
+      notaUrlBersih.length <= 150);
   const dapatSimpan =
+    notaUrlSah &&
     bolehUbah &&
     !offline &&
     berubah &&
@@ -152,6 +162,7 @@ export default function PengaturanPage() {
       warranty_days: garansiHari,
       social_handle: form.social_handle.trim().replace(/^@/, ""),
       bibit_percent: racikan,
+      nota_web_url: notaUrlBersih,
     };
     try {
       await patchOutlet(accessToken, outletId, rapi);
@@ -190,6 +201,9 @@ export default function PengaturanPage() {
       footer: form.receipt_footer,
       warrantyDays: garansiSah ? garansiHari : 0,
       recipePercent: racikanSah ? racikan : 0,
+      notaUrl: notaUrlSah
+        ? notaWebLink(notaUrlBersih, "01CONTOHTENANT000000000000", "01CONTOHSTRUK0000000PRATINJ")
+        : null,
       cashierName: identitas?.name ?? "Kasir",
       lines: [
         {
@@ -210,7 +224,17 @@ export default function PengaturanPage() {
       pending: false,
     };
     return printedText(encodeReceipt(contoh, kertas)).replace(/\n+$/, "");
-  }, [form, kertas, identitas?.name, garansiHari, garansiSah, racikan, racikanSah]);
+  }, [
+    form,
+    kertas,
+    identitas?.name,
+    garansiHari,
+    garansiSah,
+    racikan,
+    racikanSah,
+    notaUrlBersih,
+    notaUrlSah,
+  ]);
 
   const keluar = async () => {
     if (
@@ -381,6 +405,18 @@ export default function PengaturanPage() {
                   autoComplete="off"
                   placeholder="@warungwangi"
                   hint="Ditampilkan di form daftar member: calon member wajib follow akun ini."
+                />
+                <Input
+                  label="Alamat web nota (QR)"
+                  value={form.nota_web_url}
+                  onChange={ubah("nota_web_url")}
+                  maxLength={150}
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  placeholder="https://warungwangi.ionowu.com/nota"
+                  hint="Nota mencetak QR ke halaman ini: pembeli bisa cek garansi dan daftar member dari HP. Kosong = tanpa QR."
+                  error={notaUrlSah ? undefined : "Harus diawali https:// tanpa ? atau #"}
                 />
               </fieldset>
 

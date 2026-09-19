@@ -43,6 +43,9 @@ export interface ReceiptData {
   recipePercent?: number | null;
   /** Lama garansi (hari) dari Pengaturan; 0/kosong = tidak dicetak. */
   warrantyDays?: number | null;
+  /** Tautan halaman nota publik (ADR-0013) yang dicetak sebagai QR;
+   *  kosong = nota tanpa QR. Susun dengan `notaWebLink`. */
+  notaUrl?: string | null;
   cashierName: string;
   lines: ReceiptLine[];
   subtotal: string;
@@ -115,4 +118,25 @@ export function warrantyLine(
 /** Tabel takaran hanya relevan bila nota memuat bibit yang dijual per ml. */
 export function adaBibitMl(data: Pick<ReceiptData, "lines">): boolean {
   return data.lines.some((l) => l.uom === "ml");
+}
+
+/**
+ * Tautan halaman nota publik di web toko (ADR-0013):
+ * `<nota_web_url>/<tenant_id>/<id nota>`. Id berupa PATH, bukan query:
+ * lebih pendek (QR lebih kecil) dan rute web toko cukup `/nota/[t]/[i]`.
+ * Kosong bila toko belum mengisi alamat web nota di Pengaturan.
+ */
+export function notaWebLink(
+  base: string | null | undefined,
+  tenantId: string | null | undefined,
+  transactionId: string,
+): string | null {
+  const b = base?.trim().replace(/\/+$/, "");
+  if (!b || !tenantId) return null;
+  return `${b}/${tenantId}/${transactionId}`;
+}
+
+/** Judul blok QR: nota member tidak ditawari daftar member lagi. */
+export function notaQrJudul(data: Pick<ReceiptData, "member">): string {
+  return data.member ? "Cek garansi nota ini" : "Cek garansi & daftar member";
 }

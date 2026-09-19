@@ -76,6 +76,7 @@ RBAC), itu tanda dokumen harus dipecah.
 | ADR-0010 Capacitor, bukan React Native | `10-architecture/adr/` | ✅ **Diterima** | Play Store + printer Bluetooth tanpa menulis ulang frontend |
 | ADR-0011 Image hanya amd64 | `10-architecture/adr/` | ✅ **Diterima** | Arm64 via QEMU macet 6 jam; server x86_64 |
 | ADR-0012 Satuan jual ≠ satuan stok | `10-architecture/adr/` | ✅ **Diterima** | Bibit dijual per ml, stok dalam gram lewat `uom_conversions` |
+| ADR-0013 Nota publik lewat QR | `10-architecture/adr/` | ✅ **Diterima** | QR di nota → halaman web toko; endpoint publik tanpa login untuk cek garansi & daftar member |
 | **Model RBAC** | `40-security/RBAC-MODEL.md` | 🟡 Draft · 🔴 **P0** | 18 peran, 3 kelas, model izin |
 | **Pipeline Keamanan** | `40-security/SECURITY-PIPELINE.md` | ✅ Terpasang | 10 kontrol otomatis di CI |
 | **Peta Modul ERP** | `00-product/ERP-MODULE-MAP.md` | 🟡 Draft baru | Urutan modul + peringatan ruang lingkup |

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -193,6 +194,7 @@ func (h *OutletHandler) PatchOutlet(w http.ResponseWriter, r *http.Request) {
 		WarrantyDays:     req.WarrantyDays,
 		SocialHandle:     req.SocialHandle,
 		BibitPercent:     req.BibitPercent,
+		NotaWebUrl:       req.NotaWebURL,
 	})
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
@@ -237,6 +239,9 @@ type patchOutletRequest struct {
 	SocialHandle *string `json:"social_handle"`
 	// Persen bibit dalam racikan parfum (sisanya pelarut); 0 = tanpa racikan.
 	BibitPercent *int16 `json:"bibit_percent"`
+	// Alamat halaman nota publik di web toko (ADR-0013); QR di nota menunjuk
+	// ke sini. "" = nota tanpa QR.
+	NotaWebURL *string `json:"nota_web_url"`
 }
 
 // Batas panjang mengikuti kolom (outlets.name VARCHAR(200), phone
@@ -261,6 +266,7 @@ func (p *patchOutletRequest) normalize() string {
 	trim(p.Address)
 	trim(p.Phone)
 	trim(p.ReceiptFooter)
+	trim(p.NotaWebURL)
 	if p.SocialHandle != nil {
 		h := normalizeHandle(*p.SocialHandle)
 		p.SocialHandle = &h
@@ -292,6 +298,31 @@ func (p *patchOutletRequest) normalize() string {
 	// Batas sama dengan CHECK di migrasi 00013.
 	if p.BibitPercent != nil && (*p.BibitPercent < 0 || *p.BibitPercent > 100) {
 		return "Persen bibit harus 0–100"
+	}
+	if p.NotaWebURL != nil && *p.NotaWebURL != "" {
+		if msg := cekNotaWebURL(*p.NotaWebURL); msg != "" {
+			return msg
+		}
+		*p.NotaWebURL = strings.TrimRight(*p.NotaWebURL, "/")
+	}
+	return ""
+}
+
+// cekNotaWebURL: alamat yang dicetak sebagai QR di SETIAP nota. Wajib https
+// (pelanggan memindainya dengan HP), tanpa query/fragment (id nota
+// ditambahkan kasir), dan tidak boleh berisi kredensial.
+func cekNotaWebURL(raw string) string {
+	u, err := url.Parse(raw)
+	switch {
+	case err != nil, u.Host == "":
+		return "Alamat web nota tidak valid. Contoh: https://tokoanda.com/nota"
+	case u.Scheme != "https":
+		return "Alamat web nota harus diawali https://"
+	case u.User != nil, u.RawQuery != "", u.Fragment != "":
+		return "Alamat web nota tidak boleh berisi ?, # atau nama pengguna"
+	case utf8.RuneCountInString(raw) > 150:
+		// VARCHAR(200) dikurangi ruang untuk ?t=<26>&i=<26> yang ditambahkan.
+		return "Alamat web nota terlalu panjang (maks. 150 huruf)"
 	}
 	return ""
 }

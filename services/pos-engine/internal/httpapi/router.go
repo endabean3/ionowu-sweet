@@ -51,6 +51,12 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 	r.Post("/auth/refresh", authHandler.PostRefresh)
 	r.Post("/auth/logout", authHandler.PostLogout)
 
+	// Halaman nota publik (ADR-0013) — TANPA login, dibaca server web toko
+	// dari QR di nota. Rate limit dan batasannya ada di handler.
+	publicNota := NewPublicNotaHandler(pool)
+	r.Get("/public/v1/nota/{tenantId}/{saleId}", publicNota.GetNota)
+	r.Post("/public/v1/nota/{tenantId}/{saleId}/member", publicNota.PostMember)
+
 	checkout := NewCheckoutHandler(pool)
 	shift := NewShiftHandler(pool)
 

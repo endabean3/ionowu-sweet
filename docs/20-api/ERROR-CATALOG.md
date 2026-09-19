@@ -81,6 +81,9 @@ Setiap kode wajib punya satu kelas. Kelas menentukan perilaku klien, bukan pesan
 | `BARCODE_ALREADY_EXISTS` | 409 | 👤 | Barcode dipakai varian lain dalam tenant |
 | `CATEGORY_NOT_FOUND` | 404 | ⛔ | |
 | `OUTLET_NOT_FOUND` | 404 | ⛔ | Id outlet salah **atau milik tenant lain** — sengaja tidak dibedakan |
+| `NOTA_NOT_FOUND` | 404 | ⛔ | Nota publik (ADR-0013): id salah, milik tenant lain, **atau belum tersinkron**. Ketiganya sengaja tidak dibedakan |
+| `NOTA_SIGNUP_CLOSED` | 409 | 👤 | Nota tidak bisa dipakai mendaftar member: sudah dipakai, sudah atas nama member, direfund/void, atau > 30 hari |
+| `MEMBER_ALREADY_EXISTS` | 409 | 👤 | Nomor WA sudah terdaftar. Jawaban publik **tidak** menyebut kode member pemiliknya |
 | `IMPORT_FILE_INVALID` | 400 | 👤 | Format berkas rusak |
 | `IMPORT_ROW_ERRORS` | 422 | 👤 | Sebagian baris gagal; sertakan nomor baris |
 | `PLAN_LIMIT_EXCEEDED` | 402 | 👤 | Melewati batas paket ([PRICING](../00-product/PRICING-PACKAGING.md)) |
