@@ -43,7 +43,9 @@ SELECT
     v.id, v.product_id, p.category_id, p.name AS product_name, v.name AS variant_name,
     v.sku, v.barcode, v.item_type, v.uom, v.uom_precision,
     COALESCE(o.price, v.price) AS price, v.stock_quantity, v.min_stock_alert,
-    v.is_active, GREATEST(v.created_at, p.created_at) AS updated_at,
+    -- Produk nonaktif menonaktifkan SEMUA variannya di kasir: kasir hanya
+    -- menerima baris varian, tidak ada tempat lain untuk status produk.
+    COALESCE(v.is_active AND p.is_active, FALSE)::BOOLEAN AS is_active, GREATEST(v.created_at, p.created_at) AS updated_at,
     COALESCE(sc.to_uom, '')::VARCHAR AS stock_uom, COALESCE(sc.factor, 0)::DECIMAL AS stock_factor
 FROM variants v
 JOIN products p ON p.id = v.product_id AND p.tenant_id = v.tenant_id
@@ -79,7 +81,7 @@ WHERE tenant_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
 
--- name: UpdateProduct :exec
+-- name: UpdateProduct :execrows
 UPDATE products
 SET
     name = COALESCE(sqlc.narg('name'), name),
@@ -87,12 +89,16 @@ SET
     is_active = COALESCE(sqlc.narg('is_active'), is_active)
 WHERE tenant_id = $1 AND id = $2;
 
--- name: UpdateVariant :exec
+-- name: UpdateVariant :execrows
 UPDATE variants
 SET
     name = COALESCE(sqlc.narg('name'), name),
     price = COALESCE(sqlc.narg('price'), price),
-    sku = COALESCE(sqlc.narg('sku'), sku),
-    barcode = COALESCE(sqlc.narg('barcode'), barcode),
+    cost_price = COALESCE(sqlc.narg('cost_price'), cost_price),
+    min_stock_alert = COALESCE(sqlc.narg('min_stock_alert'), min_stock_alert),
+    -- "" = KOSONGKAN (NULL), bukan "biarkan". NULL-lah yang dikecualikan
+    -- indeks unik parsial idx_variants_barcode; "" akan bentrok antar-varian.
+    sku = CASE WHEN sqlc.narg('sku')::text = '' THEN NULL ELSE COALESCE(sqlc.narg('sku'), sku) END,
+    barcode = CASE WHEN sqlc.narg('barcode')::text = '' THEN NULL ELSE COALESCE(sqlc.narg('barcode'), barcode) END,
     is_active = COALESCE(sqlc.narg('is_active'), is_active)
 WHERE tenant_id = $1 AND id = $2;

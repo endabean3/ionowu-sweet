@@ -118,12 +118,16 @@ export default function KasirPage() {
   const products: MacaronProduct[] = React.useMemo(() => {
     if (!dbProducts || !dbVariants) return [];
 
+    // Barang yang DINONAKTIFKAN di Katalog tidak dijual lagi, tetapi datanya
+    // tetap ada (riwayat penjualan dan stok masih merujuknya). Server sudah
+    // menggabungkan status produk + varian ke `is_active` varian.
+    const aktif = dbVariants.filter((v) => v.is_active !== false);
     const variantPerProduk = new Map<string, number>();
-    for (const v of dbVariants) {
+    for (const v of aktif) {
       variantPerProduk.set(v.product_id, (variantPerProduk.get(v.product_id) ?? 0) + 1);
     }
 
-    return dbVariants.map((v) => {
+    return aktif.map((v) => {
       const product = dbProducts.find((p) => p.id === v.product_id);
       const namaProduk = product?.name || "Tanpa nama";
       return {

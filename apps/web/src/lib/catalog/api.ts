@@ -1,3 +1,5 @@
+import { JaringanError } from "@/lib/auth/api";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 // Bentuk PERSIS yang dibaca services/pos-engine/internal/httpapi/catalog.go
@@ -94,4 +96,58 @@ export async function importProducts(accessToken: string, file: File): Promise<H
     total_records: body?.total_records ?? 0,
     dilewati: Array.isArray(body?.dilewati) ? body.dilewati : [],
   };
+}
+
+/** Isian PATCH /variants/{id}. Field yang tidak diisi = tidak diubah. */
+export interface VariantPatch {
+  name?: string;
+  /** String desimal ("25000"), bukan number — uang tidak pernah float. */
+  price?: string;
+  /** "" = kosongkan barcode. */
+  barcode?: string;
+  min_stock_alert?: string;
+  is_active?: boolean;
+}
+
+export interface ProductPatch {
+  name?: string;
+  is_active?: boolean;
+}
+
+/** Galat dari server yang pesannya layak ditampilkan apa adanya ke pemilik. */
+export class KatalogError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+async function patch(accessToken: string, path: string, body: object): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new JaringanError();
+  }
+  if (!res.ok) {
+    const b = await res.json().catch(() => null);
+    throw new KatalogError(b?.error?.message ?? "Gagal menyimpan ke server", b?.error?.code);
+  }
+}
+
+export function patchProduct(accessToken: string, id: string, body: ProductPatch) {
+  return patch(accessToken, `/products/${encodeURIComponent(id)}`, body);
+}
+
+export function patchVariant(accessToken: string, id: string, body: VariantPatch) {
+  return patch(accessToken, `/variants/${encodeURIComponent(id)}`, body);
 }

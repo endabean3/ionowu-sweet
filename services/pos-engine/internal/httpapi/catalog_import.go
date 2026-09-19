@@ -52,6 +52,12 @@ func (h *CatalogImportHandler) PostProductsImport(w http.ResponseWriter, r *http
 	ctx := r.Context()
 	tenantID, _ := ctx.Value(tenantIDKey).(string)
 
+	// Impor = tambah/ubah produk + menetapkan harga massal (RBAC-MODEL).
+	if msg := bolehUbahKatalog(UserRole(ctx), true); msg != "" {
+		RespondError(w, http.StatusForbidden, "FORBIDDEN_ROLE", msg)
+		return
+	}
+
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Gagal memproses form data")
 		return

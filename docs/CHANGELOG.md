@@ -4,6 +4,42 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.24.0] — 2026-09-19
+
+### Ditambahkan
+* **Ubah & nonaktifkan barang dari Katalog** (prioritas #3: harga kosong, nama terpotong, ejaan
+  "Spichy"). Tombol **Ubah** di tiap barang (owner/manager) membuka dialog berisi:
+  * nama barang;
+  * harga jual per satuan jual (owner saja);
+  * batas stok menipis dalam satuan **stok** (gram untuk bibit, ADR-0012);
+  * barcode ("" = kosongkan);
+  * **Dijual di kasir**.
+  "Hapus" sengaja berupa **nonaktifkan**: riwayat penjualan dan ledger stok tetap merujuk barangnya.
+  Barang nonaktif hilang dari kasir, berlabel "Nonaktif" di katalog, diurutkan paling bawah, dan
+  bisa dinyalakan lagi. Perubahan langsung dicerminkan ke Dexie perangkat ini. Butuh online.
+* `/sync/pull`: `is_active` varian = **varian AND produk**, jadi menonaktifkan produk menyembunyikan
+  semua variannya di kasir. Kasir kini memfilter varian nonaktif (sebelumnya semua tetap tampil).
+
+### Diperbaiki (keamanan & validasi)
+* **Katalog tidak memeriksa peran sama sekali.** Kasir bisa mengubah harga lewat `PATCH
+  /variants/{id}`, serta membuat atau mengimpor produk. Kini:
+  * `POST /products` dan `PATCH` produk/varian: **owner & manager**;
+  * `price`/`cost_price` dan **impor CSV** (menetapkan harga massal): **owner saja**, sesuai
+    RBAC-MODEL.
+* **Harga tidak sah diabaikan diam-diam.** `"25.000.00"` dijawab 200 OK tanpa mengubah apa pun. Kini
+  422 `VALIDATION_ERROR` untuk angka tidak sah, negatif, desimal berlebih, atau melebihi
+  DECIMAL(14,x).
+* PATCH produk/varian untuk id salah atau milik tenant lain kini 404
+  `PRODUCT_NOT_FOUND`/`VARIANT_NOT_FOUND`, bukan 200. Barcode ganda dijawab 409
+  `BARCODE_ALREADY_EXISTS`. Barcode/SKU bisa dikosongkan (NULL), karena "" akan bentrok di indeks
+  unik parsial.
+* `PATCH /variants` kini juga menerima `cost_price` dan `min_stock_alert`.
+
+### Diuji
+* Go: `TestPatchVariantNormalize` (12 kasus), `TestPatchProductNormalize`, `TestBolehUbahKatalog`.
+* Playwright `e2e/katalog-ubah.spec.ts` (desktop + ponsel): ubah nama dan harga → tersimpan di server
+  (`/sync/pull`) dan tampil di kasir; nonaktifkan → hilang dari kasir; harga kosong ditolak.
+
 ## [1.23.0] — 2026-09-19
 
 ### Diubah

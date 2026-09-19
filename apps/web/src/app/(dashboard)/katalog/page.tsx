@@ -1,17 +1,25 @@
 "use client";
 
+import { UbahBarang } from "@/components/catalog/ubah-barang";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth/context";
+import { profilTerakhir } from "@/lib/auth/profile";
 import { db } from "@/lib/db";
 import { daftarBertahap, naikMasuk } from "@/lib/motion/tokens";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { AlertTriangle, ArrowLeft, FileUp, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, EyeOff, FileUp, Pencil, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 
 export default function KatalogPage() {
   const [search, setSearch] = useState("");
+  const [diubah, setDiubah] = useState<string | null>(null);
+  const { user, accessToken } = useAuth();
+  const role = (user ?? profilTerakhir())?.role;
+  // RBAC-MODEL §Matriks "Tambah/ubah produk": owner & manager.
+  const bolehUbah = role === "owner" || role === "manager";
 
   // Ambil semua produk dan varian dari Dexie (offline-first read)
   const products = useLiveQuery(() => db.products.toArray(), []);
@@ -29,12 +37,18 @@ export default function KatalogPage() {
     };
   });
 
-  // Filter pencarian
-  const filteredCatalog = catalog.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.variants.some((v) => v.name.toLowerCase().includes(search.toLowerCase())),
-  );
+  const aktif = (p: (typeof catalog)[number]) =>
+    p.is_active !== false && p.variants.some((v) => v.is_active !== false);
+
+  // Filter pencarian; barang nonaktif di urutan paling bawah.
+  const filteredCatalog = catalog
+    .filter(
+      (p) =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.variants.some((v) => v.name.toLowerCase().includes(search.toLowerCase())),
+    )
+    .sort((a, b) => Number(aktif(b)) - Number(aktif(a)) || a.name.localeCompare(b.name, "id"));
+  const sedangDiubah = diubah ? catalog.find((p) => p.id === diubah) : undefined;
 
   return (
     <div className="min-h-[100dvh] bg-base p-4 md:p-8">
@@ -99,10 +113,36 @@ export default function KatalogPage() {
         ) : (
           filteredCatalog.map((product) => (
             <m.div key={product.id} variants={naikMasuk} className="flex">
-              <Card variant="milky" className="flex flex-1 flex-col shadow-hard">
+              <Card
+                variant="milky"
+                className={`flex flex-1 flex-col shadow-hard ${aktif(product) ? "" : "opacity-70"}`}
+              >
                 <div className="flex-1">
-                  <h3 className="font-display text-lg font-bold text-main">{product.name}</h3>
-                  <p className="font-sans text-xs text-muted">ID: {product.id.slice(-8)}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-display text-lg font-bold text-main">{product.name}</h3>
+                      {aktif(product) ? (
+                        <p className="font-sans text-xs text-muted">ID: {product.id.slice(-8)}</p>
+                      ) : (
+                        <p className="mt-0.5 inline-flex items-center gap-1 rounded-pill border border-card-border bg-sweet-taro px-2 py-0.5 font-sans text-xs font-bold text-main">
+                          <EyeOff className="h-3 w-3" aria-hidden="true" />
+                          Nonaktif · tidak tampil di kasir
+                        </p>
+                      )}
+                    </div>
+                    {bolehUbah && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="pos-touch-target shrink-0 gap-1.5 shadow-hard-sm"
+                        aria-label={`Ubah ${product.name}`}
+                        onClick={() => setDiubah(product.id)}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        Ubah
+                      </Button>
+                    )}
+                  </div>
 
                   <div className="mt-4 space-y-2">
                     {product.variants.map((variant) => {
@@ -154,6 +194,17 @@ export default function KatalogPage() {
           ))
         )}
       </m.div>
+
+      {sedangDiubah && (
+        <UbahBarang
+          key={sedangDiubah.id}
+          product={sedangDiubah}
+          variants={sedangDiubah.variants}
+          accessToken={accessToken}
+          role={role}
+          onClose={() => setDiubah(null)}
+        />
+      )}
     </div>
   );
 }
