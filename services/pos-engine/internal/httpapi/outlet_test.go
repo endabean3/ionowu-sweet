@@ -69,3 +69,30 @@ func TestPatchOutletRacikan(t *testing.T) {
 		}
 	}
 }
+
+func TestCekNotaWebURL(t *testing.T) {
+	for _, ok := range []string{"https://warungwangi.ionowu.com/nota", "https://toko.id"} {
+		if msg := cekNotaWebURL(ok); msg != "" {
+			t.Errorf("%s: %s", ok, msg)
+		}
+	}
+	for _, rusak := range []string{
+		"http://warungwangi.ionowu.com/nota", // bukan https
+		"warungwangi.ionowu.com/nota",        // tanpa skema
+		"https://a.b/nota?x=1",               // query
+		"https://user:pw@a.b/nota",           // kredensial
+		"javascript:alert(1)",
+	} {
+		if cekNotaWebURL(rusak) == "" {
+			t.Errorf("%q harus ditolak", rusak)
+		}
+	}
+	p := patchOutletRequest{NotaWebURL: ptr(" https://warungwangi.ionowu.com/nota/ ")}
+	if msg := p.normalize(); msg != "" || *p.NotaWebURL != "https://warungwangi.ionowu.com/nota" {
+		t.Fatalf("msg=%q url=%q", msg, *p.NotaWebURL)
+	}
+	kosong := patchOutletRequest{NotaWebURL: ptr("")}
+	if msg := kosong.normalize(); msg != "" {
+		t.Fatalf("kosong = matikan QR, harus sah: %s", msg)
+	}
+}

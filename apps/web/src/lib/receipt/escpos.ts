@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { qrRaster } from "../barcode/qr";
 import {
   METHOD_LABEL,
   type ReceiptData,
@@ -6,6 +7,7 @@ import {
   formatWaktu,
   lineDiscount,
   lineGross,
+  notaQrJudul,
   receiptFooter,
   rupiah,
   warrantyLine,
@@ -138,6 +140,17 @@ class EscPosBuilder {
     return this.cmd(GS, 0x68, 64, GS, 0x77, 2, GS, 0x48, 2, GS, 0x6b, 73, b.length, ...b, LF);
   }
 
+  /**
+   * Gambar 1-bit lewat `GS v 0` (raster), rata tengah. Dipakai QR nota:
+   * raster didukung hampir semua printer termal, sedangkan perintah QR
+   * bawaan (`GS ( k`) tidak ada di sebagian printer Bluetooth murah.
+   */
+  raster(widthBytes: number, height: number, data: Uint8Array): this {
+    this.cmd(GS, 0x76, 0x30, 0, widthBytes & 0xff, widthBytes >> 8, height & 0xff, height >> 8);
+    for (const b of data) this.bytes.push(b);
+    return this.cmd(LF);
+  }
+
   build(): Uint8Array {
     return Uint8Array.from(this.bytes);
   }
@@ -227,6 +240,21 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
     out.barcode128(m.code).align("left");
   }
 
+  // QR ke halaman nota publik di web toko (ADR-0013): cek garansi, dan
+  // daftar member untuk pembeli yang belum member.
+  if (data.notaUrl) {
+    out.line(sep).align("center");
+    out
+      .bold(true)
+      .lines(wrap(notaQrJudul(data), w))
+      .bold(false);
+    out.line("Scan QR dengan kamera HP");
+    // 4 titik per modul: QR versi 6 (41 modul + zona tenang) = 196 titik
+    // ≈ 24 mm — muat di kertas 58 mm (384 titik) dan terbaca kamera HP.
+    const q = qrRaster(data.notaUrl, 4);
+    out.raster(q.widthBytes, q.height, q.data);
+  }
+
   out.line(sep).align("center");
   out.lines(wrap(`No. ${t(data.transactionId)}`, w));
   // Lihat catatan sejenis di receipt.tsx: struk offline sah bagi pembeli,
@@ -302,6 +330,13 @@ export function printedText(bytes: Uint8Array): string {
         const isi = String.fromCharCode(...bytes.slice(i + 6, i + 4 + n));
         out += `||| ${isi} |||`;
         i += 3 + n;
+      } else if (cmd === 0x76) {
+        // GS v 0 m xL xH yL yH <data>: gambar raster (QR) — datanya bisa
+        // berisi byte apa saja, jadi dilompati utuh.
+        const lebar = bytes[i + 4] | (bytes[i + 5] << 8);
+        const tinggi = bytes[i + 6] | (bytes[i + 7] << 8);
+        out += "[ QR ]";
+        i += 7 + lebar * tinggi;
       } else if (cmd === 0x56)
         i += 3; // GS V B n
       else i += 2; // GS h/w/H n

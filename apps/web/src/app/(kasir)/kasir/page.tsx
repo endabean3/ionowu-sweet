@@ -19,6 +19,7 @@ import { formatWA, looksLikeMemberCode } from "@/lib/member/member";
 import { calculateCart } from "@/lib/money/calc";
 import { barBawah } from "@/lib/motion/tokens";
 import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
+import { notaWebLink } from "@/lib/receipt/format";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -346,7 +347,13 @@ export default function KasirPage() {
     processingPaymentRef.current = true;
 
     try {
+      // SATU id untuk antrean, payload, DAN nomor di nota. Sebelumnya antrean
+      // dan payload masing-masing memanggil ulid(): nota mencetak id antrean,
+      // server menyimpan id payload — nomor di tangan pembeli tidak pernah
+      // bisa dicari di server (klaim garansi, refund, QR nota publik).
+      const saleId = ulid();
       const txId = await enqueueOfflineAction({
+        customUlid: saleId,
         // Literal "tenant" SEBELUMNYA dikirim untuk semua tenant — enqueue
         // masih benar secara mekanis (ULID tetap unik), tapi
         // SyncQueueEntry.tenant_id jadi tidak berarti apa-apa untuk query
@@ -359,7 +366,7 @@ export default function KasirPage() {
           // sebelumnya (`sl_${Date.now()}`) BUKAN ULID sama sekali dan
           // tidak konsisten dengan konvensi ID sisanya di sistem ini
           // (D-02, OFFLINE-SYNC-SPEC).
-          id: ulid(),
+          id: saleId,
           outlet_id: activeShift.outlet_id,
           shift_id: activeShift.id,
           items: cartItems.map((it) => ({
@@ -411,6 +418,7 @@ export default function KasirPage() {
         footer: outlet?.receipt_footer,
         warrantyDays: outlet?.warranty_days,
         recipePercent: outlet?.bibit_percent,
+        notaUrl: notaWebLink(outlet?.nota_web_url, identitas?.tenant_id, txId),
         member: member
           ? { code: member.member_code, name: member.name, bonuses: bonusMember }
           : null,

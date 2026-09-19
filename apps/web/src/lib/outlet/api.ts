@@ -13,6 +13,7 @@ export interface OutletRow {
   warranty_days?: number | null;
   social_handle?: string | null;
   bibit_percent?: number | null;
+  nota_web_url?: string | null;
 }
 
 export interface OutletProfile {
@@ -23,6 +24,8 @@ export interface OutletProfile {
   warranty_days: number;
   social_handle: string;
   bibit_percent: number;
+  /** "" = nota tanpa QR. */
+  nota_web_url: string;
 }
 
 /**
@@ -42,6 +45,7 @@ export async function cacheOutlets(tenantId: string, rows: OutletRow[]): Promise
       warranty_days: o.warranty_days ?? 0,
       social_handle: o.social_handle ?? null,
       bibit_percent: o.bibit_percent ?? 0,
+      nota_web_url: o.nota_web_url ?? null,
     })),
   );
 }

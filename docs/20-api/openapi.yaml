@@ -29,6 +29,8 @@ tags:
   - name: shifts
   - name: outlets
   - name: sync
+  - name: public
+    description: Tanpa login (ADR-0013) — dibaca server web toko dari QR di nota
 
 paths:
   # ═══════════════════════════════════════════════════════════════
@@ -662,6 +664,7 @@ paths:
                 warranty_days: { type: integer, minimum: 0, maximum: 365, description: "Garansi (hari) yang dicetak di nota; 0 = tanpa garansi" }
                 social_handle: { type: string, maxLength: 100, description: "Akun TikTok toko; \"@\" di depan dibuang" }
                 bibit_percent: { type: integer, minimum: 0, maximum: 100, description: "Persen bibit racikan parfum (sisanya pelarut); 0 = tanpa racikan" }
+                nota_web_url: { type: string, maxLength: 150, description: "https:// tanpa ?/#; \"\" = nota tanpa QR (ADR-0013)" }
                 timezone: { type: string }
                 business_day_start: { type: string, example: "00:00" }
                 is_active: { type: boolean, description: "Owner saja" }
@@ -670,6 +673,100 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { description: OUTLET_NOT_FOUND }
         "422": { description: "VALIDATION_ERROR (nama kosong, teks terlalu panjang)" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # NOTA PUBLIK — ADR-0013 (TANPA login)
+  # ═══════════════════════════════════════════════════════════════
+  /public/v1/nota/{tenantId}/{saleId}:
+    parameters:
+      - { name: tenantId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      - { name: saleId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    get:
+      tags: [public]
+      summary: Ringkasan nota + status garansi, untuk halaman nota di web toko
+      description: >
+        Tanpa login. Tidak memuat identitas pelanggan, kasir, HPP, atau id tenant.
+        Rate limit 300/menit per tenant (bukan per IP — pemanggilnya server web toko).
+      security: []
+      responses:
+        "200":
+          description: Nota
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      receipt_number: { type: string }
+                      sold_at: { type: string, format: date-time }
+                      total: { type: string, format: decimal }
+                      status: { type: string, enum: [paid, void, pending] }
+                      refunded: { type: boolean }
+                      has_member: { type: boolean }
+                      store:
+                        type: object
+                        properties:
+                          name: { type: string }
+                          address: { type: string }
+                          phone: { type: string }
+                          social_handle: { type: string }
+                      warranty:
+                        type: object
+                        properties:
+                          days: { type: integer }
+                          until: { type: string, format: date, description: "Hari terakhir berlaku (zona waktu outlet)" }
+                          active: { type: boolean }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: { type: string }
+                            quantity: { type: string, format: decimal }
+                            uom: { type: string }
+                            subtotal: { type: string, format: decimal }
+                      member_signup_open: { type: boolean }
+        "404": { description: "NOTA_NOT_FOUND (id salah / tenant lain / belum tersinkron — tidak dibedakan)" }
+        "429": { description: RATE_LIMITED }
+
+  /public/v1/nota/{tenantId}/{saleId}/member:
+    parameters:
+      - { name: tenantId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      - { name: saleId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    post:
+      tags: [public]
+      summary: Daftar member berbekal nota (satu pendaftaran per nota)
+      description: >
+        Tanpa login. Hanya untuk nota lunas, belum direfund, tanpa member, ≤ 30 hari.
+        Rate limit 5/menit per nota dan 30/menit per tenant.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, follows_store_social]
+              properties:
+                phone: { type: string, example: "0812-3456-7890" }
+                name: { type: string, maxLength: 200 }
+                social_handle: { type: string, maxLength: 100 }
+                follows_store_social: { type: boolean, description: "Wajib true (syarat member toko)" }
+      responses:
+        "201":
+          description: Member terdaftar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object, properties: { member_code: { type: string, example: "M-8ER68X" } } }
+        "404": { description: NOTA_NOT_FOUND }
+        "409": { description: "NOTA_SIGNUP_CLOSED · MEMBER_ALREADY_EXISTS" }
+        "422": { description: "VALIDATION_ERROR (nomor WA, belum follow, terlalu panjang)" }
+        "429": { description: RATE_LIMITED }
 
   # ═══════════════════════════════════════════════════════════════
   # SYNC — FR-40..48 (endpoint paling kritis di seluruh API)
@@ -1050,6 +1147,7 @@ components:
         receipt_footer: { type: string, nullable: true, description: "Teks penutup struk (migrasi 00010)" }
         social_handle: { type: string, nullable: true, description: "Akun media sosial toko yang wajib di-follow calon member (migrasi 00012)" }
         bibit_percent: { type: integer, description: "Persen bibit racikan parfum; 0 = tanpa racikan (migrasi 00013)" }
+        nota_web_url: { type: string, nullable: true, description: "Halaman nota publik di web toko; QR nota = <ini>/<tenant>/<nota>. Kosong = tanpa QR (migrasi 00014, ADR-0013)" }
         warranty_days: { type: integer, description: "Garansi (hari) di nota; 0 = tanpa garansi (migrasi 00011)" }
         is_active: { type: boolean }
 

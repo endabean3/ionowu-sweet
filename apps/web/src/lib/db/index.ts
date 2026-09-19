@@ -100,6 +100,8 @@ export interface LocalOutlet {
   social_handle?: string | null;
   /** Persen bibit racikan parfum; 0 = tanpa racikan (migrasi 00013). */
   bibit_percent?: number | null;
+  /** Alamat halaman nota publik di web toko (ADR-0013); kosong = tanpa QR. */
+  nota_web_url?: string | null;
 }
 
 /**

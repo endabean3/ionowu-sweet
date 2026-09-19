@@ -4,6 +4,43 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.25.0] — 2026-09-19
+
+### Ditambahkan
+* **QR di nota: cek garansi & daftar member** (ADR-0013, pilihan pemilik Warung Wangi).
+  * Nota mencetak QR ke `<Alamat web nota>/<tenant>/<nota>`; alamatnya diisi di **Pengaturan →
+    Alamat web nota (QR)**, dan kosong berarti tanpa QR.
+  * Printer termal: raster `GS v 0` (4 titik/modul ≈ 24 mm), jadi tidak bergantung pada perintah QR
+    bawaan printer. Nota browser: SVG dari matriks yang sama.
+  * **Terbukti terbaca**: `zbarimg` membaca tautan persis dari raster printer.
+* **Endpoint publik tanpa login** (pertama di pos-engine):
+  * `GET /public/v1/nota/{tenant}/{nota}` → ringkasan nota dan status garansi, tanpa
+    PII/kasir/HPP/id tenant;
+  * `POST …/member` → daftar member, **satu per nota**, hanya untuk nota lunas tanpa member
+    ≤ 30 hari.
+  * Rate limit per tenant/nota. Kode error baru: `NOTA_NOT_FOUND`, `NOTA_SIGNUP_CLOSED`,
+    `MEMBER_ALREADY_EXISTS`.
+* Migrasi **`00014_nota_web`**: `outlets.nota_web_url`, `customers.signup_sale_id` + indeks unik
+  parsial (expand murni).
+* Halaman nota ada di situs toko (`warungwangi.ionowu.com/nota/...`, repo `endabean3/warungwangi`).
+  Data dibaca dari server situs itu, dan halamannya dikunci ke tenant toko itu sendiri.
+
+### Diperbaiki
+* **Nomor di nota ≠ id penjualan di server.** Kasir memanggil `ulid()` dua kali per penjualan (id
+  antrean untuk nota, `payload.id` untuk server), sehingga nomor di tangan pembeli tidak pernah bisa
+  dicari untuk klaim garansi atau refund. Kini satu id dipakai untuk antrean, payload, dan nota.
+
+### Diuji
+* Go:
+  * batas tanggal garansi di zona waktu outlet (23:59 vs 00:00 WIB);
+  * syarat daftar (void/refund/member/dipakai/> 30 hari);
+  * validasi nomor, kode member = klien, pola ULID, URL nota (https saja, tanpa `?#`/kredensial).
+* Vitest 92/92: raster = SVG = matriks yang sama, blok QR di nota, pratinjau melompati data raster.
+* Playwright `e2e/nota-publik.spec.ts` (desktop + ponsel), alur penuh jual → QR → sinkron:
+  * nota publik tanpa PII;
+  * nomor nota = id server;
+  * daftar member 201, daftar kedua 409;
+  * tenant lain 404.
 ## [1.24.0] — 2026-09-19
 
 ### Ditambahkan

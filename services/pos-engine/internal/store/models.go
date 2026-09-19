@@ -101,6 +101,7 @@ type Customer struct {
 	SocialHandle       *string            `db:"social_handle" json:"social_handle"`
 	FollowsStoreSocial bool               `db:"follows_store_social" json:"follows_store_social"`
 	MerchandiseGivenAt pgtype.Timestamptz `db:"merchandise_given_at" json:"merchandise_given_at"`
+	SignupSaleID       *string            `db:"signup_sale_id" json:"signup_sale_id"`
 }
 
 type CustomerConsent struct {
@@ -231,6 +232,7 @@ type Outlet struct {
 	WarrantyDays     int16              `db:"warranty_days" json:"warranty_days"`
 	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 	BibitPercent     int16              `db:"bibit_percent" json:"bibit_percent"`
+	NotaWebUrl       *string            `db:"nota_web_url" json:"nota_web_url"`
 }
 
 type OutletPriceOverride struct {

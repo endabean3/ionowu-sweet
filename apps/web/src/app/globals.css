@@ -184,6 +184,16 @@ body {
     print-color-adjust: exact;
   }
 
+  /* QR nota publik: 26 mm persegi, sama dengan versi printer termal. */
+  .receipt-qr {
+    display: block;
+    width: 26mm;
+    height: 26mm;
+    margin: 1.5mm auto 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .receipt-item {
     margin-bottom: 2px;
   }
