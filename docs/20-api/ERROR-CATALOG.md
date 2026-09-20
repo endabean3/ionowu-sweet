@@ -58,9 +58,10 @@ Setiap kode wajib punya satu kelas. Kelas menentukan perilaku klien, bukan pesan
 | `IDEMPOTENCY_KEY_REUSED` | 409 | ⛔ | Key sama, body berbeda. Bug klien, jangan ulangi |
 | `INSUFFICIENT_STOCK` | 422 | ⛔ | Stok kurang. **Untuk sync offline: lihat §5** |
 | `SHIFT_NOT_FOUND` | 404 | ⛔ | Shift ID tidak ditemukan saat tutup shift |
-| `SHIFT_CLOSED` | 422 | ⛔ | Transaksi milik shift yang sudah ditutup → bucket *late arrival* |
+| `SHIFT_CLOSED` | 422 | ⛔ | Transaksi milik shift yang sudah ditutup → bucket *late arrival*. Juga dipakai menolak **void** setelah shift ditutup (pakai refund) |
 | `SHIFT_NOT_OPEN` | 422 | 👤 | Kasir belum membuka shift |
 | `TRANSACTION_ALREADY_VOIDED` | 422 | ⛔ | Sudah pernah di-void |
+| `TRANSACTION_NOT_FOUND` | 404 | ⛔ | Id transaksi salah **atau milik tenant lain** — sengaja tidak dibedakan |
 | `REFUND_EXCEEDS_TOTAL` | 422 | ⛔ | Nominal refund melebihi transaksi |
 | `INVALID_TRANSACTION_TOTAL` | 422 | ⛔ | Total klien ≠ hitung ulang server. **Selalu alarm** |
 | `SYNC_BATCH_TOO_LARGE` | 413 | 👤 | Klien harus memecah batch, lalu ulangi |

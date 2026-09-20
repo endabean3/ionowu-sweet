@@ -137,6 +137,7 @@ type Querier interface {
 	// ERROR-CATALOG §B DUPLICATE_TRANSACTION) — klien menerima record yang SUDAH
 	// ada, bukan error, persis seperti openapi.yaml POST /sales respons 200.
 	GetSaleByID(ctx context.Context, arg GetSaleByIDParams) (GetSaleByIDRow, error)
+	GetSaleDetail(ctx context.Context, arg GetSaleDetailParams) (GetSaleDetailRow, error)
 	// Dipakai PostRefund untuk menegakkan REFUND_EXCEEDS_TOTAL (ERROR-CATALOG §B)
 	// — tanpa ini, refund_total tidak pernah dibandingkan dengan grand_total asli.
 	GetSaleForRefund(ctx context.Context, arg GetSaleForRefundParams) (GetSaleForRefundRow, error)
@@ -171,6 +172,10 @@ type Querier interface {
 	GetUserByEmailGlobal(ctx context.Context, email string) (GetUserByEmailGlobalRow, error)
 	// Setelah login sukses, ambil info tenant untuk disertakan dalam JWT claims.
 	GetUserWithTenant(ctx context.Context, id string) (GetUserWithTenantRow, error)
+	// Satuan jual + konversi ke satuan stok, TANPA filter is_active: void atau
+	// refund atas barang yang sudah dinonaktifkan tetap harus mengembalikan stok
+	// dalam satuan yang benar.
+	GetVariantConversion(ctx context.Context, arg GetVariantConversionParams) (GetVariantConversionRow, error)
 	GetVariantForCheckout(ctx context.Context, arg GetVariantForCheckoutParams) (GetVariantForCheckoutRow, error)
 	// Kebalikan DecrementStockAllowNegative — barang fisik kembali ke rak.
 	// item_type dibatasi sama seperti pemotongan stok checkout.
@@ -225,6 +230,18 @@ type Querier interface {
 	ListOutletsForUser(ctx context.Context, arg ListOutletsForUserParams) ([]ListOutletsForUserRow, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	ListPublicNotaItems(ctx context.Context, arg ListPublicNotaItemsParams) ([]ListPublicNotaItemsRow, error)
+	ListSaleItems(ctx context.Context, arg ListSaleItemsParams) ([]ListSaleItemsRow, error)
+	ListSalePayments(ctx context.Context, arg ListSalePaymentsParams) ([]ListSalePaymentsRow, error)
+	ListSaleRefunds(ctx context.Context, arg ListSaleRefundsParams) ([]ListSaleRefundsRow, error)
+	// Riwayat transaksi: mencari nota lama untuk klaim garansi, refund, dan void.
+	// Semua kueri memfilter tenant_id; pemanggilnya juga membatasi outlet.
+	// Daftar transaksi terbaru dengan total refund yang sudah pernah terjadi,
+	// supaya layar riwayat bisa menandai "sudah direfund" tanpa N+1 kueri.
+	// Data percobaan (is_sandbox) dikecualikan, sama seperti seluruh laporan.
+	ListSales(ctx context.Context, arg ListSalesParams) ([]ListSalesRow, error)
+	// Laporan pergerakan stok (ledger append-only = KEBENARAN stok, DATA-MODEL
+	// §4C). Dipakai pemilik untuk melihat stok keluar bibit dalam gram.
+	ListStockEvents(ctx context.Context, arg ListStockEventsParams) ([]ListStockEventsRow, error)
 	// `uom` di sini adalah satuan STOK (satuan tempat stock_quantity dihitung):
 	// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)
@@ -265,6 +282,9 @@ type Querier interface {
 	// Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
 	// baru lewat money.RemainingRefundable sebelum refund ini disimpan.
 	SumRefundsForTransaction(ctx context.Context, arg SumRefundsForTransactionParams) (decimal.Decimal, error)
+	// Ringkasan per jenis + satuan: "terjual 412,5 g" dalam satu baris, tanpa
+	// menjumlahkan gram dengan pcs.
+	SumStockEventsByType(ctx context.Context, arg SumStockEventsByTypeParams) ([]SumStockEventsByTypeRow, error)
 	// :execrows, bukan :exec — id yang salah atau milik tenant lain harus
 	// menjadi 404, bukan "Outlet diupdate" yang tidak mengubah apa pun.
 	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int64, error)
@@ -274,6 +294,9 @@ type Querier interface {
 	// sebelum IndexedDB penuh — server bisa tampak sehat sempurna sementara sebuah
 	// perangkat kasir mendekati kegagalan total. (OBSERVABILITY §3)
 	UpsertDeviceSyncState(ctx context.Context, arg UpsertDeviceSyncStateParams) error
+	// Pembatalan hanya untuk transaksi yang MASIH lunas dan shift-nya terbuka;
+	// 0 baris = sudah void, sudah tutup shift, atau bukan milik tenant ini.
+	VoidSale(ctx context.Context, arg VoidSaleParams) (int64, error)
 	// ── VOID & IDEMPOTENSI ─────────────────────────────────────────────────
 	// Hanya transaksi 'paid' yang bisa di-void; mencoba void dua kali
 	// mengembalikan 0 baris → TRANSACTION_ALREADY_VOIDED (kelas PERMANENT).

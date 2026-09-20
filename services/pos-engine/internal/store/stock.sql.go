@@ -71,6 +71,41 @@ func (q *Queries) GetStockUom(ctx context.Context, arg GetStockUomParams) (strin
 	return stock_uom, err
 }
 
+const getVariantConversion = `-- name: GetVariantConversion :one
+SELECT v.uom, COALESCE(sc.to_uom, '')::VARCHAR AS stock_uom,
+       COALESCE(sc.factor, 0)::DECIMAL AS stock_factor
+FROM variants v
+LEFT JOIN LATERAL (
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
+WHERE v.tenant_id = $1 AND v.id = $2
+`
+
+type GetVariantConversionParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+type GetVariantConversionRow struct {
+	Uom         string          `db:"uom" json:"uom"`
+	StockUom    string          `db:"stock_uom" json:"stock_uom"`
+	StockFactor decimal.Decimal `db:"stock_factor" json:"stock_factor"`
+}
+
+// Satuan jual + konversi ke satuan stok, TANPA filter is_active: void atau
+// refund atas barang yang sudah dinonaktifkan tetap harus mengembalikan stok
+// dalam satuan yang benar.
+func (q *Queries) GetVariantConversion(ctx context.Context, arg GetVariantConversionParams) (GetVariantConversionRow, error) {
+	row := q.db.QueryRow(ctx, getVariantConversion, arg.TenantID, arg.ID)
+	var i GetVariantConversionRow
+	err := row.Scan(&i.Uom, &i.StockUom, &i.StockFactor)
+	return i, err
+}
+
 const insertStockEvent = `-- name: InsertStockEvent :one
 INSERT INTO stock_events (id, tenant_id, outlet_id, variant_id, event_type, quantity_delta, balance_after, uom, reference_id, actor_user_id, note)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -173,6 +208,89 @@ func (q *Queries) InsertStockOpnameItem(ctx context.Context, arg InsertStockOpna
 	var i InsertStockOpnameItemRow
 	err := row.Scan(&i.ID, &i.Variance)
 	return i, err
+}
+
+const listStockEvents = `-- name: ListStockEvents :many
+SELECT se.id, se.created_at, se.event_type, se.quantity_delta, se.balance_after, se.uom,
+       se.note, se.reference_id, se.variant_id,
+       p.name AS product_name, v.name AS variant_name, u.name AS actor_name
+FROM stock_events se
+JOIN variants v ON v.id = se.variant_id AND v.tenant_id = se.tenant_id
+JOIN products p ON p.id = v.product_id AND p.tenant_id = v.tenant_id
+LEFT JOIN users u ON u.id = se.actor_user_id AND u.tenant_id = se.tenant_id
+WHERE se.tenant_id = $1
+  AND se.outlet_id = $2
+  AND se.created_at >= $3::timestamptz
+  AND se.created_at < $4::timestamptz
+  AND ($5::text IS NULL OR se.variant_id = $5::text)
+ORDER BY se.created_at DESC
+LIMIT $6::int
+`
+
+type ListStockEventsParams struct {
+	TenantID string             `db:"tenant_id" json:"tenant_id"`
+	OutletID string             `db:"outlet_id" json:"outlet_id"`
+	Dari     pgtype.Timestamptz `db:"dari" json:"dari"`
+	Sampai   pgtype.Timestamptz `db:"sampai" json:"sampai"`
+	Variant  *string            `db:"variant" json:"variant"`
+	Batas    int32              `db:"batas" json:"batas"`
+}
+
+type ListStockEventsRow struct {
+	ID            string             `db:"id" json:"id"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	EventType     string             `db:"event_type" json:"event_type"`
+	QuantityDelta decimal.Decimal    `db:"quantity_delta" json:"quantity_delta"`
+	BalanceAfter  decimal.Decimal    `db:"balance_after" json:"balance_after"`
+	Uom           string             `db:"uom" json:"uom"`
+	Note          *string            `db:"note" json:"note"`
+	ReferenceID   *string            `db:"reference_id" json:"reference_id"`
+	VariantID     string             `db:"variant_id" json:"variant_id"`
+	ProductName   string             `db:"product_name" json:"product_name"`
+	VariantName   string             `db:"variant_name" json:"variant_name"`
+	ActorName     *string            `db:"actor_name" json:"actor_name"`
+}
+
+// Laporan pergerakan stok (ledger append-only = KEBENARAN stok, DATA-MODEL
+// §4C). Dipakai pemilik untuk melihat stok keluar bibit dalam gram.
+func (q *Queries) ListStockEvents(ctx context.Context, arg ListStockEventsParams) ([]ListStockEventsRow, error) {
+	rows, err := q.db.Query(ctx, listStockEvents,
+		arg.TenantID,
+		arg.OutletID,
+		arg.Dari,
+		arg.Sampai,
+		arg.Variant,
+		arg.Batas,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStockEventsRow{}
+	for rows.Next() {
+		var i ListStockEventsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.EventType,
+			&i.QuantityDelta,
+			&i.BalanceAfter,
+			&i.Uom,
+			&i.Note,
+			&i.ReferenceID,
+			&i.VariantID,
+			&i.ProductName,
+			&i.VariantName,
+			&i.ActorName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listStockLevels = `-- name: ListStockLevels :many
@@ -293,4 +411,66 @@ func (q *Queries) SetStock(ctx context.Context, arg SetStockParams) (decimal.Dec
 	var stock_quantity decimal.Decimal
 	err := row.Scan(&stock_quantity)
 	return stock_quantity, err
+}
+
+const sumStockEventsByType = `-- name: SumStockEventsByType :many
+SELECT se.event_type, se.uom,
+       SUM(se.quantity_delta)::DECIMAL AS total,
+       COUNT(*)::int AS jumlah_baris
+FROM stock_events se
+WHERE se.tenant_id = $1
+  AND se.outlet_id = $2
+  AND se.created_at >= $3::timestamptz
+  AND se.created_at < $4::timestamptz
+  AND ($5::text IS NULL OR se.variant_id = $5::text)
+GROUP BY se.event_type, se.uom
+ORDER BY se.event_type, se.uom
+`
+
+type SumStockEventsByTypeParams struct {
+	TenantID string             `db:"tenant_id" json:"tenant_id"`
+	OutletID string             `db:"outlet_id" json:"outlet_id"`
+	Dari     pgtype.Timestamptz `db:"dari" json:"dari"`
+	Sampai   pgtype.Timestamptz `db:"sampai" json:"sampai"`
+	Variant  *string            `db:"variant" json:"variant"`
+}
+
+type SumStockEventsByTypeRow struct {
+	EventType   string          `db:"event_type" json:"event_type"`
+	Uom         string          `db:"uom" json:"uom"`
+	Total       decimal.Decimal `db:"total" json:"total"`
+	JumlahBaris int32           `db:"jumlah_baris" json:"jumlah_baris"`
+}
+
+// Ringkasan per jenis + satuan: "terjual 412,5 g" dalam satu baris, tanpa
+// menjumlahkan gram dengan pcs.
+func (q *Queries) SumStockEventsByType(ctx context.Context, arg SumStockEventsByTypeParams) ([]SumStockEventsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, sumStockEventsByType,
+		arg.TenantID,
+		arg.OutletID,
+		arg.Dari,
+		arg.Sampai,
+		arg.Variant,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SumStockEventsByTypeRow{}
+	for rows.Next() {
+		var i SumStockEventsByTypeRow
+		if err := rows.Scan(
+			&i.EventType,
+			&i.Uom,
+			&i.Total,
+			&i.JumlahBaris,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

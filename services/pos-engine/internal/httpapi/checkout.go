@@ -13,7 +13,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
 
-	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/auth"
 	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/money"
 	"github.com/endabean3/ionowu-sweet/services/pos-engine/internal/store"
 )
@@ -412,33 +411,12 @@ func (h *CheckoutHandler) PostRefund(w http.ResponseWriter, r *http.Request, tra
 	// yang sedang login boleh menyetujui refundnya sendiri.
 	approvedBy := actorID
 	if actorRole == "cashier" {
-		if req.ApproverUserID == "" || req.Pin == "" {
-			RespondError(w, http.StatusForbidden, "MANAGER_PIN_REQUIRED", "Refund oleh kasir butuh persetujuan PIN manager")
+		id, msg, status, code := verifikasiPinManager(ctx, h.q, tenantID, req.ApproverUserID, req.Pin)
+		if msg != "" {
+			RespondError(w, status, code, msg)
 			return
 		}
-		approver, err := h.q.GetApproverForPin(ctx, store.GetApproverForPinParams{TenantID: tenantID, ID: req.ApproverUserID})
-		if errors.Is(err, pgx.ErrNoRows) {
-			RespondError(w, http.StatusUnauthorized, "INVALID_PIN", "Approver tidak ditemukan")
-			return
-		}
-		if err != nil {
-			RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memeriksa approver")
-			return
-		}
-		if !approver.IsActive || (approver.Role != "owner" && approver.Role != "manager") {
-			RespondError(w, http.StatusForbidden, "MANAGER_PIN_REQUIRED", "Approver harus manager/owner aktif")
-			return
-		}
-		if approver.PinHash == nil {
-			RespondError(w, http.StatusUnauthorized, "INVALID_PIN", "Manager ini belum mengatur PIN")
-			return
-		}
-		ok, err := auth.VerifyPassword(req.Pin, *approver.PinHash)
-		if err != nil || !ok {
-			RespondError(w, http.StatusUnauthorized, "INVALID_PIN", "PIN salah")
-			return
-		}
-		approvedBy = approver.ID
+		approvedBy = id
 	}
 
 	tx, err := h.pool.Begin(ctx)
