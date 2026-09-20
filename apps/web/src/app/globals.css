@@ -172,14 +172,16 @@ body {
     gap: 4px;
   }
 
-  /* Barcode member: lebar tetap 44 mm & tinggi 12 mm — cukup besar untuk
-     dipindai kamera ponsel dari kertas 58 mm. print-color-adjust memaksa
-     batang hitam tetap tercetak walau "cetak latar belakang" dimatikan. */
+  /* Barcode member & kode nota: lebar tetap 44 mm & tinggi 12 mm — cukup
+     besar untuk dipindai dari kertas 58 mm. Jarak atas-bawah 2,5 mm: zona
+     tenang barcode ikut terjaga, dan pemindai tidak terganggu teks yang
+     menempel. print-color-adjust memaksa batang hitam tetap tercetak walau
+     "cetak latar belakang" dimatikan. */
   .receipt-barcode {
     display: block;
     width: 44mm;
     height: 12mm;
-    margin: 1.5mm auto 0;
+    margin: 2.5mm auto;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -189,9 +191,11 @@ body {
      karena kaburnya membuat titik dithering menyatu jadi abu-abu. */
   .receipt-logo {
     display: block;
-    width: 48mm;
+    /* Lebar sebenarnya diisi inline dari bitmap (8 titik = 1 mm); nilai di
+       sini hanya batas aman bila logonya rusak. */
+    max-width: 48mm;
     height: auto;
-    margin: 0 auto 1.5mm;
+    margin: 0 auto 2.5mm;
     image-rendering: pixelated;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -202,7 +206,7 @@ body {
     display: block;
     width: 26mm;
     height: 26mm;
-    margin: 1.5mm auto 0;
+    margin: 2.5mm auto;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

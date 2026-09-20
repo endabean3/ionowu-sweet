@@ -21,8 +21,18 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   * Latar transparan dianggap **putih** — PNG transparan yang diperlakukan hitam akan keluar
     sebagai kotak hitam pekat sepanjang logo.
   * Rasio dijaga: logo persegi tidak digepengkan saat tingginya dibatasi.
+  * **Tinggi maksimal 192 titik (24 mm)** — dipilih dengan melihat hasil cetak: 30 mm memakan
+    hampir sepertiga nota 58 mm, sedangkan 20 mm membuat tulisan di dalam logo hilang.
   * Cadangan `<img>` bila `createImageBitmap` tidak tersedia (WebView Android lama).
 * Migrasi **`00016_outlet_receipt_logo`**: `outlets.receipt_logo` TEXT (expand murni).
+
+### Diperbaiki
+* **Nota browser mencetak logo jauh lebih besar daripada printer termal** untuk berkas yang
+  sama: CSS memaksa 48 mm, sementara printer memakai lebar bitmap-nya (mis. 24 mm). Lebar di
+  layar kini diambil dari bitmap (8 titik = 1 mm pada 203 dpi), jadi pratinjau = hasil cetak.
+* **Blok barcode berdempetan dengan teks.** Logo, barcode member, QR garansi, dan barcode kode
+  nota kini punya jarak 2,5 mm (baris kosong di printer termal) — itu sekaligus zona tenang
+  barcode, yang tanpa jarak membuat sebagian pemindai gagal membaca.
 
 ### Keamanan / ketahanan
 * Server memvalidasi bitmap **termasuk panjang datanya** (lebar kelipatan 8 ≤ 576, tinggi ≤ 240,
@@ -37,6 +47,8 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
   dan bisa dihapus lagi.
 * Dicoba dengan **logo Warung Wangi yang asli**; hasil hitam-putihnya diperiksa langsung di
   pratinjau nota bergaya cetak.
+* **`zbarimg` membaca ketiga kode dari satu nota** yang sudah memuat logo: QR nota publik,
+  barcode kode nota, dan barcode member — jadi jarak baru tidak mengorbankan keterbacaan.
 
 ## [1.28.0] — 2026-09-20
 

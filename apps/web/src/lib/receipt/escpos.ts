@@ -176,7 +176,10 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
   // jalur cetak.
   const logo = decodeLogo(data.logo);
   if (logo && logo.width <= COLUMNS_DOTS[paper]) {
-    out.align("center").raster(logo.width / 8, logo.height, logo.bits);
+    out
+      .align("center")
+      .raster(logo.width / 8, logo.height, logo.bits)
+      .line();
   }
 
   out
@@ -250,7 +253,9 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
       .lines(wrap(t(`Member ${m.code}${m.name ? ` (${m.name})` : ""}`), w))
       .bold(false);
     for (const bonus of m.bonuses) out.lines(wrap(t(`Bonus: ${bonus}`), w));
-    out.barcode128(m.code).align("left");
+    // Baris kosong = zona tenang barcode. Tanpa itu, teks yang menempel di
+    // atas/bawah batang membuat sebagian pemindai gagal membaca.
+    out.line().barcode128(m.code).line().align("left");
   }
 
   // QR ke halaman nota publik di web toko (ADR-0013): cek garansi, dan
@@ -265,13 +270,13 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
     // 4 titik per modul: QR versi 6 (41 modul + zona tenang) = 196 titik
     // ≈ 24 mm — muat di kertas 58 mm (384 titik) dan terbaca kamera HP.
     const q = qrRaster(data.notaUrl, 4);
-    out.raster(q.widthBytes, q.height, q.data);
+    out.line().raster(q.widthBytes, q.height, q.data).line();
   }
 
   out.line(sep).align("center");
   // Kode nota sebagai BARCODE 1D: kasir memindainya untuk membuka nota ini
   // di layar Riwayat (klaim garansi, refund, void) tanpa mengetik ulang.
-  out.barcode128(kodeNota(data.transactionId));
+  out.line().barcode128(kodeNota(data.transactionId)).line();
   out.lines(wrap(`No. ${t(data.transactionId)}`, w));
   // Lihat catatan sejenis di receipt.tsx: struk offline sah bagi pembeli,
   // tetapi belum terlihat di laporan pemilik sampai antreannya terkirim.

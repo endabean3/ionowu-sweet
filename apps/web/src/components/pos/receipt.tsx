@@ -16,7 +16,7 @@ import {
   rupiah,
   warrantyLine,
 } from "@/lib/receipt/format";
-import { decodeLogo, logoKeDataUrl } from "@/lib/receipt/logo";
+import { TITIK_PER_MM, decodeLogo, logoKeDataUrl } from "@/lib/receipt/logo";
 import { ml, takaranRacikan } from "@/lib/receipt/recipe";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
@@ -202,7 +202,13 @@ function LogoNota({ raw }: { raw?: string | null }) {
       alt=""
       width={logo.width}
       height={logo.height}
-      style={{ aspectRatio: `${logo.width} / ${logo.height}` }}
+      // Ukuran diambil dari bitmap-nya: 8 titik = 1 mm di printer 203 dpi.
+      // Sebelumnya CSS memaksa 48 mm, sehingga nota browser mencetak logo
+      // jauh lebih besar daripada printer termal untuk berkas yang sama.
+      style={{
+        width: `${logo.width / TITIK_PER_MM}mm`,
+        aspectRatio: `${logo.width} / ${logo.height}`,
+      }}
     />
   );
 }

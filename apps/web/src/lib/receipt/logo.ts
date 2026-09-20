@@ -14,8 +14,19 @@
 /** Lebar cetak printer termal dalam titik. */
 export const LEBAR_TITIK = { 58: 384, 80: 576 } as const;
 
-/** Batas tinggi: menjaga satu nota tetap cepat terkirim lewat Bluetooth. */
-export const MAKS_TINGGI = 240;
+/**
+ * Batas tinggi logo dalam TITIK. 8 titik = 1 mm pada printer termal 203 dpi,
+ * jadi 192 titik = 24 mm.
+ *
+ * Angka ini dipilih dengan melihat hasil cetaknya, bukan ditebak: 240 titik
+ * (30 mm) memakan hampir sepertiga nota 58 mm, sedangkan 160 titik (20 mm)
+ * membuat tulisan di dalam logo hilang sama sekali. Tinggi juga membatasi
+ * lama kirim lewat Bluetooth — logo persegi di sini ±4,6 KB.
+ */
+export const MAKS_TINGGI = 192;
+
+/** Printer termal 203 dpi: 8 titik = 1 mm. Dipakai menyamakan ukuran di layar. */
+export const TITIK_PER_MM = 8;
 
 export interface LogoBitmap {
   /** Kelipatan 8 (satu byte = 8 titik). */
