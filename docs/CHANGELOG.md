@@ -4,6 +4,20 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.30.0] — 2026-09-20
+
+### Diubah
+* **Resep racikan tidak lagi dicetak di nota** (keputusan pemilik Warung Wangi): takaran
+  bibit:pelarut adalah pengetahuan toko, bukan informasi pembeli. Nota kini hanya menyebut
+  **jumlah bibit dalam ml** pada baris barangnya.
+  * Tabel "Racikan 65% bibit : 35% pelarut" dan daftar takaran per ukuran botol dibuang dari
+    nota termal maupun nota browser, beserta `ReceiptData.recipePercent` dan `adaBibitMl`.
+  * **Keypad kasir tidak berubah**: pintasan "Botol 30 ml → 19,5 ml" tetap ada, dan itulah
+    satu-satunya tempat resep dipakai. Pengaturan "% bibit" tetap mengaturnya.
+  * Teks bantuan di Pengaturan diperbaiki; sebelumnya menjanjikan takaran ikut tercetak di nota.
+  * Uji lama yang memastikan tabel takaran TERCETAK diganti dengan kebalikannya: nota berisi
+    bibit ml tidak boleh memuat kata "racikan"/"pelarut", tetapi wajib memuat "30 ml x Rp …".
+
 ## [1.29.0] — 2026-09-20
 
 ### Ditambahkan

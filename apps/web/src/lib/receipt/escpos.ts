@@ -3,7 +3,6 @@ import { qrRaster } from "../barcode/qr";
 import {
   METHOD_LABEL,
   type ReceiptData,
-  adaBibitMl,
   formatWaktu,
   kodeNota,
   lineDiscount,
@@ -14,7 +13,6 @@ import {
   warrantyLine,
 } from "./format";
 import { decodeLogo } from "./logo";
-import { ml, takaranRacikan } from "./recipe";
 
 /**
  * Menyusun struk menjadi byte ESC/POS untuk printer termal.
@@ -225,24 +223,6 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
       .bold(true)
       .lines(row("Kembali", rupiah(data.changeAmount), w))
       .bold(false);
-  }
-
-  // Racikan (Warung Wangi 65:35): tabel takaran per ukuran botol, hanya bila
-  // nota memuat bibit per ml — nota botol/aksesori saja tidak perlu.
-  const takaran = adaBibitMl(data) ? takaranRacikan(data.recipePercent) : [];
-  if (takaran.length > 0) {
-    const p = data.recipePercent as number;
-    out.line(sep).align("center");
-    out
-      .bold(true)
-      .lines(wrap(`Racikan ${p}% bibit : ${100 - p}% pelarut`, w))
-      .bold(false);
-    out.align("left");
-    const kolom = (a: string, b: string, c: string) =>
-      a.padEnd(9) + b.padEnd(w - 9 - 11) + c.padStart(11);
-    out.line(kolom("Botol", "Bibit", "Pelarut"));
-    for (const t of takaran)
-      out.line(kolom(`${t.botol} ml`, `${ml(t.bibit)} ml`, `${ml(t.pelarut)} ml`));
   }
 
   if (data.member) {

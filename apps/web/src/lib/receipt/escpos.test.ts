@@ -310,28 +310,18 @@ describe("member di nota", () => {
   });
 });
 
-describe("racikan di nota", () => {
-  const baris = (d: ReceiptData, paper: 58 | 80 = 58) =>
-    printedText(encodeReceipt(d, paper)).split("\n");
-
-  it("nota berisi bibit ml + racikan 65: tabel takaran tercetak dan muat lebar kertas", () => {
+describe("resep TIDAK dicetak di nota", () => {
+  // Permintaan pemilik: resep racikan adalah pengetahuan toko. Nota pembeli
+  // hanya menyebut jumlah bibit dalam ml; takaran botol tetap ada di keypad
+  // kasir (components/pos/qty-keypad.tsx).
+  it("nota berisi bibit ml tidak memuat tabel takaran atau kata resep", () => {
     for (const paper of [58, 80] as const) {
-      const b = baris({ ...contoh, recipePercent: 65 }, paper);
-      expect(b).toContain("Racikan 65% bibit : 35% pelarut");
-      // Baris item "30 ml x Rp 500" juga diawali "30 ml" — cocokkan pola lengkap.
-      expect(b.some((x) => /^30 ml\s+19,5 ml\s+10,5 ml$/.test(x))).toBe(true);
-      expect(b.some((x) => /^15 ml\s+9,8 ml\s+5,2 ml$/.test(x))).toBe(true);
-      for (const x of b) expect(x.length).toBeLessThanOrEqual(COLUMNS[paper]);
+      const teks = printedText(encodeReceipt(contoh, paper));
+      expect(teks).not.toContain("Racikan");
+      expect(teks).not.toContain("Pelarut");
+      expect(teks).not.toMatch(/pelarut/i);
+      // Yang JUSTRU harus ada: jumlah bibit dalam ml pada baris barangnya.
+      expect(teks).toMatch(/30 ml x Rp/);
     }
-  });
-
-  it("tanpa bibit ml (botol saja) atau racikan 0: tabel tidak dicetak", () => {
-    const botolSaja: ReceiptData = {
-      ...contoh,
-      recipePercent: 65,
-      lines: [{ name: "Botol Slim", quantity: "1", unitPrice: "4000", discount: "0", uom: "pcs" }],
-    };
-    expect(baris(botolSaja).join("\n")).not.toContain("Racikan");
-    expect(baris({ ...contoh, recipePercent: 0 }).join("\n")).not.toContain("Racikan");
   });
 });

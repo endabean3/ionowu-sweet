@@ -96,7 +96,6 @@ export default function RiwayatPage() {
       outletPhone: outlet?.phone,
       footer: outlet?.receipt_footer,
       warrantyDays: outlet?.warranty_days,
-      recipePercent: outlet?.bibit_percent,
       logo: outlet?.receipt_logo,
     };
     setNotaCetak(lengkap);

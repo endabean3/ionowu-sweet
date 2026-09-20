@@ -206,7 +206,6 @@ export default function PengaturanPage() {
       outletPhone: form.phone,
       footer: form.receipt_footer,
       warrantyDays: garansiSah ? garansiHari : 0,
-      recipePercent: racikanSah ? racikan : 0,
       logo: form.receipt_logo || null,
       notaUrl: notaUrlSah
         ? notaWebLink(notaUrlBersih, "01CONTOHTENANT000000000000", "01CONTOHSTRUK0000000PRATINJ")
@@ -395,15 +394,16 @@ export default function PengaturanPage() {
                     max={100}
                     hint={
                       racikanSah && racikan > 0
-                        ? `${racikan} : ${100 - racikan} pelarut`
+                        ? `${racikan} : ${100 - racikan} pelarut — untuk kasir`
                         : "0 = tanpa racikan"
                     }
                     error={racikanSah ? undefined : "Isi 0–100"}
                   />
                 </div>
                 <p className="-mt-2 text-xs text-main">
-                  Di nota: "Garansi {garansiSah ? garansiHari : "N"} hari s/d &lt;tanggal&gt;" dan
-                  tabel takaran bibit per ukuran botol (hanya nota berisi bibit ml).
+                  Garansi dicetak di nota: "Garansi {garansiSah ? garansiHari : "N"} hari s/d
+                  &lt;tanggal&gt;". Racikan TIDAK dicetak di nota — hanya dipakai keypad kasir untuk
+                  menghitung bibit per ukuran botol. Nota pembeli cuma menyebut jumlah ml.
                 </p>
                 <Input
                   label="Akun TikTok toko"
