@@ -417,7 +417,6 @@ export default function KasirPage() {
         outletPhone: outlet?.phone,
         footer: outlet?.receipt_footer,
         warrantyDays: outlet?.warranty_days,
-        recipePercent: outlet?.bibit_percent,
         notaUrl: notaWebLink(outlet?.nota_web_url, identitas?.tenant_id, txId),
         logo: outlet?.receipt_logo,
         member: member

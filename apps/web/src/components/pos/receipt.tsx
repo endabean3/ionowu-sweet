@@ -6,7 +6,6 @@ import { formatQuantity } from "@/lib/catalog/quantity";
 import {
   METHOD_LABEL,
   type ReceiptData,
-  adaBibitMl,
   formatWaktu,
   kodeNota,
   lineDiscount,
@@ -17,7 +16,6 @@ import {
   warrantyLine,
 } from "@/lib/receipt/format";
 import { TITIK_PER_MM, decodeLogo, logoKeDataUrl } from "@/lib/receipt/logo";
-import { ml, takaranRacikan } from "@/lib/receipt/recipe";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -117,23 +115,6 @@ export function Receipt({ data }: { data: ReceiptData }) {
             <span>Kembali</span>
             <span>{rupiah(data.changeAmount)}</span>
           </div>
-        )}
-
-        {adaBibitMl(data) && takaranRacikan(data.recipePercent).length > 0 && (
-          <>
-            <div className="receipt-sep" />
-            <div className="receipt-center receipt-bold">
-              Racikan {data.recipePercent}% bibit : {100 - (data.recipePercent ?? 0)}% pelarut
-            </div>
-            {takaranRacikan(data.recipePercent).map((t) => (
-              <div key={t.botol} className="receipt-row receipt-small">
-                <span>Botol {t.botol} ml</span>
-                <span>
-                  {ml(t.bibit)} + {ml(t.pelarut)} ml
-                </span>
-              </div>
-            ))}
-          </>
         )}
 
         {data.member && (

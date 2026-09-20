@@ -177,8 +177,10 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   kode `M-XXXXXX` + barcode CODE128 di nota, bonus tester tiap beli & merchandise perdana.
   Bisa offline; `customers` diproses paling awal di `/sync/push`.
 * **Garansi di nota** (migrasi 00011): "Garansi N hari s/d <tanggal>", diatur di Pengaturan.
-* **Racikan parfum** (migrasi 00013): Pengaturan "% bibit" (Warung Wangi 65 → 65:35). Nota berisi
-  bibit ml mencetak takaran botol 10–100 ml; keypad kasir menampilkan "Botol 30 ml → 19,5 ml".
+* **Racikan parfum** (migrasi 00013): Pengaturan "% bibit" (Warung Wangi 65 → 65:35) dipakai
+  **HANYA di keypad kasir** ("Botol 30 ml → 19,5 ml"). **Resep tidak pernah dicetak di nota** —
+  keputusan pemilik 2026-09-20: takarannya pengetahuan toko. Nota pembeli hanya menyebut jumlah
+  bibit dalam ml. Jangan dikembalikan ke nota tanpa permintaan baru.
 * **Nota publik lewat QR** (ADR-0013, migrasi 00014): nota mencetak QR ke
   `<outlets.nota_web_url>/<tenant>/<nota>` (Warung Wangi: `warungwangi.ionowu.com/nota`, repo
   terpisah `endabean3/warungwangi`). Halaman itu membaca **endpoint publik TANPA login**
