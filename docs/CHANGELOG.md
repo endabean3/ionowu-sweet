@@ -4,6 +4,30 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.28.0] — 2026-09-20
+
+### Ditambahkan
+* **Kode nota dicetak sebagai barcode 1D (CODE128)** di setiap nota — printer termal (`GS k 73`,
+  dengan teks terbaca di bawahnya) maupun nota browser (SVG). Isinya **6 karakter terakhir id
+  transaksi**, sama dengan akhiran `receipt_number`, jadi hasil pindai langsung menemukan notanya
+  di layar Riwayat.
+  * Bukan id penuh 26 karakter: CODE128 sepanjang itu butuh ±341 modul, sementara kertas 58 mm
+    hanya 384 titik — modulnya jadi 1 titik (0,125 mm), di bawah batas baca pemindai genggam
+    murah. Enam karakter tercetak dengan modul 2 titik (±33 mm). Id penuh tetap dicetak sebagai
+    teks "No. …" di bawah barcode.
+  * QR nota publik (ADR-0013) TIDAK diganti: QR untuk kamera pembeli (cek garansi, daftar
+    member), barcode 1D untuk pemindai toko.
+* Pencarian di Riwayat kini mencocokkan **nomor nota ATAU id transaksi**, supaya hasil pindai
+  apa pun (kode 6 karakter atau id penuh) menemukan notanya.
+
+### Diuji
+* **`zbarimg` membaca kode nota** dari gambar nota yang dirender, baik versi layar maupun versi
+  gaya cetak — bukan sekadar bentuk batangnya benar.
+* Vitest: kode nota = 6 karakter terakhir (huruf besar), dan barcode tercetak tepat di atas
+  baris "No. …".
+* Playwright: nota memuat barcode kode nota, dan mengetik kode itu di kolom cari Riwayat
+  (persis yang dilakukan pemindai) menyisakan tepat satu nota.
+
 ## [1.27.0] — 2026-09-20
 
 ### Ditambahkan

@@ -21,7 +21,11 @@ WHERE s.tenant_id = $1
   AND NOT s.is_sandbox
   AND COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at) >= sqlc.arg('dari')::timestamptz
   AND COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at) < sqlc.arg('sampai')::timestamptz
-  AND (sqlc.narg('cari')::text IS NULL OR s.receipt_number ILIKE '%' || sqlc.narg('cari')::text || '%')
+  -- Cocokkan nomor nota ATAU id transaksi: barcode di nota memuat 6 karakter
+  -- terakhir id (= akhiran receipt_number), jadi hasil pindai selalu ketemu.
+  AND (sqlc.narg('cari')::text IS NULL
+       OR s.receipt_number ILIKE '%' || sqlc.narg('cari')::text || '%'
+       OR s.id ILIKE '%' || sqlc.narg('cari')::text || '%')
 ORDER BY COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at) DESC
 LIMIT sqlc.arg('batas')::int;
 

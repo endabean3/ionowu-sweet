@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeReceipt, printedText } from "../receipt/escpos";
-import { type ReceiptData, notaQrJudul, notaWebLink } from "../receipt/format";
+import { type ReceiptData, kodeNota, notaQrJudul, notaWebLink } from "../receipt/format";
 import { QR_TENANG, qrMatrix, qrRaster, qrSvgPath } from "./qr";
 
 const URL_NOTA =
@@ -60,7 +60,8 @@ describe("QR nota", () => {
     expect(teks).toContain("[ QR ]");
     // Data raster (byte biner) tidak bocor jadi huruf acak: baris setelah QR
     // tetap utuh.
-    expect(teks).toMatch(/\[ QR \]\n-+\nNo\. 01K5SALE00000000000000000A/);
+    // Byte raster (biner) tidak bocor jadi huruf acak: blok sesudahnya utuh.
+    expect(teks).toMatch(/\[ QR \]\n-+\n\|\|\| \w+ \|\|\|\nNo\. 01K5SALE00000000000000000A/);
   });
 
   it("tanpa alamat web nota: tidak ada QR", () => {
@@ -69,5 +70,19 @@ describe("QR nota", () => {
 
   it("nota member tidak menawarkan daftar member lagi", () => {
     expect(notaQrJudul({ member: { code: "M-ABCDEF", bonuses: [] } })).toBe("Cek garansi nota ini");
+  });
+
+  it("kode nota = 6 karakter terakhir id, huruf besar", () => {
+    expect(kodeNota("01k5sale00000000000000000a")).toBe("00000A");
+    expect(kodeNota(URL_NOTA.slice(-30))).toHaveLength(6);
+  });
+
+  it("nota termal memuat barcode kode nota di atas baris No.", () => {
+    const teks = printedText(encodeReceipt(contoh));
+    const kode = kodeNota(contoh.transactionId);
+    expect(teks).toContain(`||| ${kode} |||`);
+    expect(teks).toMatch(
+      new RegExp(`\\|\\|\\|\\s*${kode}\\s*\\|\\|\\|\\nNo\\. ${contoh.transactionId}`),
+    );
   });
 });

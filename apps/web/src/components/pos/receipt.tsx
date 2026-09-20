@@ -8,6 +8,7 @@ import {
   type ReceiptData,
   adaBibitMl,
   formatWaktu,
+  kodeNota,
   lineDiscount,
   lineGross,
   notaQrJudul,
@@ -145,7 +146,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
                 Bonus: {b}
               </div>
             ))}
-            <BarcodeMember kode={data.member.code} />
+            <BarcodeKode kode={data.member.code} label="Member" />
           </>
         )}
 
@@ -159,6 +160,9 @@ export function Receipt({ data }: { data: ReceiptData }) {
         )}
 
         <div className="receipt-sep" />
+        {/* Kode nota sebagai barcode 1D — dipindai kasir untuk membuka nota
+            ini di Riwayat. Id penuh tetap tercetak sebagai teks di bawahnya. */}
+        <BarcodeKode kode={kodeNota(data.transactionId)} label="Kode nota" />
         <div className="receipt-center receipt-small">No. {data.transactionId}</div>
         {/* Ditandai terang-terangan: struk dari transaksi offline sudah sah bagi
             pembeli, tetapi belum tentu terlihat di laporan pemilik sampai
@@ -205,7 +209,7 @@ function QrNota({ url }: { url: string }) {
  * supaya pelanggan selalu bisa memindai kodenya dari nota.
  * Zona tenang 10 modul di kiri-kanan: tanpa itu banyak pemindai gagal membaca.
  */
-function BarcodeMember({ kode }: { kode: string }) {
+function BarcodeKode({ kode, label }: { kode: string; label: string }) {
   let hasil: ReturnType<typeof code128Bars>;
   try {
     hasil = code128Bars(kode);
@@ -220,7 +224,7 @@ function BarcodeMember({ kode }: { kode: string }) {
       viewBox={`0 0 ${lebar} 40`}
       preserveAspectRatio="none"
       role="img"
-      aria-label={`Barcode member ${kode}`}
+      aria-label={`Barcode ${label.toLowerCase()} ${kode}`}
     >
       <rect x="0" y="0" width={lebar} height="40" fill="#fff" />
       {hasil.bars.map((b) => (

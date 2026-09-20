@@ -194,6 +194,11 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   ikut terlihat. Void hanya selama shift transaksi masih TERBUKA (invarian §6 #5); setelah itu
   hanya refund. Kasir butuh PIN manager (dipakai bersama refund lewat `verifikasiPinManager`);
   alur PIN belum ada di layar, jadi kasir diarahkan ke owner/manager.
+* **Kode nota = barcode 1D** di setiap nota (CODE128, printer termal & browser): 6 karakter
+  terakhir id transaksi — sama dengan akhiran `receipt_number`. Dipindai kasir di kolom cari
+  **Riwayat** (yang kini mencocokkan `receipt_number` ATAU `id`). Bukan id penuh: 26 karakter
+  memaksa modul 1 titik di kertas 58 mm, di bawah batas baca pemindai murah. Terbukti terbaca
+  `zbarimg` dari nota yang dirender.
 * **Laporan stok** (`/laporan-stok`): pergerakan dari ledger `stock_events` (terjual, masuk,
   rusak, koreksi, void) dalam satuan stok, ringkasan per jenis, dan unduh CSV.
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
