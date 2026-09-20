@@ -46,6 +46,9 @@ export interface ReceiptData {
   /** Tautan halaman nota publik (ADR-0013) yang dicetak sebagai QR;
    *  kosong = nota tanpa QR. Susun dengan `notaWebLink`. */
   notaUrl?: string | null;
+  /** Logo kepala nota: bitmap 1-bit "<lebar>,<tinggi>,<base64>" dari
+   *  Pengaturan (migrasi 00016). Kosong = nota tanpa logo. */
+  logo?: string | null;
   cashierName: string;
   lines: ReceiptLine[];
   subtotal: string;

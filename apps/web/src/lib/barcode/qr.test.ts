@@ -57,15 +57,17 @@ describe("QR nota", () => {
   it("nota termal memuat blok QR; pratinjau melompati data raster utuh", () => {
     const teks = printedText(encodeReceipt(contoh));
     expect(teks).toContain("Cek garansi & daftar member");
-    expect(teks).toContain("[ QR ]");
+    expect(teks).toContain("[ gambar ]");
     // Data raster (byte biner) tidak bocor jadi huruf acak: baris setelah QR
     // tetap utuh.
     // Byte raster (biner) tidak bocor jadi huruf acak: blok sesudahnya utuh.
-    expect(teks).toMatch(/\[ QR \]\n-+\n\|\|\| \w+ \|\|\|\nNo\. 01K5SALE00000000000000000A/);
+    // Urutan yang dijaga: QR → pemisah → barcode kode nota → baris "No.".
+    // Baris kosong di antaranya adalah zona tenang barcode, bukan kesalahan.
+    expect(teks).toMatch(/\[ gambar \]\s+-+\s+\|\|\| \w+ \|\|\|\s+No\. 01K5SALE00000000000000000A/);
   });
 
   it("tanpa alamat web nota: tidak ada QR", () => {
-    expect(printedText(encodeReceipt({ ...contoh, notaUrl: null }))).not.toContain("QR");
+    expect(printedText(encodeReceipt({ ...contoh, notaUrl: null }))).not.toContain("gambar");
   });
 
   it("nota member tidak menawarkan daftar member lagi", () => {
@@ -82,7 +84,7 @@ describe("QR nota", () => {
     const kode = kodeNota(contoh.transactionId);
     expect(teks).toContain(`||| ${kode} |||`);
     expect(teks).toMatch(
-      new RegExp(`\\|\\|\\|\\s*${kode}\\s*\\|\\|\\|\\nNo\\. ${contoh.transactionId}`),
+      new RegExp(`\\|\\|\\| ${kode} \\|\\|\\|\\s+No\\. ${contoh.transactionId}`),
     );
   });
 });

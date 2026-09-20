@@ -2,9 +2,12 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -195,6 +198,7 @@ func (h *OutletHandler) PatchOutlet(w http.ResponseWriter, r *http.Request) {
 		SocialHandle:     req.SocialHandle,
 		BibitPercent:     req.BibitPercent,
 		NotaWebUrl:       req.NotaWebURL,
+		ReceiptLogo:      req.ReceiptLogo,
 	})
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Update gagal")
@@ -242,6 +246,9 @@ type patchOutletRequest struct {
 	// Alamat halaman nota publik di web toko (ADR-0013); QR di nota menunjuk
 	// ke sini. "" = nota tanpa QR.
 	NotaWebURL *string `json:"nota_web_url"`
+	// Logo kepala nota sebagai bitmap 1-bit siap cetak:
+	// "<lebar>,<tinggi>,<base64>". "" = hapus logo (migrasi 00016).
+	ReceiptLogo *string `json:"receipt_logo"`
 }
 
 // Batas panjang mengikuti kolom (outlets.name VARCHAR(200), phone
@@ -299,6 +306,11 @@ func (p *patchOutletRequest) normalize() string {
 	if p.BibitPercent != nil && (*p.BibitPercent < 0 || *p.BibitPercent > 100) {
 		return "Persen bibit harus 0–100"
 	}
+	if p.ReceiptLogo != nil && *p.ReceiptLogo != "" {
+		if msg := cekLogoNota(*p.ReceiptLogo); msg != "" {
+			return msg
+		}
+	}
 	if p.NotaWebURL != nil && *p.NotaWebURL != "" {
 		if msg := cekNotaWebURL(*p.NotaWebURL); msg != "" {
 			return msg
@@ -323,6 +335,47 @@ func cekNotaWebURL(raw string) string {
 	case utf8.RuneCountInString(raw) > 150:
 		// VARCHAR(200) dikurangi ruang untuk ?t=<26>&i=<26> yang ditambahkan.
 		return "Alamat web nota terlalu panjang (maks. 150 huruf)"
+	}
+	return ""
+}
+
+// Batas logo nota: lebar mengikuti kertas terlebar yang didukung (80 mm =
+// 576 titik), tinggi dibatasi supaya satu nota tidak lama dikirim lewat
+// Bluetooth — 576×240 ≈ 17 KB titik.
+const (
+	maxLogoLebar  = 576
+	maxLogoTinggi = 240
+)
+
+// cekLogoNota memvalidasi bitmap 1-bit "<lebar>,<tinggi>,<base64>".
+//
+// Diperiksa ketat, termasuk PANJANG datanya: byte yang kurang atau berlebih
+// membuat printer termal mencetak sampah sepanjang gulungan kertas, dan itu
+// baru ketahuan di depan pembeli.
+func cekLogoNota(raw string) string {
+	bagian := strings.SplitN(raw, ",", 3)
+	if len(bagian) != 3 {
+		return "Logo nota tidak valid"
+	}
+	lebar, err1 := strconv.Atoi(bagian[0])
+	tinggi, err2 := strconv.Atoi(bagian[1])
+	if err1 != nil || err2 != nil || lebar <= 0 || tinggi <= 0 {
+		return "Ukuran logo nota tidak valid"
+	}
+	if lebar > maxLogoLebar || tinggi > maxLogoTinggi {
+		return fmt.Sprintf("Logo nota maksimal %d×%d titik", maxLogoLebar, maxLogoTinggi)
+	}
+	if lebar%8 != 0 {
+		// Baris bitmap dikirim per byte; lebar kelipatan 8 membuat printer dan
+		// peramban sepakat tanpa aturan padding tersendiri.
+		return "Lebar logo nota harus kelipatan 8 titik"
+	}
+	data, err := base64.StdEncoding.DecodeString(bagian[2])
+	if err != nil {
+		return "Data logo nota rusak"
+	}
+	if len(data) != lebar/8*tinggi {
+		return "Data logo nota tidak sesuai ukurannya"
 	}
 	return ""
 }

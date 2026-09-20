@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 95 dokumen .md di docs/ · 11 folder · 13 ADR diterima (0001–0013)
-15 migrasi · 47 tabel · 65 indeks · 82 kueri SQL
+16 migrasi · 47 tabel · 65 indeks · 82 kueri SQL
 ```
 
 > Angka dihitung ulang 2026-09-19 langsung dari repo. Audit dokumen menyeluruh
@@ -194,6 +194,12 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   ikut terlihat. Void hanya selama shift transaksi masih TERBUKA (invarian §6 #5); setelah itu
   hanya refund. Kasir butuh PIN manager (dipakai bersama refund lewat `verifikasiPinManager`);
   alur PIN belum ada di layar, jadi kasir diarahkan ke owner/manager.
+* **Logo toko di kepala nota** (migrasi 00016): diunggah di Pengaturan, diubah menjadi **bitmap
+  1-bit di peramban** (bukan di jalur cetak), lalu disimpan sebagai `"<lebar>,<tinggi>,<base64>"`
+  di `outlets.receipt_logo`. Printer termal memakai `GS v 0`; nota browser memakai bitmap yang
+  sama, jadi pratinjau = hasil cetak. Gambar bergaris tegas dipetakan dengan ambang keras,
+  bergradasi dengan dithering Floyd–Steinberg. Batas 576×240 titik menjaga nota tetap cepat
+  terkirim lewat Bluetooth.
 * **Kode nota = barcode 1D** di setiap nota (CODE128, printer termal & browser): 6 karakter
   terakhir id transaksi — sama dengan akhiran `receipt_number`. Dipindai kasir di kolom cari
   **Riwayat** (yang kini mencocokkan `receipt_number` ATAU `id`). Bukan id penuh: 26 karakter

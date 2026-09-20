@@ -14,7 +14,7 @@ import (
 const insertOutlet = `-- name: InsertOutlet :one
 INSERT INTO outlets (id, tenant_id, name, address, phone, timezone, business_day_start)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer, warranty_days, social_handle, bibit_percent, nota_web_url
+RETURNING id, name, address, phone, is_active, created_at, timezone, business_day_start, receipt_footer, warranty_days, social_handle, bibit_percent, nota_web_url, receipt_logo
 `
 
 type InsertOutletParams struct {
@@ -41,6 +41,7 @@ type InsertOutletRow struct {
 	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 	BibitPercent     int16              `db:"bibit_percent" json:"bibit_percent"`
 	NotaWebUrl       *string            `db:"nota_web_url" json:"nota_web_url"`
+	ReceiptLogo      *string            `db:"receipt_logo" json:"receipt_logo"`
 }
 
 func (q *Queries) InsertOutlet(ctx context.Context, arg InsertOutletParams) (InsertOutletRow, error) {
@@ -68,13 +69,14 @@ func (q *Queries) InsertOutlet(ctx context.Context, arg InsertOutletParams) (Ins
 		&i.SocialHandle,
 		&i.BibitPercent,
 		&i.NotaWebUrl,
+		&i.ReceiptLogo,
 	)
 	return i, err
 }
 
 const listOutlets = `-- name: ListOutlets :many
 SELECT id, tenant_id, name, address, phone, is_active, created_at, timezone, business_day_start,
-       receipt_footer, warranty_days, social_handle, bibit_percent, nota_web_url
+       receipt_footer, warranty_days, social_handle, bibit_percent, nota_web_url, receipt_logo
 FROM outlets
 WHERE tenant_id = $1
 ORDER BY created_at ASC
@@ -95,6 +97,7 @@ type ListOutletsRow struct {
 	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 	BibitPercent     int16              `db:"bibit_percent" json:"bibit_percent"`
 	NotaWebUrl       *string            `db:"nota_web_url" json:"nota_web_url"`
+	ReceiptLogo      *string            `db:"receipt_logo" json:"receipt_logo"`
 }
 
 func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutletsRow, error) {
@@ -121,6 +124,7 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 			&i.SocialHandle,
 			&i.BibitPercent,
 			&i.NotaWebUrl,
+			&i.ReceiptLogo,
 		); err != nil {
 			return nil, err
 		}
@@ -134,7 +138,7 @@ func (q *Queries) ListOutlets(ctx context.Context, tenantID string) ([]ListOutle
 
 const listOutletsForUser = `-- name: ListOutletsForUser :many
 SELECT o.id, o.tenant_id, o.name, o.address, o.phone, o.is_active, o.created_at,
-       o.timezone, o.business_day_start, o.receipt_footer, o.warranty_days, o.social_handle, o.bibit_percent, o.nota_web_url
+       o.timezone, o.business_day_start, o.receipt_footer, o.warranty_days, o.social_handle, o.bibit_percent, o.nota_web_url, o.receipt_logo
 FROM outlets o
 JOIN user_outlet_assignments uoa ON uoa.outlet_id = o.id
 WHERE uoa.tenant_id = $1 AND uoa.user_id = $2
@@ -161,6 +165,7 @@ type ListOutletsForUserRow struct {
 	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 	BibitPercent     int16              `db:"bibit_percent" json:"bibit_percent"`
 	NotaWebUrl       *string            `db:"nota_web_url" json:"nota_web_url"`
+	ReceiptLogo      *string            `db:"receipt_logo" json:"receipt_logo"`
 }
 
 // MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
@@ -193,6 +198,7 @@ func (q *Queries) ListOutletsForUser(ctx context.Context, arg ListOutletsForUser
 			&i.SocialHandle,
 			&i.BibitPercent,
 			&i.NotaWebUrl,
+			&i.ReceiptLogo,
 		); err != nil {
 			return nil, err
 		}
@@ -217,7 +223,10 @@ SET
     warranty_days = COALESCE($10, warranty_days),
     social_handle = COALESCE($11, social_handle),
     bibit_percent = COALESCE($12, bibit_percent),
-    nota_web_url = COALESCE($13, nota_web_url)
+    nota_web_url = COALESCE($13, nota_web_url),
+    -- "" = hapus logo; NULL (tidak dikirim) = biarkan.
+    receipt_logo = CASE WHEN $14::text = '' THEN NULL
+                        ELSE COALESCE($14, receipt_logo) END
 WHERE tenant_id = $1 AND id = $2
 `
 
@@ -235,6 +244,7 @@ type UpdateOutletParams struct {
 	SocialHandle     *string     `db:"social_handle" json:"social_handle"`
 	BibitPercent     *int16      `db:"bibit_percent" json:"bibit_percent"`
 	NotaWebUrl       *string     `db:"nota_web_url" json:"nota_web_url"`
+	ReceiptLogo      *string     `db:"receipt_logo" json:"receipt_logo"`
 }
 
 // :execrows, bukan :exec — id yang salah atau milik tenant lain harus
@@ -254,6 +264,7 @@ func (q *Queries) UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int
 		arg.SocialHandle,
 		arg.BibitPercent,
 		arg.NotaWebUrl,
+		arg.ReceiptLogo,
 	)
 	if err != nil {
 		return 0, err

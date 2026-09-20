@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -94,5 +95,39 @@ func TestCekNotaWebURL(t *testing.T) {
 	kosong := patchOutletRequest{NotaWebURL: ptr("")}
 	if msg := kosong.normalize(); msg != "" {
 		t.Fatalf("kosong = matikan QR, harus sah: %s", msg)
+	}
+}
+
+func TestCekLogoNota(t *testing.T) {
+	// 16×2 titik = 16/8*2 = 4 byte.
+	sah := "16,2," + base64.StdEncoding.EncodeToString([]byte{0xff, 0x00, 0x0f, 0xf0})
+	if msg := cekLogoNota(sah); msg != "" {
+		t.Fatalf("logo sah ditolak: %s", msg)
+	}
+	rusak := map[string]string{
+		"tanpa koma":         "abc",
+		"ukuran bukan angka": "x,y,AAAA",
+		"nol":                "0,2,AAAA",
+		"terlalu lebar":      "584,2," + base64.StdEncoding.EncodeToString(make([]byte, 584/8*2)),
+		"terlalu tinggi":     "16,241," + base64.StdEncoding.EncodeToString(make([]byte, 16/8*241)),
+		"lebar bukan 8":      "12,2,AAAA",
+		"base64 rusak":       "16,2,bukan base64!!",
+		// Yang paling berbahaya: ukuran benar, data kurang — printer
+		// memuntahkan sampah sepanjang gulungan kertas.
+		"data kependekan":  "16,2," + base64.StdEncoding.EncodeToString([]byte{0xff, 0x00}),
+		"data kepanjangan": "16,2," + base64.StdEncoding.EncodeToString(make([]byte, 8)),
+	}
+	for nama, v := range rusak {
+		if cekLogoNota(v) == "" {
+			t.Errorf("%s: seharusnya ditolak", nama)
+		}
+	}
+
+	// Lewat normalize: "" berarti hapus logo, dan itu sah.
+	if msg := (&patchOutletRequest{ReceiptLogo: ptr("")}).normalize(); msg != "" {
+		t.Fatalf("hapus logo harus sah: %s", msg)
+	}
+	if (&patchOutletRequest{ReceiptLogo: ptr("16,2,AA")}).normalize() == "" {
+		t.Fatal("logo rusak harus ditolak lewat normalize")
 	}
 }
