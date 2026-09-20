@@ -83,6 +83,7 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 
 		stockHandler := NewStockHandler(pool)
 		r.Get("/stock/levels", stockHandler.GetStockLevels)
+		r.Get("/stock/events", stockHandler.GetStockEvents)
 		r.Post("/stock/events", stockHandler.PostStockEvent)
 
 		stockOpnameHandler := NewStockOpnameHandler(pool)
@@ -90,6 +91,11 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 
 		analyticsHandler := NewAnalyticsHandler(pool)
 		r.Get("/analytics/dashboard", analyticsHandler.GetDashboard)
+
+		salesHistory := NewSalesHistoryHandler(pool)
+		r.Get("/sales", salesHistory.GetSales)
+		r.Get("/sales/{id}", salesHistory.GetSale)
+		r.Post("/sales/{id}/void", salesHistory.PostVoid)
 
 		r.Post("/sales", checkout.PostSale)
 		r.Post("/sales/{id}/refund", func(w http.ResponseWriter, req *http.Request) {

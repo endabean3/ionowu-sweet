@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 95 dokumen .md di docs/ · 11 folder · 13 ADR diterima (0001–0013)
-14 migrasi · 47 tabel · 65 indeks · 68 kueri SQL
+15 migrasi · 47 tabel · 65 indeks · 82 kueri SQL
 ```
 
 > Angka dihitung ulang 2026-09-19 langsung dari repo. Audit dokumen menyeluruh
@@ -189,6 +189,13 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 * **Layar Stok** (`/stok`): sisa stok per barang dalam SATUAN STOK, plus barang masuk, barang
   rusak/hilang, dan opname (hasil timbang menggantikan stok, selisih masuk ledger). Owner,
   manager, gudang saja; butuh online karena stok adalah angka bersama semua perangkat.
+* **Riwayat transaksi** (`/riwayat`): cari nota lama, cetak ulang, **refund**, dan **void**.
+  Dibaca dari server (`GET /sales`, `GET /sales/{id}`), bukan Dexie — transaksi perangkat lain
+  ikut terlihat. Void hanya selama shift transaksi masih TERBUKA (invarian §6 #5); setelah itu
+  hanya refund. Kasir butuh PIN manager (dipakai bersama refund lewat `verifikasiPinManager`);
+  alur PIN belum ada di layar, jadi kasir diarahkan ke owner/manager.
+* **Laporan stok** (`/laporan-stok`): pergerakan dari ledger `stock_events` (terjual, masuk,
+  rusak, koreksi, void) dalam satuan stok, ringkasan per jenis, dan unduh CSV.
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
   menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.

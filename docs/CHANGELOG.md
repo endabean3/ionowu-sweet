@@ -4,6 +4,37 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.27.0] — 2026-09-20
+
+### Ditambahkan
+* **Riwayat transaksi** (`/riwayat`) — prioritas tinggi #1–#3 daftar pemilik:
+  * daftar nota 30 hari terakhir dengan pencarian nomor nota, penanda **Void** dan **Refund**;
+  * detail nota: barang, pembayaran, riwayat refund;
+  * **cetak ulang nota** (printer Bluetooth maupun browser), memakai profil toko dari cache;
+  * **refund** penuh/sebagian dengan alasan, dan pilihan barang kembali ke rak (hanya refund
+    penuh — refund sebagian tidak tahu barang mana yang kembali);
+  * **void** transaksi salah input, mengembalikan stok dan mencatatnya di ledger.
+* **`GET /sales`**, **`GET /sales/{id}`**, dan **`POST /sales/{id}/void`** di pos-engine.
+  Void hanya untuk transaksi lunas, belum direfund, dan **shift-nya masih terbuka** — Z-Report
+  yang sudah dicetak tidak pernah berubah (CLAUDE.md §6 #5). Setelahnya: refund.
+* **Laporan stok** (`/laporan-stok`, `GET /stock/events`): pergerakan stok dari ledger — terjual,
+  masuk, rusak, koreksi opname, void — dalam **satuan stok** (gram untuk bibit), ringkasan per
+  jenis, rentang hari ini / 7 / 30 hari, dan **unduh CSV**.
+* Migrasi **`00015_void_stock_event`**: `stock_events.event_type` menerima `void`, supaya
+  pembatalan tidak tercampur dengan refund di laporan (CHECK dilebarkan, `NOT VALID` + `VALIDATE`).
+
+### Diubah
+* Pemeriksaan PIN manager dipindah ke `verifikasiPinManager` dan dipakai bersama refund dan void.
+  Aturan yang sama ditulis dua kali adalah cara termudah membuat salah satunya lebih longgar.
+* Pengembalian stok saat void memakai konversi satuan yang sama dengan penjualan
+  (`GetVariantConversion`, tanpa filter `is_active`): barang yang sudah dinonaktifkan tetap
+  kembali dalam satuan yang benar.
+
+### Diuji
+* Go: rentang tanggal riwayat (hari terakhir inklusif, format salah ditolak) dan batas jumlah baris.
+* Playwright: `riwayat.spec.ts` (void mengembalikan stok, refund penuh, nota yang sudah direfund
+  tidak bisa di-void) dan `laporan-stok.spec.ts` (tanda + / −, satuan, catatan mutasi).
+
 ## [1.26.0] — 2026-09-20
 
 ### Ditambahkan

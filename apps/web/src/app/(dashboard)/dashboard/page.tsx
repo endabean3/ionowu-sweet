@@ -9,7 +9,9 @@ import {
   Activity,
   ArrowLeft,
   Boxes,
+  ClipboardList,
   DollarSign,
+  History,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -88,10 +90,22 @@ export default function DashboardPage() {
               <span>Master Katalog</span>
             </Button>
           </Link>
+          <Link href="/riwayat">
+            <Button variant="secondary" size="sm" className="gap-2 shadow-hard-sm">
+              <History className="h-4 w-4" aria-hidden="true" />
+              <span>Riwayat</span>
+            </Button>
+          </Link>
           <Link href="/stok">
             <Button variant="secondary" size="sm" className="gap-2 shadow-hard-sm">
               <Boxes className="h-4 w-4" aria-hidden="true" />
               <span>Stok</span>
+            </Button>
+          </Link>
+          <Link href="/laporan-stok">
+            <Button variant="ghost" size="sm" className="gap-2 pos-touch-target">
+              <ClipboardList className="h-4 w-4" aria-hidden="true" />
+              <span>Laporan stok</span>
             </Button>
           </Link>
           <Link href="/pengaturan">

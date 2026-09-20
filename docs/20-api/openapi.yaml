@@ -350,13 +350,17 @@ paths:
   /sales:
     get:
       tags: [sales]
-      summary: Riwayat transaksi (histori kasir, bukan laporan BI)
+      summary: Riwayat transaksi satu outlet (histori kasir, bukan laporan BI)
+      description: >
+        Bawaan 30 hari terakhir, maksimal 200 baris, terbaru dulu. `refunded_total`
+        ikut dihitung supaya layar riwayat bisa menandai nota yang sudah direfund.
+        Data percobaan (`is_sandbox`) dikecualikan.
       parameters:
-        - { name: outlet_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
-        - { name: shift_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
-        - { name: from, in: query, schema: { type: string, format: date-time } }
-        - { name: to, in: query, schema: { type: string, format: date-time } }
-        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: outlet_id, in: query, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: dari, in: query, schema: { type: string, format: date } }
+        - { name: sampai, in: query, description: "inklusif", schema: { type: string, format: date } }
+        - { name: cari, in: query, description: "cocokkan nomor nota", schema: { type: string, maxLength: 100 } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       responses:
         "200":
           description: Daftar transaksi
@@ -365,9 +369,21 @@ paths:
               schema:
                 type: object
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/Sale" } }
-                  page: { type: integer }
-                  total: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { $ref: "#/components/schemas/ULID" }
+                        receipt_number: { type: string }
+                        sold_at: { type: string, format: date-time }
+                        grand_total: { type: string, format: decimal }
+                        payment_status: { type: string, enum: [paid, void, pending] }
+                        refunded_total: { type: string, format: decimal }
+                        member_code: { type: string, nullable: true }
+                        cashier_name: { type: string, nullable: true }
+                        item_count: { type: integer }
+        "422": { description: "VALIDATION_ERROR (outlet_id / tanggal)" }
     post:
       tags: [sales]
       summary: >
@@ -395,6 +411,43 @@ paths:
           description: Payload tidak valid (mis. discount > discount_max_pct_cashier tanpa discount_approved_by)
           content:
             application/json: { schema: { $ref: "#/components/schemas/Error" } }
+
+  /sales/{saleId}:
+    get:
+      tags: [sales]
+      summary: Detail nota — barang, pembayaran, dan riwayat refund
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      responses:
+        "200": { description: "Detail transaksi (sale, items, payments, refunds)" }
+        "404": { description: TRANSACTION_NOT_FOUND }
+
+  /sales/{saleId}/void:
+    post:
+      tags: [sales]
+      summary: Batalkan transaksi salah input; stok kembali dan tercatat di ledger
+      description: >
+        HANYA untuk transaksi lunas, belum pernah direfund, dan shift-nya MASIH TERBUKA —
+        Z-Report yang sudah dicetak tidak pernah berubah. Setelah shift ditutup, pakai refund.
+        Owner & manager langsung; kasir wajib `approver_user_id` + `pin` manager.
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+                approver_user_id: { $ref: "#/components/schemas/ULID" }
+                pin: { type: string }
+      responses:
+        "200": { description: Transaksi dibatalkan }
+        "403": { description: "FORBIDDEN_ROLE · MANAGER_PIN_REQUIRED" }
+        "404": { description: TRANSACTION_NOT_FOUND }
+        "422": { description: "TRANSACTION_ALREADY_VOIDED · SHIFT_CLOSED · VALIDATION_ERROR (sudah direfund / alasan kosong)" }
 
   /sales/{saleId}/refund:
     parameters:
@@ -492,6 +545,55 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { description: "VARIANT_NOT_FOUND (tidak ada / tenant lain / tanpa stok) · OUTLET_NOT_FOUND" }
         "422": { description: "VALIDATION_ERROR (jumlah, event_type, id)" }
+
+  /stock/events-report:
+    get:
+      tags: [stock]
+      summary: Laporan pergerakan stok dari ledger (path sebenarnya GET /stock/events)
+      description: >
+        Jalur yang sama dengan POST /stock/events, method GET. Semua peran boleh melihat
+        (RBAC-MODEL §Stok "Lihat level stok"). Jumlah BERTANDA dan dalam satuan stok:
+        negatif = keluar. Bawaan 30 hari terakhir, maksimal 200 baris.
+      parameters:
+        - { name: outlet_id, in: query, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: dari, in: query, schema: { type: string, format: date } }
+        - { name: sampai, in: query, description: "inklusif", schema: { type: string, format: date } }
+        - { name: variant_id, in: query, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        "200":
+          description: "Pergerakan stok + ringkasan per jenis & satuan"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            created_at: { type: string, format: date-time }
+                            event_type: { type: string, enum: [sale, refund, void, restock, opname_adjust, waste, transfer_in, transfer_out, repack_in, repack_out] }
+                            quantity_delta: { type: string, format: decimal, description: "bertanda; negatif = keluar" }
+                            balance_after: { type: string, format: decimal }
+                            uom: { type: string }
+                            product_name: { type: string }
+                            actor_name: { type: string, nullable: true }
+                            note: { type: string, nullable: true }
+                      summary:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            event_type: { type: string }
+                            uom: { type: string }
+                            total: { type: string, format: decimal }
+                            jumlah_baris: { type: integer }
+        "422": { description: VALIDATION_ERROR }
 
   /stock/levels:
     get:

@@ -87,3 +87,52 @@ WHERE v.tenant_id = $1 AND v.id = $2;
 SELECT EXISTS (
     SELECT 1 FROM outlets WHERE tenant_id = $1 AND id = $2 AND is_active
 );
+
+-- name: GetVariantConversion :one
+-- Satuan jual + konversi ke satuan stok, TANPA filter is_active: void atau
+-- refund atas barang yang sudah dinonaktifkan tetap harus mengembalikan stok
+-- dalam satuan yang benar.
+SELECT v.uom, COALESCE(sc.to_uom, '')::VARCHAR AS stock_uom,
+       COALESCE(sc.factor, 0)::DECIMAL AS stock_factor
+FROM variants v
+LEFT JOIN LATERAL (
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
+WHERE v.tenant_id = $1 AND v.id = $2;
+
+-- name: ListStockEvents :many
+-- Laporan pergerakan stok (ledger append-only = KEBENARAN stok, DATA-MODEL
+-- §4C). Dipakai pemilik untuk melihat stok keluar bibit dalam gram.
+SELECT se.id, se.created_at, se.event_type, se.quantity_delta, se.balance_after, se.uom,
+       se.note, se.reference_id, se.variant_id,
+       p.name AS product_name, v.name AS variant_name, u.name AS actor_name
+FROM stock_events se
+JOIN variants v ON v.id = se.variant_id AND v.tenant_id = se.tenant_id
+JOIN products p ON p.id = v.product_id AND p.tenant_id = v.tenant_id
+LEFT JOIN users u ON u.id = se.actor_user_id AND u.tenant_id = se.tenant_id
+WHERE se.tenant_id = $1
+  AND se.outlet_id = $2
+  AND se.created_at >= sqlc.arg('dari')::timestamptz
+  AND se.created_at < sqlc.arg('sampai')::timestamptz
+  AND (sqlc.narg('variant')::text IS NULL OR se.variant_id = sqlc.narg('variant')::text)
+ORDER BY se.created_at DESC
+LIMIT sqlc.arg('batas')::int;
+
+-- name: SumStockEventsByType :many
+-- Ringkasan per jenis + satuan: "terjual 412,5 g" dalam satu baris, tanpa
+-- menjumlahkan gram dengan pcs.
+SELECT se.event_type, se.uom,
+       SUM(se.quantity_delta)::DECIMAL AS total,
+       COUNT(*)::int AS jumlah_baris
+FROM stock_events se
+WHERE se.tenant_id = $1
+  AND se.outlet_id = $2
+  AND se.created_at >= sqlc.arg('dari')::timestamptz
+  AND se.created_at < sqlc.arg('sampai')::timestamptz
+  AND (sqlc.narg('variant')::text IS NULL OR se.variant_id = sqlc.narg('variant')::text)
+GROUP BY se.event_type, se.uom
+ORDER BY se.event_type, se.uom;

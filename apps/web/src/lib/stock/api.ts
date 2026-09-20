@@ -70,3 +70,52 @@ export function kirimOpname(
 ): Promise<{ data: { variant_id: string; system: string; counted: string; variance: string }[] }> {
   return kirim(accessToken, "/stock/opname", { outlet_id: outletId, items });
 }
+
+export interface StockEventRow {
+  id: string;
+  created_at: string;
+  event_type: string;
+  /** Bertanda: negatif = stok keluar. */
+  quantity_delta: string;
+  balance_after: string;
+  uom: string;
+  note?: string | null;
+  reference_id?: string | null;
+  variant_id: string;
+  product_name: string;
+  variant_name: string;
+  actor_name?: string | null;
+}
+
+export interface StockSummaryRow {
+  event_type: string;
+  uom: string;
+  total: string;
+  jumlah_baris: number;
+}
+
+/** Laporan pergerakan stok (ledger) untuk satu outlet. */
+export async function fetchStockEvents(
+  accessToken: string,
+  outletId: string,
+  opsi: { dari?: string; sampai?: string; variantId?: string; limit?: number } = {},
+): Promise<{ events: StockEventRow[]; summary: StockSummaryRow[] }> {
+  const q = new URLSearchParams({ outlet_id: outletId });
+  if (opsi.dari) q.set("dari", opsi.dari);
+  if (opsi.sampai) q.set("sampai", opsi.sampai);
+  if (opsi.variantId) q.set("variant_id", opsi.variantId);
+  if (opsi.limit) q.set("limit", String(opsi.limit));
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/stock/events?${q}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new JaringanError();
+  }
+  const b = await res.json().catch(() => null);
+  if (!res.ok)
+    throw new StokError(b?.error?.message ?? "Gagal memuat laporan stok", b?.error?.code);
+  return { events: b?.data?.events ?? [], summary: b?.data?.summary ?? [] };
+}

@@ -48,7 +48,8 @@ kode biasa. Migrasi yang dihasilkan ORM menyembunyikan operasi berbahaya di bali
 ├── 00011_outlet_warranty.sql        outlets.warranty_days (garansi di nota) — expand murni
 ├── 00012_customer_member.sql        member: kode, akun sosmed, follow, merchandise — expand murni
 ├── 00013_outlet_recipe.sql          outlets.bibit_percent (racikan parfum) — expand murni
-└── 00014_nota_web.sql               outlets.nota_web_url + customers.signup_sale_id (ADR-0013) — expand murni
+├── 00014_nota_web.sql               outlets.nota_web_url + customers.signup_sale_id (ADR-0013) — expand murni
+└── 00015_void_stock_event.sql       stock_events.event_type menerima 'void' — CHECK dilebarkan
 ```
 
 **47 tabel · 57 indeks · validasi dependensi FK lulus.**
