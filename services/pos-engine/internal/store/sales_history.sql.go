@@ -239,7 +239,11 @@ WHERE s.tenant_id = $1
   AND NOT s.is_sandbox
   AND COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at) >= $3::timestamptz
   AND COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at) < $4::timestamptz
-  AND ($5::text IS NULL OR s.receipt_number ILIKE '%' || $5::text || '%')
+  -- Cocokkan nomor nota ATAU id transaksi: barcode di nota memuat 6 karakter
+  -- terakhir id (= akhiran receipt_number), jadi hasil pindai selalu ketemu.
+  AND ($5::text IS NULL
+       OR s.receipt_number ILIKE '%' || $5::text || '%'
+       OR s.id ILIKE '%' || $5::text || '%')
 ORDER BY COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at) DESC
 LIMIT $6::int
 `

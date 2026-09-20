@@ -140,3 +140,19 @@ export function notaWebLink(
 export function notaQrJudul(data: Pick<ReceiptData, "member">): string {
   return data.member ? "Cek garansi nota ini" : "Cek garansi & daftar member";
 }
+
+/**
+ * Kode nota yang dicetak sebagai BARCODE 1D di nota: 6 karakter terakhir id
+ * transaksi — sama dengan akhiran `receipt_number` di server
+ * ("20260920063109-CVG6ZS"), jadi memindainya langsung menemukan notanya di
+ * layar Riwayat.
+ *
+ * Kenapa bukan id penuh (26 karakter): CODE128 26 karakter butuh ±341 modul,
+ * dan kertas 58 mm hanya 384 titik — modulnya jadi 1 titik (0,125 mm), di
+ * bawah batas baca pemindai genggam murah. Enam karakter tercetak dengan
+ * modul 2 titik (±33 mm) dan terbaca andal. Id penuh tetap dicetak sebagai
+ * teks "No. …" di bawahnya.
+ */
+export function kodeNota(transactionId: string): string {
+  return transactionId.slice(-6).toUpperCase();
+}

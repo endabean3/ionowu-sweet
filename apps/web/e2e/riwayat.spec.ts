@@ -107,4 +107,23 @@ test.describe("Riwayat transaksi", () => {
     await baris(page).first().click();
     await expect(dialog.getByRole("button", { name: /Batalkan transaksi/ })).toBeHidden();
   });
+
+  test("kode nota tercetak sebagai barcode dan hasil pindainya menemukan notanya", async ({
+    page,
+  }) => {
+    await jual(page);
+
+    // Nota memuat barcode kode nota (6 karakter terakhir id transaksi).
+    const nota = page.locator("#receipt-print-root");
+    const id = ((await nota.textContent()) ?? "").match(/No\. ([0-9A-Z]{26})/)?.[1] as string;
+    const kode = id.slice(-6);
+    await expect(nota.locator(`svg[aria-label="Barcode kode nota ${kode}"]`)).toHaveCount(1);
+
+    // Memindai barcode = mengetik kodenya di kolom cari Riwayat.
+    await page.goto("/riwayat");
+    await expect(baris(page).first()).toBeVisible({ timeout: 20000 });
+    await page.getByLabel("Cari nomor nota").fill(kode);
+    await expect(baris(page)).toHaveCount(1);
+    await expect(baris(page).first()).toContainText(kode);
+  });
 });

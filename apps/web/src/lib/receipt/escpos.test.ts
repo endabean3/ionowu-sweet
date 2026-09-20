@@ -36,9 +36,28 @@ function decode(bytes: Uint8Array): { lines: string[]; commands: string[] } {
         throw new Error(`perintah ESC tak dikenal: ${op}`);
       }
     } else if (b === GS) {
-      if (bytes[i + 1] !== 0x56) throw new Error(`perintah GS tak dikenal: ${bytes[i + 1]}`);
-      commands.push("GS V");
-      i += 4;
+      const op = bytes[i + 1];
+      if (op === 0x56) {
+        commands.push("GS V");
+        i += 4;
+      } else if (op === 0x68 || op === 0x77 || op === 0x48) {
+        // GS h/w/H n — tinggi, lebar modul, dan posisi teks barcode.
+        commands.push(`GS ${String.fromCharCode(op)} ${bytes[i + 2]}`);
+        i += 3;
+      } else if (op === 0x6b) {
+        // GS k 73 n {B <data> — CODE128; datanya byte cetak, bukan teks nota.
+        const n = bytes[i + 3];
+        commands.push(`GS k ${String.fromCharCode(...bytes.slice(i + 6, i + 4 + n))}`);
+        i += 4 + n;
+      } else if (op === 0x76) {
+        // GS v 0 m xL xH yL yH <bitmap> — gambar raster (QR nota).
+        const lebar = bytes[i + 4] | (bytes[i + 5] << 8);
+        const tinggi = bytes[i + 6] | (bytes[i + 7] << 8);
+        commands.push("GS v 0");
+        i += 8 + lebar * tinggi;
+      } else {
+        throw new Error(`perintah GS tak dikenal: ${op}`);
+      }
     } else if (b === 0x0a || (b >= 0x20 && b <= 0x7e)) {
       text += String.fromCharCode(b);
       i += 1;

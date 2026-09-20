@@ -5,6 +5,7 @@ import {
   type ReceiptData,
   adaBibitMl,
   formatWaktu,
+  kodeNota,
   lineDiscount,
   lineGross,
   notaQrJudul,
@@ -256,6 +257,9 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
   }
 
   out.line(sep).align("center");
+  // Kode nota sebagai BARCODE 1D: kasir memindainya untuk membuka nota ini
+  // di layar Riwayat (klaim garansi, refund, void) tanpa mengetik ulang.
+  out.barcode128(kodeNota(data.transactionId));
   out.lines(wrap(`No. ${t(data.transactionId)}`, w));
   // Lihat catatan sejenis di receipt.tsx: struk offline sah bagi pembeli,
   // tetapi belum terlihat di laporan pemilik sampai antreannya terkirim.
