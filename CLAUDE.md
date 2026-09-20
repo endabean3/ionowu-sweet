@@ -186,6 +186,9 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   Ini satu-satunya permukaan tanpa login di pos-engine — **ubahan di `public_nota.go`/`.sql`
   ditinjau sebagai perubahan keamanan**. Nomor di nota = id penjualan di server (dulu dua ULID
   berbeda — bug itu sudah diperbaiki; jangan dipisah lagi).
+* **Layar Stok** (`/stok`): sisa stok per barang dalam SATUAN STOK, plus barang masuk, barang
+  rusak/hilang, dan opname (hasil timbang menggantikan stok, selisih masuk ledger). Owner,
+  manager, gudang saja; butuh online karena stok adalah angka bersama semua perangkat.
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
   menghitung pajak sendiri; ia memakai `tax` dari payload penjualan.
 * **APK Android** via Capacitor (ADR-0010) dengan jalur rilis Play Store.

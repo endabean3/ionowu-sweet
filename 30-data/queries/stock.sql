@@ -32,3 +32,58 @@ RETURNING id;
 INSERT INTO stock_opname_items (id, tenant_id, opname_id, variant_id, system_quantity, counted_quantity)
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, variance;
+
+-- name: AdjustStock :one
+-- Stok masuk / barang rusak / koreksi opname dari layar Stok.
+--
+-- UPDATE tunggal ini sudah atomik dan mengambil kunci baris (alasan yang sama
+-- dengan DecrementStockStrict di checkout.sql). `delta` BERTANDA: positif
+-- menambah, negatif mengurangi, dan dihitung dalam SATUAN STOK (gram untuk
+-- bibit, ADR-0012).
+--
+-- Jasa dan sewa (item_type lain) sengaja tidak punya stok, jadi 0 baris
+-- kembali = varian tidak ada, milik tenant lain, atau tidak berstok.
+UPDATE variants
+SET stock_quantity = stock_quantity + sqlc.arg('delta')::DECIMAL
+WHERE tenant_id = $1
+  AND id        = $2
+  AND item_type IN ('stock', 'composite')
+RETURNING stock_quantity;
+
+-- name: LockVariantStock :one
+-- Opname: baca stok tersimpan sambil mengunci barisnya. Selisih dihitung dari
+-- angka INI, bukan dari angka yang dikirim klien — angka klien bisa basi
+-- (dibaca sebelum penjualan terakhir) atau dipalsukan.
+SELECT stock_quantity
+FROM variants
+WHERE tenant_id = $1 AND id = $2 AND item_type IN ('stock', 'composite')
+FOR UPDATE;
+
+-- name: SetStock :one
+-- Opname: stok DITETAPKAN sama dengan hasil timbang, bukan ditambah.
+UPDATE variants
+SET stock_quantity = sqlc.arg('counted')::DECIMAL
+WHERE tenant_id = $1 AND id = $2 AND item_type IN ('stock', 'composite')
+RETURNING stock_quantity;
+
+-- name: GetStockUom :one
+-- Satuan tempat stock_quantity dihitung: satuan STOK bila varian punya
+-- konversi (bibit: gram), selain itu satuan jual. Dipakai untuk mengisi
+-- stock_events.uom — ledger stok tidak boleh menebak satuan.
+SELECT COALESCE(sc.to_uom, v.uom)::VARCHAR AS stock_uom
+FROM variants v
+LEFT JOIN LATERAL (
+    SELECT c.to_uom
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
+WHERE v.tenant_id = $1 AND v.id = $2;
+
+-- name: OutletBelongsToTenant :one
+-- Foreign key hanya menjamin outlet ADA. Tanpa ini, mutasi stok tenant A bisa
+-- dicatat atas outlet tenant B.
+SELECT EXISTS (
+    SELECT 1 FROM outlets WHERE tenant_id = $1 AND id = $2 AND is_active
+);

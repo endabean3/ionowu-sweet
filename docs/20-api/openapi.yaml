@@ -455,33 +455,43 @@ paths:
   /stock/events:
     post:
       tags: [stock]
-      summary: >
-        Kirim batch event stok (restock manual, dsb). Menerima banyak event
-        sekaligus — inti dari sinkronisasi setelah offline berjam-jam (FR-31).
-        Idempotent per event id.
+      summary: Satu mutasi stok — barang masuk (restock) atau rusak/hilang (waste)
+      description: >
+        Dipakai layar Stok. Owner, manager, dan gudang saja (RBAC-MODEL §Stok).
+        `quantity` SELALU positif dan dalam SATUAN STOK (gram untuk bibit, ADR-0012);
+        arah ditentukan `event_type`. Saldo `variants.stock_quantity` dan baris ledger
+        ditulis dalam satu transaksi. `opname_adjust` tidak diterima di sini —
+        koreksi opname hanya lahir dari `/stock/opname`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [events]
+              required: [outlet_id, variant_id, event_type, quantity]
               properties:
-                events:
-                  type: array
-                  minItems: 1
-                  maxItems: 500
-                  items: { $ref: "#/components/schemas/StockEventInput" }
+                outlet_id: { $ref: "#/components/schemas/ULID" }
+                variant_id: { $ref: "#/components/schemas/ULID" }
+                event_type: { type: string, enum: [restock, waste] }
+                quantity: { type: string, format: decimal, example: "250", description: "> 0, maks. 3 desimal, satuan stok" }
+                note: { type: string, maxLength: 500 }
       responses:
         "201":
-          description: Event diterima
+          description: Stok dicatat
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  accepted: { type: integer }
-                  duplicates: { type: integer, description: "sudah pernah diterima sebelumnya, diabaikan aman" }
+                  event_id: { $ref: "#/components/schemas/ULID" }
+                  data:
+                    type: object
+                    properties:
+                      stock_quantity: { type: string, format: decimal, description: "saldo baru" }
+                      uom: { type: string, description: "satuan stok" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: "VARIANT_NOT_FOUND (tidak ada / tenant lain / tanpa stok) · OUTLET_NOT_FOUND" }
+        "422": { description: "VALIDATION_ERROR (jumlah, event_type, id)" }
 
   /stock/levels:
     get:
@@ -501,32 +511,52 @@ paths:
   /stock/opname:
     post:
       tags: [stock]
-      summary: Catat hasil stok opname — menghasilkan event `adjustment`, tidak menimpa angka (FR-32)
+      summary: Opname — hasil timbang menjadi stok yang berlaku, selisihnya masuk ledger
+      description: >
+        Owner, manager, dan gudang saja. `counted_quantity` dalam SATUAN STOK.
+        Jumlah menurut sistem TIDAK dikirim klien: ia dibaca di dalam transaksi
+        sambil mengunci baris varian, jadi penjualan yang masuk bersamaan tidak
+        hilang tertimpa. Selisih 0 tidak menghasilkan baris ledger.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [outlet_id, counts]
+              required: [outlet_id, items]
               properties:
                 outlet_id: { $ref: "#/components/schemas/ULID" }
-                counts:
+                items:
                   type: array
+                  minItems: 1
+                  maxItems: 500
                   items:
                     type: object
-                    required: [variant_id, counted_qty]
+                    required: [variant_id, counted_quantity]
                     properties:
                       variant_id: { $ref: "#/components/schemas/ULID" }
-                      counted_qty: { type: number, format: decimal }
+                      counted_quantity: { type: string, format: decimal, example: "238.5" }
       responses:
         "201":
-          description: Event adjustment dibuat untuk tiap selisih
+          description: Opname tersimpan
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/StockEvent" }
+                type: object
+                properties:
+                  opname_id: { $ref: "#/components/schemas/ULID" }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        variant_id: { $ref: "#/components/schemas/ULID" }
+                        system: { type: string, format: decimal }
+                        counted: { type: string, format: decimal }
+                        variance: { type: string, format: decimal }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: "VARIANT_NOT_FOUND · OUTLET_NOT_FOUND" }
+        "422": { description: "VALIDATION_ERROR (jumlah, barang ganda, id)" }
 
   /stock/history/{variantId}:
     parameters:

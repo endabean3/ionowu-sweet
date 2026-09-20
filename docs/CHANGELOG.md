@@ -4,6 +4,34 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.26.0] — 2026-09-20
+
+### Ditambahkan
+* **Layar Stok** (`/stok`, tertaut dari Dasbor & Katalog) — prioritas #4 daftar kerja pemilik:
+  * sisa stok tiap barang dalam **satuan stok** (gram untuk bibit, ADR-0012), yang habis dan
+    menipis diurutkan paling atas, plus pencarian;
+  * **Stok masuk** (barang datang), **Rusak/hilang**, dan **Opname** (hasil timbang) dalam satu
+    dialog, dengan pratinjau "Stok menjadi …" dan selisih opname sebelum disimpan;
+  * owner, manager, gudang saja (RBAC-MODEL §Stok). Butuh online: stok adalah angka bersama
+    semua perangkat kasir, jadi tidak diantrekan seperti penjualan.
+
+### Diperbaiki (mutasi stok sebelumnya tidak benar-benar bekerja)
+* `POST /stock/events` memakai **`outlet_id` hardcode `"outlet_kemang"`** (sisa data contoh),
+  **tidak pernah memperbarui `variants.stock_quantity`**, dan menulis `balance_after` = delta —
+  ledger berisi saldo palsu sementara stok di kasir tidak bergerak.
+* `POST /stock/opname` menyimpan berkas opname tetapi **tidak mengubah stok sama sekali**, dan
+  meng-hardcode satuan `"pcs"` di ledger (koreksi bibit tercatat pcs, bukan gram). Jumlah menurut
+  sistem juga diambil dari kiriman klien; kini dibaca di dalam transaksi sambil mengunci baris.
+* Kedua endpoint **tidak memeriksa peran**; kini owner/manager/gudang, dan outlet diverifikasi
+  milik tenant. Jumlah divalidasi (≥ 0, maks. 3 desimal, muat DECIMAL(14,3)); `event_type` dibatasi
+  `restock`/`waste`; barang ganda dalam satu opname ditolak.
+* Saldo dan ledger kini ditulis dalam satu transaksi, dan `stock_events.uom` memakai satuan stok.
+
+### Diuji
+* Go: RBAC stok, validasi jumlah, arah tanda restock/waste, dan validasi opname (ULID, ganda).
+* Playwright `e2e/stok.spec.ts` (desktop + ponsel): masuk 250 → rusak 10 → opname 238,5, tiap
+  langkah diperiksa lewat `GET /stock/levels`; angka tidak sah ditolak sebelum dikirim.
+
 ## [1.25.0] — 2026-09-19
 
 ### Ditambahkan
