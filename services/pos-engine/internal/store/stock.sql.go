@@ -12,6 +12,65 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const adjustStock = `-- name: AdjustStock :one
+UPDATE variants
+SET stock_quantity = stock_quantity + $3::DECIMAL
+WHERE tenant_id = $1
+  AND id        = $2
+  AND item_type IN ('stock', 'composite')
+RETURNING stock_quantity
+`
+
+type AdjustStockParams struct {
+	TenantID string          `db:"tenant_id" json:"tenant_id"`
+	ID       string          `db:"id" json:"id"`
+	Delta    decimal.Decimal `db:"delta" json:"delta"`
+}
+
+// Stok masuk / barang rusak / koreksi opname dari layar Stok.
+//
+// UPDATE tunggal ini sudah atomik dan mengambil kunci baris (alasan yang sama
+// dengan DecrementStockStrict di checkout.sql). `delta` BERTANDA: positif
+// menambah, negatif mengurangi, dan dihitung dalam SATUAN STOK (gram untuk
+// bibit, ADR-0012).
+//
+// Jasa dan sewa (item_type lain) sengaja tidak punya stok, jadi 0 baris
+// kembali = varian tidak ada, milik tenant lain, atau tidak berstok.
+func (q *Queries) AdjustStock(ctx context.Context, arg AdjustStockParams) (decimal.Decimal, error) {
+	row := q.db.QueryRow(ctx, adjustStock, arg.TenantID, arg.ID, arg.Delta)
+	var stock_quantity decimal.Decimal
+	err := row.Scan(&stock_quantity)
+	return stock_quantity, err
+}
+
+const getStockUom = `-- name: GetStockUom :one
+SELECT COALESCE(sc.to_uom, v.uom)::VARCHAR AS stock_uom
+FROM variants v
+LEFT JOIN LATERAL (
+    SELECT c.to_uom
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
+WHERE v.tenant_id = $1 AND v.id = $2
+`
+
+type GetStockUomParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+// Satuan tempat stock_quantity dihitung: satuan STOK bila varian punya
+// konversi (bibit: gram), selain itu satuan jual. Dipakai untuk mengisi
+// stock_events.uom — ledger stok tidak boleh menebak satuan.
+func (q *Queries) GetStockUom(ctx context.Context, arg GetStockUomParams) (string, error) {
+	row := q.db.QueryRow(ctx, getStockUom, arg.TenantID, arg.ID)
+	var stock_uom string
+	err := row.Scan(&stock_uom)
+	return stock_uom, err
+}
+
 const insertStockEvent = `-- name: InsertStockEvent :one
 INSERT INTO stock_events (id, tenant_id, outlet_id, variant_id, event_type, quantity_delta, balance_after, uom, reference_id, actor_user_id, note)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -171,4 +230,67 @@ func (q *Queries) ListStockLevels(ctx context.Context, tenantID string) ([]ListS
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockVariantStock = `-- name: LockVariantStock :one
+SELECT stock_quantity
+FROM variants
+WHERE tenant_id = $1 AND id = $2 AND item_type IN ('stock', 'composite')
+FOR UPDATE
+`
+
+type LockVariantStockParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+// Opname: baca stok tersimpan sambil mengunci barisnya. Selisih dihitung dari
+// angka INI, bukan dari angka yang dikirim klien — angka klien bisa basi
+// (dibaca sebelum penjualan terakhir) atau dipalsukan.
+func (q *Queries) LockVariantStock(ctx context.Context, arg LockVariantStockParams) (decimal.Decimal, error) {
+	row := q.db.QueryRow(ctx, lockVariantStock, arg.TenantID, arg.ID)
+	var stock_quantity decimal.Decimal
+	err := row.Scan(&stock_quantity)
+	return stock_quantity, err
+}
+
+const outletBelongsToTenant = `-- name: OutletBelongsToTenant :one
+SELECT EXISTS (
+    SELECT 1 FROM outlets WHERE tenant_id = $1 AND id = $2 AND is_active
+)
+`
+
+type OutletBelongsToTenantParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+// Foreign key hanya menjamin outlet ADA. Tanpa ini, mutasi stok tenant A bisa
+// dicatat atas outlet tenant B.
+func (q *Queries) OutletBelongsToTenant(ctx context.Context, arg OutletBelongsToTenantParams) (bool, error) {
+	row := q.db.QueryRow(ctx, outletBelongsToTenant, arg.TenantID, arg.ID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const setStock = `-- name: SetStock :one
+UPDATE variants
+SET stock_quantity = $3::DECIMAL
+WHERE tenant_id = $1 AND id = $2 AND item_type IN ('stock', 'composite')
+RETURNING stock_quantity
+`
+
+type SetStockParams struct {
+	TenantID string          `db:"tenant_id" json:"tenant_id"`
+	ID       string          `db:"id" json:"id"`
+	Counted  decimal.Decimal `db:"counted" json:"counted"`
+}
+
+// Opname: stok DITETAPKAN sama dengan hasil timbang, bukan ditambah.
+func (q *Queries) SetStock(ctx context.Context, arg SetStockParams) (decimal.Decimal, error) {
+	row := q.db.QueryRow(ctx, setStock, arg.TenantID, arg.ID, arg.Counted)
+	var stock_quantity decimal.Decimal
+	err := row.Scan(&stock_quantity)
+	return stock_quantity, err
 }

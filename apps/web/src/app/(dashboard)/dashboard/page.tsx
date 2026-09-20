@@ -8,6 +8,7 @@ import { m } from "framer-motion";
 import {
   Activity,
   ArrowLeft,
+  Boxes,
   DollarSign,
   Settings,
   ShieldCheck,
@@ -85,6 +86,12 @@ export default function DashboardPage() {
             <Button variant="primary" size="sm" className="gap-2 shadow-hard-sm">
               <ShoppingBag className="h-4 w-4" />
               <span>Master Katalog</span>
+            </Button>
+          </Link>
+          <Link href="/stok">
+            <Button variant="secondary" size="sm" className="gap-2 shadow-hard-sm">
+              <Boxes className="h-4 w-4" aria-hidden="true" />
+              <span>Stok</span>
             </Button>
           </Link>
           <Link href="/pengaturan">

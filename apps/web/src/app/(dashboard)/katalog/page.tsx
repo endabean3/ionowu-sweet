@@ -9,7 +9,16 @@ import { db } from "@/lib/db";
 import { daftarBertahap, naikMasuk } from "@/lib/motion/tokens";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { AlertTriangle, ArrowLeft, EyeOff, FileUp, Pencil, Plus, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Boxes,
+  EyeOff,
+  FileUp,
+  Pencil,
+  Plus,
+  Search,
+} from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 
@@ -71,6 +80,12 @@ export default function KatalogPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link href="/stok">
+            <Button variant="secondary" size="default" className="gap-2 shadow-hard-sm">
+              <Boxes className="h-4 w-4" aria-hidden="true" />
+              <span>Stok</span>
+            </Button>
+          </Link>
           <Link href="/katalog/impor">
             <Button variant="secondary" size="default" className="gap-2 shadow-hard-sm">
               <FileUp className="h-4 w-4" aria-hidden="true" />

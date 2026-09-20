@@ -11,6 +11,16 @@ import (
 )
 
 type Querier interface {
+	// Stok masuk / barang rusak / koreksi opname dari layar Stok.
+	//
+	// UPDATE tunggal ini sudah atomik dan mengambil kunci baris (alasan yang sama
+	// dengan DecrementStockStrict di checkout.sql). `delta` BERTANDA: positif
+	// menambah, negatif mengurangi, dan dihitung dalam SATUAN STOK (gram untuk
+	// bibit, ADR-0012).
+	//
+	// Jasa dan sewa (item_type lain) sengaja tidak punya stok, jadi 0 baris
+	// kembali = varian tidak ada, milik tenant lain, atau tidak berstok.
+	AdjustStock(ctx context.Context, arg AdjustStockParams) (decimal.Decimal, error)
 	// expected = saldo awal + tunai masuk + kas masuk − kas keluar.
 	//
 	// Transaksi yang tiba TERLAMBAT (is_late_arrival) sengaja DIKECUALIKAN:
@@ -133,6 +143,10 @@ type Querier interface {
 	// Validasi item yang mau di-restock benar-benar milik transaksi ini
 	// (mencegah refund_items menunjuk ke sales_item transaksi/tenant lain).
 	GetSalesItemForRefund(ctx context.Context, arg GetSalesItemForRefundParams) (GetSalesItemForRefundRow, error)
+	// Satuan tempat stock_quantity dihitung: satuan STOK bila varian punya
+	// konversi (bibit: gram), selain itu satuan jual. Dipakai untuk mengisi
+	// stock_events.uom — ledger stok tidak boleh menebak satuan.
+	GetStockUom(ctx context.Context, arg GetStockUomParams) (string, error)
 	// Dipanggil SEBELUM memproses batch. Bila key sudah ada dengan hash body yang
 	// sama, kembalikan respons tersimpan apa adanya — klien menerima jawaban
 	// identik seperti percobaan pertama.
@@ -214,6 +228,10 @@ type Querier interface {
 	// `uom` di sini adalah satuan STOK (satuan tempat stock_quantity dihitung):
 	// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)
+	// Opname: baca stok tersimpan sambil mengunci barisnya. Selisih dihitung dari
+	// angka INI, bukan dari angka yang dikirim klien — angka klien bisa basi
+	// (dibaca sebelum penjualan terakhir) atau dipalsukan.
+	LockVariantStock(ctx context.Context, arg LockVariantStockParams) (decimal.Decimal, error)
 	LookupVariantByBarcode(ctx context.Context, arg LookupVariantByBarcodeParams) (LookupVariantByBarcodeRow, error)
 	// Dipanggil di transaksi penjualan yang sama. merchandise_given_at hanya
 	// diisi SEKALI — pada transaksi pertama member — dan tidak pernah ditimpa.
@@ -222,6 +240,9 @@ type Querier interface {
 	// Indeks unik parsial mencegah dua shift terbuka untuk kasir yang sama.
 	// Bila terjadi konflik, itu bug klien — bukan kondisi yang perlu ditangani diam-diam.
 	OpenShift(ctx context.Context, arg OpenShiftParams) (OpenShiftRow, error)
+	// Foreign key hanya menjamin outlet ADA. Tanpa ini, mutasi stok tenant A bisa
+	// dicatat atas outlet tenant B.
+	OutletBelongsToTenant(ctx context.Context, arg OutletBelongsToTenantParams) (bool, error)
 	// FR-31 petty cash — mempengaruhi perhitungan expected_cash di atas.
 	RecordCashMovement(ctx context.Context, arg RecordCashMovementParams) (RecordCashMovementRow, error)
 	// sqlc-vet-disable: wajib-tenant-scope
@@ -239,6 +260,8 @@ type Querier interface {
 	// Retensi 7 hari; dibersihkan job harian. (RETENTION §2)
 	SaveSyncReceipt(ctx context.Context, arg SaveSyncReceiptParams) error
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
+	// Opname: stok DITETAPKAN sama dengan hasil timbang, bukan ditambah.
+	SetStock(ctx context.Context, arg SetStockParams) (decimal.Decimal, error)
 	// Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
 	// baru lewat money.RemainingRefundable sebelum refund ini disimpan.
 	SumRefundsForTransaction(ctx context.Context, arg SumRefundsForTransactionParams) (decimal.Decimal, error)
