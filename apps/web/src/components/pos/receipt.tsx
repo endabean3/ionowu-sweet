@@ -16,6 +16,7 @@ import {
   rupiah,
   warrantyLine,
 } from "@/lib/receipt/format";
+import { decodeLogo, logoKeDataUrl } from "@/lib/receipt/logo";
 import { ml, takaranRacikan } from "@/lib/receipt/recipe";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
@@ -54,6 +55,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
     // (#receipt-print-root) supaya tidak mengganggu layar kasir.
     <div id="receipt-print-root" aria-hidden="true">
       <div className="receipt">
+        <LogoNota raw={data.logo} />
         <div className="receipt-center receipt-bold">{data.outletName}</div>
         {data.outletAddress?.trim() && (
           <div className="receipt-center receipt-small">{data.outletAddress}</div>
@@ -178,6 +180,30 @@ export function Receipt({ data }: { data: ReceiptData }) {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Logo toko di kepala nota. Memakai bitmap 1-bit yang SAMA dengan yang
+ * dikirim ke printer, jadi yang terlihat di layar persis yang keluar dari
+ * printer — termasuk bagian gradasi yang menjadi titik-titik.
+ */
+function LogoNota({ raw }: { raw?: string | null }) {
+  const logo = decodeLogo(raw);
+  if (!logo) return null;
+  const src = logoKeDataUrl(logo);
+  if (!src) return null;
+  return (
+    // <img> biasa, bukan next/image: sumbernya data URL yang dibuat di
+    // perangkat ini, jadi tidak ada yang perlu dioptimalkan server.
+    <img
+      className="receipt-logo"
+      src={src}
+      alt=""
+      width={logo.width}
+      height={logo.height}
+      style={{ aspectRatio: `${logo.width} / ${logo.height}` }}
+    />
   );
 }
 

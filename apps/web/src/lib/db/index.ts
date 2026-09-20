@@ -102,6 +102,8 @@ export interface LocalOutlet {
   bibit_percent?: number | null;
   /** Alamat halaman nota publik di web toko (ADR-0013); kosong = tanpa QR. */
   nota_web_url?: string | null;
+  /** Logo kepala nota: bitmap 1-bit "<lebar>,<tinggi>,<base64>" (migrasi 00016). */
+  receipt_logo?: string | null;
 }
 
 /**

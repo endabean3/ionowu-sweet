@@ -14,6 +14,7 @@ export interface OutletRow {
   social_handle?: string | null;
   bibit_percent?: number | null;
   nota_web_url?: string | null;
+  receipt_logo?: string | null;
 }
 
 export interface OutletProfile {
@@ -26,6 +27,8 @@ export interface OutletProfile {
   bibit_percent: number;
   /** "" = nota tanpa QR. */
   nota_web_url: string;
+  /** Bitmap 1-bit logo; "" = hapus logo, undefined = biarkan. */
+  receipt_logo?: string;
 }
 
 /**
@@ -46,6 +49,7 @@ export async function cacheOutlets(tenantId: string, rows: OutletRow[]): Promise
       social_handle: o.social_handle ?? null,
       bibit_percent: o.bibit_percent ?? 0,
       nota_web_url: o.nota_web_url ?? null,
+      receipt_logo: o.receipt_logo ?? null,
     })),
   );
 }

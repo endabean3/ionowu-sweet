@@ -1,6 +1,7 @@
 "use client";
 
 import { PrinterPicker } from "@/components/pos/printer-picker";
+import { LogoNotaField } from "@/components/settings/logo-nota-field";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,8 @@ interface Form {
   /** Teks di input; diubah ke angka saat simpan. */
   bibit_percent: string;
   nota_web_url: string;
+  /** Bitmap 1-bit "<lebar>,<tinggi>,<base64>"; "" = tanpa logo. */
+  receipt_logo: string;
 }
 
 const kosong: Form = {
@@ -51,6 +54,7 @@ const kosong: Form = {
   social_handle: "",
   bibit_percent: "0",
   nota_web_url: "",
+  receipt_logo: "",
 };
 
 function keForm(o: OutletRow): Form {
@@ -63,6 +67,7 @@ function keForm(o: OutletRow): Form {
     social_handle: o.social_handle ?? "",
     bibit_percent: String(o.bibit_percent ?? 0),
     nota_web_url: o.nota_web_url ?? "",
+    receipt_logo: o.receipt_logo ?? "",
   };
 }
 
@@ -163,6 +168,7 @@ export default function PengaturanPage() {
       social_handle: form.social_handle.trim().replace(/^@/, ""),
       bibit_percent: racikan,
       nota_web_url: notaUrlBersih,
+      receipt_logo: form.receipt_logo,
     };
     try {
       await patchOutlet(accessToken, outletId, rapi);
@@ -201,6 +207,7 @@ export default function PengaturanPage() {
       footer: form.receipt_footer,
       warrantyDays: garansiSah ? garansiHari : 0,
       recipePercent: racikanSah ? racikan : 0,
+      logo: form.receipt_logo || null,
       notaUrl: notaUrlSah
         ? notaWebLink(notaUrlBersih, "01CONTOHTENANT000000000000", "01CONTOHSTRUK0000000PRATINJ")
         : null,
@@ -234,6 +241,7 @@ export default function PengaturanPage() {
     racikanSah,
     notaUrlBersih,
     notaUrlSah,
+    form.receipt_logo,
   ]);
 
   const keluar = async () => {
@@ -417,6 +425,10 @@ export default function PengaturanPage() {
                   placeholder="https://warungwangi.ionowu.com/nota"
                   hint="Nota mencetak QR ke halaman ini: pembeli bisa cek garansi dan daftar member dari HP. Kosong = tanpa QR."
                   error={notaUrlSah ? undefined : "Harus diawali https:// tanpa ? atau #"}
+                />
+                <LogoNotaField
+                  nilai={form.receipt_logo}
+                  onUbah={(v) => setForm((f) => ({ ...f, receipt_logo: v }))}
                 />
               </fieldset>
 

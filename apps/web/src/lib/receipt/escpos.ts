@@ -13,6 +13,7 @@ import {
   rupiah,
   warrantyLine,
 } from "./format";
+import { decodeLogo } from "./logo";
 import { ml, takaranRacikan } from "./recipe";
 
 /**
@@ -31,6 +32,9 @@ export type PaperWidth = 58 | 80;
 
 /** Karakter per baris dengan font A bawaan (12×24 titik). */
 export const COLUMNS: Record<PaperWidth, number> = { 58: 32, 80: 48 };
+
+/** Lebar cetak dalam TITIK — batas gambar (logo, QR) yang muat di kertas. */
+export const COLUMNS_DOTS: Record<PaperWidth, number> = { 58: 384, 80: 576 };
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -166,6 +170,14 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
   // ESC @ — reset, supaya sisa format (tebal/rata tengah) dari cetakan
   // sebelumnya yang terputus tidak ikut terbawa ke struk ini.
   out.cmd(ESC, 0x40);
+
+  // Logo toko paling atas, rata tengah. Bitmap-nya sudah 1-bit sejak
+  // diunggah (lib/receipt/logo.ts), jadi tidak ada pengolahan gambar di
+  // jalur cetak.
+  const logo = decodeLogo(data.logo);
+  if (logo && logo.width <= COLUMNS_DOTS[paper]) {
+    out.align("center").raster(logo.width / 8, logo.height, logo.bits);
+  }
 
   out
     .align("center")
@@ -335,11 +347,11 @@ export function printedText(bytes: Uint8Array): string {
         out += `||| ${isi} |||`;
         i += 3 + n;
       } else if (cmd === 0x76) {
-        // GS v 0 m xL xH yL yH <data>: gambar raster (QR) — datanya bisa
-        // berisi byte apa saja, jadi dilompati utuh.
+        // GS v 0 m xL xH yL yH <data>: gambar raster (logo toko atau QR) —
+        // datanya bisa berisi byte apa saja, jadi dilompati utuh.
         const lebar = bytes[i + 4] | (bytes[i + 5] << 8);
         const tinggi = bytes[i + 6] | (bytes[i + 7] << 8);
-        out += "[ QR ]";
+        out += "[ gambar ]";
         i += 7 + lebar * tinggi;
       } else if (cmd === 0x56)
         i += 3; // GS V B n

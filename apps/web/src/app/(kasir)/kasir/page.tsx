@@ -419,6 +419,7 @@ export default function KasirPage() {
         warrantyDays: outlet?.warranty_days,
         recipePercent: outlet?.bibit_percent,
         notaUrl: notaWebLink(outlet?.nota_web_url, identitas?.tenant_id, txId),
+        logo: outlet?.receipt_logo,
         member: member
           ? { code: member.member_code, name: member.name, bonuses: bonusMember }
           : null,

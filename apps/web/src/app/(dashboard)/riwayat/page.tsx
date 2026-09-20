@@ -97,6 +97,7 @@ export default function RiwayatPage() {
       footer: outlet?.receipt_footer,
       warrantyDays: outlet?.warranty_days,
       recipePercent: outlet?.bibit_percent,
+      logo: outlet?.receipt_logo,
     };
     setNotaCetak(lengkap);
     void printer.cetak(lengkap);

@@ -4,6 +4,40 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.29.0] — 2026-09-20
+
+### Ditambahkan
+* **Logo toko di kepala nota** (permintaan pemilik Warung Wangi; sebelumnya ditunda).
+  * **Pengaturan → Logo nota**: unggah PNG/JPG/WebP, lihat pratinjau **hitam-putih persis hasil
+    cetak**, dan hapus lagi bila perlu.
+  * Gambar diubah menjadi **bitmap 1-bit di peramban saat diunggah**, bukan saat mencetak —
+    kasir tidak boleh menunggu gambar diproses ketika pembeli berdiri di depan. Yang disimpan di
+    `outlets.receipt_logo` adalah bitmap itu (`"<lebar>,<tinggi>,<base64>"`), bukan berkas asli.
+  * Printer termal mencetaknya lewat raster `GS v 0`; nota browser memakai bitmap yang sama.
+  * **Gambar bergaris tegas → ambang keras, gambar bergradasi → dithering Floyd–Steinberg.**
+    Dithering pada logo bergaris membuat teks kecil ("Parfum Refill Berkualitas") berbintik;
+    ambang keras pada foto sebaliknya menjadikannya bidang hitam. Pilihannya otomatis dari isi
+    gambar.
+  * Latar transparan dianggap **putih** — PNG transparan yang diperlakukan hitam akan keluar
+    sebagai kotak hitam pekat sepanjang logo.
+  * Rasio dijaga: logo persegi tidak digepengkan saat tingginya dibatasi.
+  * Cadangan `<img>` bila `createImageBitmap` tidak tersedia (WebView Android lama).
+* Migrasi **`00016_outlet_receipt_logo`**: `outlets.receipt_logo` TEXT (expand murni).
+
+### Keamanan / ketahanan
+* Server memvalidasi bitmap **termasuk panjang datanya** (lebar kelipatan 8 ≤ 576, tinggi ≤ 240,
+  byte harus tepat `lebar/8 × tinggi`). Data yang kurang atau berlebih membuat printer termal
+  memuntahkan sampah sepanjang gulungan kertas, dan itu baru ketahuan di depan pembeli.
+
+### Diuji
+* Go: `TestCekLogoNota` — termasuk data kependekan/kepanjangan dan lebar bukan kelipatan 8.
+* Vitest **100/100**: encode↔decode, urutan bit (logo tidak terbalik), data rusak ditolak, logo
+  tercetak SEBELUM nama toko, dan logo lebih lebar dari kertas dilewati.
+* Playwright: unggah logo di Pengaturan → tersimpan sebagai bitmap di server → muncul di nota,
+  dan bisa dihapus lagi.
+* Dicoba dengan **logo Warung Wangi yang asli**; hasil hitam-putihnya diperiksa langsung di
+  pratinjau nota bergaya cetak.
+
 ## [1.28.0] — 2026-09-20
 
 ### Ditambahkan

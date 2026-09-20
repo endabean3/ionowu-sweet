@@ -233,6 +233,7 @@ type Outlet struct {
 	SocialHandle     *string            `db:"social_handle" json:"social_handle"`
 	BibitPercent     int16              `db:"bibit_percent" json:"bibit_percent"`
 	NotaWebUrl       *string            `db:"nota_web_url" json:"nota_web_url"`
+	ReceiptLogo      *string            `db:"receipt_logo" json:"receipt_logo"`
 }
 
 type OutletPriceOverride struct {

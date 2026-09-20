@@ -184,6 +184,19 @@ body {
     print-color-adjust: exact;
   }
 
+  /* Logo toko: selebar area cetak, tinggi mengikuti rasio aslinya.
+     image-rendering: pixelated — bitmap 1-bit tidak boleh dihaluskan browser,
+     karena kaburnya membuat titik dithering menyatu jadi abu-abu. */
+  .receipt-logo {
+    display: block;
+    width: 48mm;
+    height: auto;
+    margin: 0 auto 1.5mm;
+    image-rendering: pixelated;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   /* QR nota publik: 26 mm persegi, sama dengan versi printer termal. */
   .receipt-qr {
     display: block;
