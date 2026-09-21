@@ -29,7 +29,11 @@ import (
 //   - Kunci = (tenant_id, id nota). Id nota adalah ULID dengan 80 bit acak;
 //     menebak nota orang lain tidak praktis. Keduanya wajib di setiap kueri
 //     (aturan emas tenant_id tetap berlaku).
-//   - Tidak ada identitas pelanggan, kasir, atau HPP di jawaban.
+//   - Jawabannya tidak pernah memuat lebih dari yang SUDAH TERCETAK di kertas
+//     nota itu: tidak ada kasir, HPP, riwayat belanja, atau nomor WhatsApp.
+//     Kode & nama member ikut keluar justru karena keduanya dicetak di nota
+//     member beserta barcodenya (escpos.ts) — pemegang URL ini sudah
+//     memegang kertas yang memuatnya.
 //   - Satu pendaftaran member per nota (idx_customers_signup_sale), hanya
 //     untuk nota lunas tanpa member, dan hanya dalam JendelaDaftarMember.
 //   - Rate limit per tenant (baca) dan per nota (daftar). BUKAN per IP: semua
@@ -88,6 +92,17 @@ type publicNota struct {
 	} `json:"warranty"`
 	Items            []publicNotaItem `json:"items"`
 	MemberSignupOpen bool             `json:"member_signup_open"`
+	// Kartu member: terisi HANYA bila nota ini atas nama member. Isinya
+	// sengaja sama dengan yang tercetak di kertas, ditambah satu penanda
+	// merchandise — tidak ada nomor WA dan tidak ada riwayat belanja.
+	Member *publicNotaMember `json:"member,omitempty"`
+}
+
+type publicNotaMember struct {
+	Code string `json:"code"`
+	Name string `json:"name,omitempty"`
+	// true = merchandise perdana sudah diberikan.
+	MerchandiseGiven bool `json:"merchandise_given"`
 }
 
 // garansiSampai: tanggal (zona waktu outlet) terakhir garansi berlaku —
@@ -188,6 +203,17 @@ func (h *PublicNotaHandler) GetNota(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	out.MemberSignupOpen = bolehDaftar(row, now)
+	// Hanya bila notanya benar-benar atas nama member yang masih aktif —
+	// LEFT JOIN di kuerinya mengembalikan NULL untuk member nonaktif atau
+	// yang sudah digabung (merged_into_id), dan kartu kosong lebih baik
+	// daripada kartu berisi kode yang tidak berlaku lagi di kasir.
+	if row.MemberCode != nil {
+		out.Member = &publicNotaMember{
+			Code:             *row.MemberCode,
+			Name:             deref(row.MemberName),
+			MerchandiseGiven: row.MemberMerchandiseGiven,
+		}
+	}
 
 	// Nota tidak berubah setelah lunas kecuali refund; cache pendek cukup
 	// meredam muat-ulang beruntun tanpa menyembunyikan refund lama-lama.

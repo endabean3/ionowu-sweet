@@ -106,6 +106,58 @@ export function fetchSale(accessToken: string, id: string): Promise<SaleDetail> 
   return panggil<SaleDetail>(accessToken, `/sales/${encodeURIComponent(id)}`);
 }
 
+/**
+ * Owner/manager yang bisa dimintai PIN dari layar kasir (GET /approvers).
+ * Isinya sengaja minim — tidak ada email, tidak ada hash PIN.
+ */
+export interface Approver {
+  id: string;
+  name: string;
+  role: "owner" | "manager";
+  /** false = akunnya ada tetapi PIN-nya belum pernah diatur. */
+  punya_pin: boolean;
+}
+
+export function fetchApprovers(accessToken: string): Promise<Approver[]> {
+  return panggil<Approver[]>(accessToken, "/approvers").then((r) => r ?? []);
+}
+
+/**
+ * Persetujuan manager untuk aksi yang tidak boleh dilakukan kasir sendiri.
+ * Kosong bila yang login memang owner/manager — server mengabaikannya.
+ */
+export interface Persetujuan {
+  approver_user_id: string;
+  pin: string;
+}
+
+/**
+ * Mengatur PIN persetujuan MILIK SENDIRI. `pin` kosong = hapus PIN.
+ * Password diminta lagi di server, bukan hanya di layar.
+ */
+export function aturPinSendiri(
+  accessToken: string,
+  password: string,
+  pin: string,
+): Promise<{ punya_pin: boolean }> {
+  return panggil<{ punya_pin: boolean }>(accessToken, "/me/pin", {
+    method: "PATCH",
+    body: JSON.stringify({ password, pin }),
+  }) as Promise<{ punya_pin: boolean }>;
+}
+
+/**
+ * Memeriksa PIN manager TANPA mengubah apa pun. Dipakai gerbang diskon
+ * besar, yang diputuskan sebelum transaksi ada — jadi tidak ada payload
+ * tempat menitipkan PIN seperti pada refund/void.
+ */
+export function verifikasiPin(accessToken: string, p: Persetujuan): Promise<unknown> {
+  return panggil<unknown>(accessToken, "/approvals/verify", {
+    method: "POST",
+    body: JSON.stringify(p),
+  });
+}
+
 export interface RefundPayload {
   shift_id?: string;
   refund_type: "full" | "partial";
@@ -114,6 +166,8 @@ export interface RefundPayload {
   reason: string;
   restock: boolean;
   items?: { sales_item_id: string; quantity: string; amount: string }[];
+  approver_user_id?: string;
+  pin?: string;
 }
 
 export function kirimRefund(accessToken: string, id: string, body: RefundPayload) {
@@ -123,9 +177,14 @@ export function kirimRefund(accessToken: string, id: string, body: RefundPayload
   });
 }
 
-export function batalkanTransaksi(accessToken: string, id: string, reason: string) {
+export function batalkanTransaksi(
+  accessToken: string,
+  id: string,
+  reason: string,
+  persetujuan?: Persetujuan,
+) {
   return panggil<unknown>(accessToken, `/sales/${encodeURIComponent(id)}/void`, {
     method: "POST",
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ reason, ...persetujuan }),
   });
 }

@@ -79,6 +79,71 @@ export async function provisionTenant(): Promise<TenantFixture> {
   return { email, password, accessToken, productName };
 }
 
+/**
+ * Menambah satu produk bervarian tunggal ke tenant yang sudah ada.
+ * Dipakai uji yang butuh barang dengan barcode/SKU tertentu — fixture
+ * bawaan sengaja dibiarkan tanpa barcode.
+ */
+export async function tambahProduk(
+  fx: TenantFixture,
+  opts: { name: string; barcode?: string; sku?: string; uom?: string; price?: string },
+): Promise<void> {
+  const res = await fetch(`${API_URL}/products`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${fx.accessToken}`,
+    },
+    body: JSON.stringify({
+      name: opts.name,
+      variants: [
+        {
+          name: "Default",
+          sku: opts.sku ?? "",
+          barcode: opts.barcode ?? "",
+          price: opts.price ?? "15000",
+          cost_price: "5000",
+          uom: opts.uom ?? "pcs",
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`buat produk gagal: ${res.status} ${await res.text()}`);
+  }
+}
+
+/**
+ * Impor katalog dari CSV. Satu-satunya jalur yang bisa MENETAPKAN satuan
+ * stok berbeda dari satuan jual (ADR-0012) — POST /products tidak punya
+ * field itu, jadi uji faktor gram/ml harus lewat sini.
+ */
+export async function imporKatalogCsv(fx: TenantFixture, csv: string): Promise<void> {
+  const form = new FormData();
+  form.append("file", new Blob([csv], { type: "text/csv" }), "katalog.csv");
+  const res = await fetch(`${API_URL}/products/import`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${fx.accessToken}` },
+    body: form,
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`impor gagal: ${res.status} ${JSON.stringify(body)}`);
+  if (body?.dilewati?.length) throw new Error(`baris dilewati: ${JSON.stringify(body.dilewati)}`);
+}
+
+/**
+ * PIN manager untuk uji, DIBANGKITKAN saat dijalankan.
+ *
+ * Bukan sekadar menyenangkan gerbang `pin-kasir-polos` di .gitleaks.toml:
+ * aturan itu melarang PIN muncul sebagai nilai polos di repo, dan berkas uji
+ * justru tempat PIN sungguhan paling mudah tersalin tanpa sengaja — seseorang
+ * menempelkan PIN toko untuk "mencoba sebentar", lalu ikut ter-commit.
+ * Membangkitkannya juga membuat tiap kali jalan memakai PIN berbeda.
+ */
+export function pinUji(): string {
+  return String(100000 + Math.floor(Math.random() * 900000));
+}
+
 /** Login lewat UI (email + password — Tenant ID tidak diminta lagi). */
 export async function loginViaUI(page: Page, fx: TenantFixture) {
   await page.goto("/login");

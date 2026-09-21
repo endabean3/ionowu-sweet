@@ -207,9 +207,16 @@ export function encodeReceipt(data: ReceiptData, paper: PaperWidth = 58): Uint8A
   out.line(sep);
   // Subtotal & pajak hanya bila ada pajak — tanpa pajak, Subtotal sama
   // persis dengan TOTAL dan hanya menambah satu baris kertas.
-  if (new Decimal(data.taxTotal || "0").gt(0)) {
+  const diskonNota = new Decimal(data.discountTotal || "0");
+  if (new Decimal(data.taxTotal || "0").gt(0) || diskonNota.gt(0)) {
     out.lines(row("Subtotal", rupiah(data.subtotal), w));
-    out.lines(row("Pajak", rupiah(data.taxTotal), w));
+    // Diskon dicetak walau pajaknya nol: pembeli yang membayar kurang dari
+    // jumlah harga barang harus bisa melihat ALASANNYA di kertas, bukan
+    // menyimpulkan sendiri bahwa kasir salah hitung.
+    if (diskonNota.gt(0)) out.lines(row("Diskon", `-${rupiah(diskonNota)}`, w));
+    if (new Decimal(data.taxTotal || "0").gt(0)) {
+      out.lines(row("Pajak", rupiah(data.taxTotal), w));
+    }
   }
   out
     .bold(true)
@@ -304,6 +311,48 @@ export function encodeTestPage(paper: PaperWidth, printerName: string): Uint8Arr
       w,
     ),
   );
+  out.cmd(ESC, 0x64, 4);
+  out.cmd(GS, 0x56, 0x42, 0x00);
+  return out.build();
+}
+
+/** Satu baris laporan siap cetak; teksnya sudah dipotong selebar kolom. */
+export interface BarisCetak {
+  teks: string;
+  tebal?: boolean;
+  tengah?: boolean;
+}
+
+/**
+ * Laporan tutup buku (Z-Report) ke printer termal.
+ *
+ * Isinya datang sudah jadi dari `lib/reports/zreport.ts` sebagai baris teks;
+ * di sini hanya ditambahkan format ESC/POS (tebal, rata tengah) dan potong
+ * kertas. Pemisahan itu disengaja: pratinjau di layar dan hasil cetak
+ * disusun dari SATU fungsi, jadi tidak bisa berbeda.
+ */
+export function encodeReportLines(baris: BarisCetak[], paper: PaperWidth = 58): Uint8Array {
+  const out = new EscPosBuilder();
+  out.cmd(ESC, 0x40);
+
+  let tebal = false;
+  let tengah = false;
+  for (const b of baris) {
+    if (!!b.tengah !== tengah) {
+      tengah = !!b.tengah;
+      out.align(tengah ? "center" : "left");
+    }
+    if (!!b.tebal !== tebal) {
+      tebal = !!b.tebal;
+      out.bold(tebal);
+    }
+    out.line(toPrinterText(b.teks));
+  }
+  if (tebal) out.bold(false);
+  if (tengah) out.align("left");
+
+  // Umpan kertas sebelum potong: pisau ada ±4 baris di atas kepala cetak,
+  // jadi tanpa umpan ini baris terakhir laporan terpotong di tengah huruf.
   out.cmd(ESC, 0x64, 4);
   out.cmd(GS, 0x56, 0x42, 0x00);
   return out.build();

@@ -102,3 +102,49 @@ SET
     barcode = CASE WHEN sqlc.narg('barcode')::text = '' THEN NULL ELSE COALESCE(sqlc.narg('barcode'), barcode) END,
     is_active = COALESCE(sqlc.narg('is_active'), is_active)
 WHERE tenant_id = $1 AND id = $2;
+
+-- name: GetVariantDetail :one
+-- Isian layar "Ubah barang". Termasuk HPP, yang SENGAJA tidak ikut
+-- /sync/pull: margin usaha adalah informasi paling sensitif bagi pemilik
+-- UMKM (SECURITY.md §3), dan apa pun yang disinkronkan ikut tersimpan di
+-- IndexedDB setiap ponsel kasir — yang hanya dijaga kunci layar ponsel
+-- (lihat lib/auth/access.ts). Pemanggil WAJIB menyaringnya per peran.
+SELECT v.id, v.name, v.sku, v.barcode, v.price, v.cost_price,
+       v.min_stock_alert, v.uom, v.uom_precision, v.is_active,
+       COALESCE(sc.to_uom, '')::VARCHAR  AS stock_uom,
+       COALESCE(sc.factor, 0)::DECIMAL   AS stock_factor
+FROM variants v
+LEFT JOIN LATERAL (
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
+WHERE v.tenant_id = $1 AND v.id = $2;
+
+-- name: InsertUomConversion :execrows
+-- Konversi satuan jual → satuan stok (ADR-0012): bibit dijual per ml,
+-- stoknya gram. from_uom diambil dari varian itu sendiri supaya tidak
+-- mungkin menyimpan konversi yang tidak akan pernah terpakai.
+INSERT INTO uom_conversions (id, tenant_id, variant_id, from_uom, to_uom, factor)
+SELECT sqlc.arg('conversion_id')::varchar, v.tenant_id, v.id, v.uom,
+       sqlc.arg('to_uom')::varchar, sqlc.arg('factor')::decimal
+FROM variants v
+WHERE v.tenant_id = sqlc.arg('tenant_id')::varchar
+  AND v.id        = sqlc.arg('variant_id')::varchar
+ON CONFLICT DO NOTHING;
+
+-- name: UpdateUomConversionFactor :execrows
+-- HANYA faktornya. `to_uom` tidak pernah diubah lewat sini: seluruh ledger
+-- stock_events barang ini sudah tercatat dalam satuan itu, dan menggantinya
+-- membuat gram dan mililiter berjumlah di kolom yang sama tanpa satu pun
+-- baris yang terlihat salah.
+UPDATE uom_conversions c
+SET factor = sqlc.arg('factor')::decimal
+FROM variants v
+WHERE c.tenant_id = $1
+  AND c.variant_id = $2
+  AND v.tenant_id = c.tenant_id
+  AND v.id = c.variant_id
+  AND c.from_uom = v.uom;

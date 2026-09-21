@@ -1,4 +1,10 @@
-import { type PaperWidth, encodeReceipt, encodeTestPage } from "@/lib/receipt/escpos";
+import {
+  type BarisCetak,
+  type PaperWidth,
+  encodeReceipt,
+  encodeReportLines,
+  encodeTestPage,
+} from "@/lib/receipt/escpos";
 import type { ReceiptData } from "@/lib/receipt/format";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
@@ -104,6 +110,16 @@ export function printReceiptBluetooth(printer: SavedPrinter, data: ReceiptData):
 
 export function printTestPageBluetooth(printer: SavedPrinter): Promise<void> {
   return sendBytes(printer, encodeTestPage(printer.paper, printer.name));
+}
+
+/**
+ * Laporan tutup buku ke printer termal. Barisnya sudah disusun pemanggil
+ * (lib/reports/zreport.ts) memakai LEBAR KOLOM printer ini — memanggilnya
+ * dengan baris yang disusun untuk lebar lain menghasilkan laporan yang
+ * patah di tengah angka.
+ */
+export function printReportBluetooth(printer: SavedPrinter, baris: BarisCetak[]): Promise<void> {
+  return sendBytes(printer, encodeReportLines(baris, printer.paper));
 }
 
 /** Pesan dari plugin sudah berbahasa Indonesia dan ditujukan ke kasir. */

@@ -93,6 +93,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 | **`node_modules` root DAN paket harus sama-sama volume** | Status pnpm (`.modules.yaml`, `.pnpm/`) ada di root. Bila hanya `apps/web` yang volume, `down -v` mengosongkan isi tapi status selamat → pnpm bilang *"Already up to date"* dengan `node_modules` **kosong** |
 | **`git config --global --add safe.directory /workspace`** | uid bind mount ≠ uid `dev` → `git rev-parse` menolak → `go build` gagal `exit 1` dengan pesan VCS yang menyesatkan |
 | **Percepat store pnpm dengan MENUTUPI jalur bawaannya pakai volume — jangan mengubah konfigurasi pnpm** | Bawaan pnpm menaruh store di `/workspace/.pnpm-store`, di dalam bind mount: lambat dan mengotori repo (pernah 452 MB). Memaksanya lewat `storeDir` di `pnpm-workspace.yaml` **merusak CI**: berkas itu ikut ter-checkout di GitHub Actions dan `actions/setup-node` gagal karena jalur container tidak ada di runner. (Sejak pnpm 10, `store-dir` di `.npmrc` dan `npm_config_store_dir` juga diabaikan diam-diam.) |
+| **Hanya GET/POST/PATCH/DELETE** — jangan pernah menambah `PUT` | Middleware CORS hanya mengizinkan keempatnya. `PUT` gagal di **preflight**: peramban menolaknya sebelum ada permintaan yang sampai ke server, jadi log server bersih dan yang terlihat hanyalah tombol yang "tidak melakukan apa-apa" |
 | **Seeder wajib satu transaksi** | Tanpa itu, `make seed` di database terisi gagal *setelah* menulis tenant/outlet/produk → tenant yatim menumpuk. Sempat ada **tiga** "Kopi Senja", dan kueri yang lupa memfilter `tenant_id` tetap terlihat benar |
 
 ---
@@ -143,10 +144,10 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ```
 95 dokumen .md di docs/ · 11 folder · 13 ADR diterima (0001–0013)
-16 migrasi · 47 tabel · 65 indeks · 82 kueri SQL
+16 migrasi · 47 tabel · 65 indeks · 101 kueri SQL
 ```
 
-> Angka dihitung ulang 2026-09-19 langsung dari repo. Audit dokumen menyeluruh
+> Kueri dihitung ulang 2026-09-21; sisanya 2026-09-19. Semuanya langsung dari repo. Audit dokumen menyeluruh
 > (§seksi, yatim, kontradiksi, FK, tenant-scope) belum diulang sejak angka lama.
 
 ### Produksi sudah hidup (deploy pertama 2026-09-17)
@@ -186,7 +187,10 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   terpisah `endabean3/warungwangi`). Halaman itu membaca **endpoint publik TANPA login**
   `/public/v1/nota/...` dari server-nya untuk cek garansi & daftar member (1× per nota, ≤ 30 hari).
   Ini satu-satunya permukaan tanpa login di pos-engine — **ubahan di `public_nota.go`/`.sql`
-  ditinjau sebagai perubahan keamanan**. Nomor di nota = id penjualan di server (dulu dua ULID
+  ditinjau sebagai perubahan keamanan**. Batas isinya: **hanya yang SUDAH tercetak di kertas
+  nota itu**. Karena itu `member` (kode + nama + penanda merchandise) boleh keluar — keduanya
+  dicetak di nota member beserta barcodenya — sedangkan **nomor WA tidak pernah**, meski ia
+  kolom bersebelahan di tabel yang sama. Nomor di nota = id penjualan di server (dulu dua ULID
   berbeda — bug itu sudah diperbaiki; jangan dipisah lagi).
 * **Layar Stok** (`/stok`): sisa stok per barang dalam SATUAN STOK, plus barang masuk, barang
   rusak/hilang, dan opname (hasil timbang menggantikan stok, selisih masuk ledger). Owner,
@@ -194,8 +198,8 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 * **Riwayat transaksi** (`/riwayat`): cari nota lama, cetak ulang, **refund**, dan **void**.
   Dibaca dari server (`GET /sales`, `GET /sales/{id}`), bukan Dexie — transaksi perangkat lain
   ikut terlihat. Void hanya selama shift transaksi masih TERBUKA (invarian §6 #5); setelah itu
-  hanya refund. Kasir butuh PIN manager (dipakai bersama refund lewat `verifikasiPinManager`);
-  alur PIN belum ada di layar, jadi kasir diarahkan ke owner/manager.
+  hanya refund. **Kasir kini bisa refund & void sendiri**: manajer mengetik PIN di layar yang
+  sama (`PinManager`), token tetap milik kasir, `approved_by` menyebut manajernya.
 * **Logo toko di kepala nota** (migrasi 00016): diunggah di Pengaturan, diubah menjadi **bitmap
   1-bit di peramban** (bukan di jalur cetak), lalu disimpan sebagai `"<lebar>,<tinggi>,<base64>"`
   di `outlets.receipt_logo`. Printer termal memakai `GS v 0`; nota browser memakai bitmap yang
@@ -207,6 +211,40 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
   **Riwayat** (yang kini mencocokkan `receipt_number` ATAU `id`). Bukan id penuh: 26 karakter
   memaksa modul 1 titik di kertas 58 mm, di bawah batas baca pemindai murah. Terbukti terbaca
   `zbarimg` dari nota yang dirender.
+* **Scan barcode barang** di kolom cari kasir: cocok PERSIS dengan `barcode` atau `sku` →
+  langsung masuk keranjang; cocok sebagian hanya menyaring grid (kasir yang mengetik nama tidak
+  boleh kejatuhan barang). Barang curah yang dipindai membuka dialog jumlah. Aturannya di
+  `apps/web/src/lib/catalog/cari.ts` — jangan disalin balik ke komponen.
+* **Tutup buku / Z-Report** (`/laporan-harian`, `GET /reports/daily`): penjualan kotor→bersih,
+  metode bayar, kas laci, void/refund, shift (diharapkan vs dihitung), 10 terlaris. Owner &
+  manager saja. Angka utama MENGECUALIKAN `is_late_arrival`; ember terpisah dicetak dengan
+  kalimat "TIDAK termasuk angka di atas" — itulah invarian §6 #5 dalam bentuk kode. Pratinjau
+  layar dan hasil cetak disusun SATU fungsi (`lib/reports/zreport.ts`); jangan dipisah.
+* **Karyawan & PIN persetujuan** (Pengaturan, owner saja): `GET/POST /users`,
+  `PATCH /users/{id}`, `PATCH /me/pin`, `GET /approvers`, `POST /approvals/verify`.
+  Sebelum ini TIDAK ADA cara membuat akun karyawan — tiap tenant hanya punya owner, jadi
+  peran `cashier` tak pernah ada dan seluruh aturan RBAC-nya tidur. Karyawan baru otomatis
+  ditugaskan ke semua outlet **dalam transaksi yang sama**; tanpa itu `GET /outlets` miliknya
+  kosong dan ia tidak bisa membuka shift. Mengatur PIN **wajib mengetik password lagi**.
+* **Diskon per transaksi** di kasir: satu kolom menerima nominal ("5000") atau persen
+  ("10%"). Kasir bebas sampai **20%**, di atasnya butuh PIN manager (RBAC-MODEL §Matriks) —
+  dan karena PIN diperiksa di server, diskon besar hanya bisa diberikan saat online.
+  Gerbangnya ada di KLIEN, dan memang hanya bisa di sana: transaksi offline selalu diterima
+  (invarian §6 #4). Aturannya di `lib/pos/diskon.ts`. Diskon ikut tercetak di nota.
+* **Member dari web ditemukan kasir** (`GET /customers/lookup?q=`): pelanggan yang mendaftar
+  sendiri lewat QR nota lahir di SERVER, sedangkan cermin perangkat baru terisi saat
+  `/sync/pull` — dan sync berkala HANYA jalan bila ada antrean lokal. Panel Member dan kolom
+  cari utama kasir kini menelusuri server bila hasil lokal kosong, lalu menyimpannya ke
+  perangkat. Jangan hapus jalur ini: tanpanya kartu member yang baru dibuat tidak bisa
+  dipakai di kasir sama sekali.
+* **Daftar member** (`/member`, `GET /members`, `PATCH /members/{id}`): cari nama/WA/kode,
+  total belanja, dan penanda merchandise perdana yang bisa dicabut. Nomor WA bisa diperbaiki;
+  **kode member tidak pernah bisa diubah** — barcodenya sudah tercetak di nota pelanggan.
+* **HPP & faktor g/ml dari layar Katalog.** HPP dibaca lewat `GET /variants/{id}` (owner
+  saja) dan **sengaja TIDAK ikut `/sync/pull`**: apa pun yang disinkronkan menetap di
+  IndexedDB tiap ponsel kasir. Faktor konversi bisa dikoreksi; mengubahnya tidak menyentuh
+  sisa stok, hanya penjualan berikutnya. **Satuan stok tidak bisa diganti** — ledger barang
+  itu sudah tercatat dalam satuan lama.
 * **Laporan stok** (`/laporan-stok`): pergerakan dari ledger `stock_events` (terjual, masuk,
   rusak, koreksi, void) dalam satuan stok, ringkasan per jenis, dan unduh CSV.
 * **Tanpa PPN.** Kasir memakai `taxRate: "0"` (Warung Wangi bukan PKP). Server tidak
@@ -219,8 +257,9 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 
 ### Belum digarap — jangan diasumsikan ada
 
-Void transaksi (refund ada, void tidak), transfer stok antar-outlet, CRM lanjutan (segmentasi, poin, WA — member dasar SUDAH ada), SOP,
-layanan Python (ADR-0006), rate limit berbasis Redis (pos-engine belum punya klien Redis),
+Transfer stok antar-outlet, CRM lanjutan (segmentasi, poin, WA — member dasar + daftar member
+SUDAH ada), SOP, pesanan tertahan, penugasan karyawan PER-OUTLET (karyawan baru ditugaskan ke
+SEMUA outlet; menunggu layar multi-outlet), layanan Python (ADR-0006), rate limit berbasis Redis (pos-engine belum punya klien Redis),
 jalur principal platform/distributor (RBAC-MODEL.md §5 — `TenantMiddleware` menolaknya
 eksplisit), dan skenario uji [OFFLINE-SYNC-SPEC](./docs/30-data/OFFLINE-SYNC-SPEC.md) di luar
 yang sudah ada di `e2e/` (mis. 10.000 transaksi, offline 7 hari, jam mundur).
@@ -232,7 +271,7 @@ yang sudah ada di `e2e/` (mis. 10.000 transaksi, offline 7 hari, jam mundur).
 2. Uji restore backup R2 sekali dan catat waktunya (GO-LIVE §3) — sebelum toko percontohan
 3. Alarm kritis + uptime monitor eksternal (GO-LIVE §5)
 4. ADR aturan pembulatan uang
-5. Void transaksi dengan PIN manager (RBAC-MODEL §"Void transaksi")
+5. Logo ionowu di nota — menunggu keputusan pemilik
 
 ### Yang memblokir, dan bukan pekerjaan teknis
 * **Vendor QRIS** (arah sub-merchant disetujui; Midtrans dievaluasi lebih dulu) — memblokir FR-23

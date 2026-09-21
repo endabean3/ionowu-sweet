@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 )
 
 const customerBelongsToTenant = `-- name: CustomerBelongsToTenant :one
@@ -122,6 +123,146 @@ func (q *Queries) ListCustomersForSync(ctx context.Context, tenantID string) ([]
 	return items, nil
 }
 
+const listMembers = `-- name: ListMembers :many
+SELECT
+    c.id, c.name, c.phone, c.member_code, c.social_handle,
+    c.follows_store_social, c.merchandise_given_at,
+    c.first_seen_at, c.last_seen_at,
+    COALESCE(b.jumlah, 0)::int      AS jumlah_transaksi,
+    COALESCE(b.belanja, 0)::decimal AS total_belanja
+FROM customers c
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS jumlah, SUM(s.grand_total) AS belanja
+    FROM sales_transactions s
+    WHERE s.tenant_id = c.tenant_id
+      AND s.customer_id = c.id
+      AND s.payment_status = 'paid'
+      AND NOT s.is_sandbox
+) b ON TRUE
+WHERE c.tenant_id = $1
+  AND c.is_active
+  AND c.merged_into_id IS NULL
+  AND c.member_code IS NOT NULL
+  AND ($2::text IS NULL
+       OR c.member_code ILIKE '%' || $2::text || '%'
+       OR c.phone       ILIKE '%' || $2::text || '%'
+       OR c.name        ILIKE '%' || $2::text || '%')
+ORDER BY c.last_seen_at DESC NULLS LAST, c.first_seen_at DESC
+LIMIT $3::int
+`
+
+type ListMembersParams struct {
+	TenantID string  `db:"tenant_id" json:"tenant_id"`
+	Cari     *string `db:"cari" json:"cari"`
+	Batas    int32   `db:"batas" json:"batas"`
+}
+
+type ListMembersRow struct {
+	ID                 string             `db:"id" json:"id"`
+	Name               *string            `db:"name" json:"name"`
+	Phone              *string            `db:"phone" json:"phone"`
+	MemberCode         *string            `db:"member_code" json:"member_code"`
+	SocialHandle       *string            `db:"social_handle" json:"social_handle"`
+	FollowsStoreSocial bool               `db:"follows_store_social" json:"follows_store_social"`
+	MerchandiseGivenAt pgtype.Timestamptz `db:"merchandise_given_at" json:"merchandise_given_at"`
+	FirstSeenAt        pgtype.Timestamptz `db:"first_seen_at" json:"first_seen_at"`
+	LastSeenAt         pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	JumlahTransaksi    int32              `db:"jumlah_transaksi" json:"jumlah_transaksi"`
+	TotalBelanja       decimal.Decimal    `db:"total_belanja" json:"total_belanja"`
+}
+
+// Daftar member untuk layar /member. Berbeda dari ListCustomersForSync:
+// yang ini dibaca pemilik di satu layar (bukan dicermin ke tiap perangkat),
+// jadi ia boleh mencari, menghitung belanja, dan dibatasi halaman.
+//
+// Email & tanggal lahir TETAP tidak ikut — bukan karena perangkat, tetapi
+// karena tidak ada satu pun fitur yang memakainya (DATA-MODEL §5). Kolom
+// yang tidak pernah dibaca lebih baik tidak pernah dikirim.
+func (q *Queries) ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error) {
+	rows, err := q.db.Query(ctx, listMembers, arg.TenantID, arg.Cari, arg.Batas)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMembersRow{}
+	for rows.Next() {
+		var i ListMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Phone,
+			&i.MemberCode,
+			&i.SocialHandle,
+			&i.FollowsStoreSocial,
+			&i.MerchandiseGivenAt,
+			&i.FirstSeenAt,
+			&i.LastSeenAt,
+			&i.JumlahTransaksi,
+			&i.TotalBelanja,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lookupMember = `-- name: LookupMember :one
+SELECT id, name, phone, member_code, social_handle, follows_store_social, merchandise_given_at
+FROM customers
+WHERE tenant_id = $1
+  AND is_active
+  AND merged_into_id IS NULL
+  AND member_code IS NOT NULL
+  AND (member_code = $2::text OR phone = $3::text)
+LIMIT 1
+`
+
+type LookupMemberParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	Kode     string `db:"kode" json:"kode"`
+	Wa       string `db:"wa" json:"wa"`
+}
+
+type LookupMemberRow struct {
+	ID                 string             `db:"id" json:"id"`
+	Name               *string            `db:"name" json:"name"`
+	Phone              *string            `db:"phone" json:"phone"`
+	MemberCode         *string            `db:"member_code" json:"member_code"`
+	SocialHandle       *string            `db:"social_handle" json:"social_handle"`
+	FollowsStoreSocial bool               `db:"follows_store_social" json:"follows_store_social"`
+	MerchandiseGivenAt pgtype.Timestamptz `db:"merchandise_given_at" json:"merchandise_given_at"`
+}
+
+// Satu member dari kode ATAU nomor WA, untuk layar kasir.
+//
+// Endpoint ini ada karena cermin lokal perangkat hanya diperbarui saat
+// /sync/pull. Member yang baru mendaftar sendiri lewat QR nota di web toko
+// ada di SERVER, bukan di antrean perangkat — jadi kasir yang mengetik
+// kodenya lima menit kemudian tidak menemukan siapa pun, dan pelanggan yang
+// baru saja mendaftar ditolak di meja kasir.
+//
+// Kolomnya PERSIS sama dengan ListCustomersForSync: tidak ada riwayat
+// belanja, email, atau tanggal lahir. Kasir boleh mengenali member, bukan
+// membaca berapa uang yang pernah ia belanjakan (RBAC-MODEL §CRM).
+func (q *Queries) LookupMember(ctx context.Context, arg LookupMemberParams) (LookupMemberRow, error) {
+	row := q.db.QueryRow(ctx, lookupMember, arg.TenantID, arg.Kode, arg.Wa)
+	var i LookupMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Phone,
+		&i.MemberCode,
+		&i.SocialHandle,
+		&i.FollowsStoreSocial,
+		&i.MerchandiseGivenAt,
+	)
+	return i, err
+}
+
 const markCustomerPurchase = `-- name: MarkCustomerPurchase :one
 UPDATE customers
 SET last_seen_at = GREATEST(COALESCE(last_seen_at, $3::timestamptz), $3::timestamptz),
@@ -144,4 +285,45 @@ func (q *Queries) MarkCustomerPurchase(ctx context.Context, arg MarkCustomerPurc
 	var pembelian_pertama bool
 	err := row.Scan(&pembelian_pertama)
 	return pembelian_pertama, err
+}
+
+const updateMember = `-- name: UpdateMember :execrows
+UPDATE customers
+SET name                 = COALESCE($3, name),
+    phone                = COALESCE($4, phone),
+    social_handle        = COALESCE($5, social_handle),
+    merchandise_given_at = CASE
+        WHEN $6::boolean IS NULL THEN merchandise_given_at
+        WHEN $6::boolean THEN COALESCE(merchandise_given_at, now())
+        ELSE NULL
+    END
+WHERE tenant_id = $1 AND id = $2 AND merged_into_id IS NULL
+`
+
+type UpdateMemberParams struct {
+	TenantID     string  `db:"tenant_id" json:"tenant_id"`
+	ID           string  `db:"id" json:"id"`
+	Name         *string `db:"name" json:"name"`
+	Phone        *string `db:"phone" json:"phone"`
+	SocialHandle *string `db:"social_handle" json:"social_handle"`
+	Merchandise  *bool   `db:"merchandise" json:"merchandise"`
+}
+
+// Koreksi data member dari layar /member. Nomor WA IKUT bisa diperbaiki —
+// salah ketik satu digit berarti pengingat WA kelak sampai ke orang lain.
+// Kode member TIDAK pernah diubah: barcodenya sudah tercetak di nota yang
+// dipegang pelanggan.
+func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateMember,
+		arg.TenantID,
+		arg.ID,
+		arg.Name,
+		arg.Phone,
+		arg.SocialHandle,
+		arg.Merchandise,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

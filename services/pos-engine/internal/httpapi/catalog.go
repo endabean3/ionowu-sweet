@@ -1,13 +1,16 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oklog/ulid/v2"
 	"github.com/shopspring/decimal"
@@ -209,8 +212,13 @@ type patchVariantReq struct {
 	SKU           *string `json:"sku"`
 	Barcode       *string `json:"barcode"`
 	IsActive      *bool   `json:"is_active"`
+	// Konversi satuan jual → satuan stok (ADR-0012). StockUom hanya berlaku
+	// saat barang BELUM punya konversi; sesudahnya hanya faktornya yang
+	// boleh berubah — lihat UpdateUomConversionFactor.
+	StockUom    *string `json:"stock_uom"`
+	StockFactor *string `json:"stock_factor"`
 
-	price, costPrice, minStock decimal.NullDecimal
+	price, costPrice, minStock, stockFactor decimal.NullDecimal
 }
 
 // ubahHarga: harga jual atau HPP ikut diubah — hak owner saja (RBAC-MODEL
@@ -260,6 +268,28 @@ func (p *patchVariantReq) normalize() string {
 	if p.MinStockAlert != nil {
 		if p.minStock, msg = desimal("Batas stok menipis", *p.MinStockAlert, 3); msg != "" {
 			return msg
+		}
+	}
+	if p.StockFactor != nil {
+		if p.stockFactor, msg = desimal("Faktor satuan stok", *p.StockFactor, 4); msg != "" {
+			return msg
+		}
+		// Faktor 0 berarti "1 ml = 0 g": setiap penjualan akan mengurangi
+		// stok NOL, dan stok bibit tidak pernah berkurang sepeser pun
+		// sementara nota terlihat benar. CHECK di skema menolaknya juga,
+		// tetapi pesan constraint tidak berarti apa-apa bagi pemilik toko.
+		if p.stockFactor.Decimal.IsZero() {
+			return "Faktor satuan stok harus lebih besar dari 0"
+		}
+	}
+	if p.StockUom != nil {
+		u := strings.TrimSpace(*p.StockUom)
+		if u == "" || utf8.RuneCountInString(u) > 10 {
+			return "Satuan stok maksimal 10 huruf"
+		}
+		p.StockUom = &u
+		if p.StockFactor == nil {
+			return "Satuan stok harus disertai faktornya"
 		}
 	}
 	for kolom, v := range map[string]**string{"SKU": &p.SKU, "Barcode": &p.Barcode} {
@@ -376,7 +406,106 @@ func (h *CatalogHandler) PatchVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.StockFactor != nil {
+		if msg := h.simpanKonversi(ctx, tenantID, variantID, &req); msg != "" {
+			RespondError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", msg)
+			return
+		}
+	}
+
 	RespondJSON(w, http.StatusOK, map[string]any{"message": "Varian diupdate"})
+}
+
+// simpanKonversi menulis faktor satuan stok (ADR-0012). Mengembalikan pesan
+// untuk pemilik ("" = berhasil).
+//
+// Aturan yang ditegakkan di sini: satuan stok hanya boleh DITETAPKAN sekali.
+// Setelahnya hanya faktornya yang berubah. Seluruh ledger stock_events
+// barang ini sudah tercatat dalam satuan itu; menggantinya membuat gram dan
+// mililiter berjumlah di kolom yang sama tanpa satu baris pun terlihat salah.
+//
+// Mengubah FAKTOR aman dan memang perlu (timbangan ulang bibit menghasilkan
+// 0,92 g/ml, bukan 0,9): saldo stok yang sudah ada tetap dalam gram, dan
+// faktor baru hanya dipakai penjualan berikutnya.
+func (h *CatalogHandler) simpanKonversi(
+	ctx context.Context, tenantID, variantID string, req *patchVariantReq,
+) string {
+	kini, err := h.queries.GetVariantConversion(ctx, store.GetVariantConversionParams{
+		TenantID: tenantID, ID: variantID,
+	})
+	if err != nil {
+		return "Gagal membaca satuan stok barang"
+	}
+
+	if kini.StockUom == "" {
+		if req.StockUom == nil {
+			return "Barang ini belum punya satuan stok; sertakan stock_uom"
+		}
+		if _, err := h.queries.InsertUomConversion(ctx, store.InsertUomConversionParams{
+			ConversionID: ulid.Make().String(), TenantID: tenantID, VariantID: variantID,
+			ToUom: *req.StockUom, Factor: req.stockFactor.Decimal,
+		}); err != nil {
+			return "Gagal menyimpan satuan stok"
+		}
+		return ""
+	}
+
+	if req.StockUom != nil && *req.StockUom != kini.StockUom {
+		return "Satuan stok tidak bisa diganti dari " + kini.StockUom +
+			" — seluruh riwayat stok barang ini sudah tercatat dalam satuan itu. Buat barang baru bila memang berbeda."
+	}
+	if _, err := h.queries.UpdateUomConversionFactor(ctx, store.UpdateUomConversionFactorParams{
+		TenantID: tenantID, VariantID: variantID, Factor: req.stockFactor.Decimal,
+	}); err != nil {
+		return "Gagal menyimpan faktor satuan stok"
+	}
+	return ""
+}
+
+// GetVariant menangani GET /variants/{id} — isian layar "Ubah barang".
+//
+// HPP hanya dikirim ke owner (RBAC-MODEL §Matriks "Ubah HPP & harga jual",
+// SECURITY.md §3). Inilah alasan endpoint ini ada sama sekali: cost_price
+// TIDAK ikut /sync/pull, karena apa pun yang disinkronkan ikut menetap di
+// IndexedDB setiap ponsel kasir.
+func (h *CatalogHandler) GetVariant(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tenantID, _ := ctx.Value(tenantIDKey).(string)
+
+	if msg := bolehUbahKatalog(UserRole(ctx), false); msg != "" {
+		RespondError(w, http.StatusForbidden, "FORBIDDEN_ROLE", msg)
+		return
+	}
+
+	v, err := h.queries.GetVariantDetail(ctx, store.GetVariantDetailParams{
+		TenantID: tenantID, ID: chi.URLParam(r, "id"),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		RespondError(w, http.StatusNotFound, "VARIANT_NOT_FOUND", "Varian tidak ditemukan")
+		return
+	}
+	if err != nil {
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memuat barang")
+		return
+	}
+
+	out := map[string]any{
+		"id":              v.ID,
+		"name":            v.Name,
+		"sku":             v.Sku,
+		"barcode":         v.Barcode,
+		"price":           v.Price,
+		"min_stock_alert": v.MinStockAlert,
+		"uom":             v.Uom,
+		"uom_precision":   v.UomPrecision,
+		"is_active":       v.IsActive,
+		"stock_uom":       v.StockUom,
+		"stock_factor":    v.StockFactor,
+	}
+	if UserRole(ctx) == "owner" {
+		out["cost_price"] = v.CostPrice
+	}
+	RespondJSON(w, http.StatusOK, map[string]any{"data": out})
 }
 
 // kosongJadiNull mengubah "" menjadi NULL untuk kolom nullable yang ikut

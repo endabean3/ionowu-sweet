@@ -86,3 +86,45 @@ WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL;
 INSERT INTO users (id, tenant_id, name, email, password_hash, role)
 VALUES ($1, $2, $3, $4, $5, 'owner')
 RETURNING id;
+
+-- name: GetUserForPinChange :one
+-- Verifikasi password SEBELUM mengubah PIN sendiri. Password diminta lagi
+-- meski sesi sudah hidup, dan itu disengaja: PIN inilah yang kelak dipakai
+-- menyetujui refund TANPA login. Siapa pun yang menemukan ponsel manager
+-- dalam keadaan terbuka tidak boleh bisa menanam PIN miliknya sendiri.
+SELECT id, role, password_hash, is_active
+FROM users
+WHERE tenant_id = $1 AND id = $2;
+
+-- name: SetUserPin :execrows
+-- Hanya untuk DIRI SENDIRI (pemanggil mengirim id dari klaim JWT-nya).
+-- NULL = PIN dihapus; manager itu tidak bisa menyetujui apa pun lagi.
+UPDATE users
+SET pin_hash = sqlc.narg('pin_hash')
+WHERE tenant_id = $1 AND id = $2;
+
+-- name: CreateStaffUser :one
+-- Karyawan baru di tenant yang SUDAH ADA (owner menambah kasir/manager).
+-- Berbeda dari RegisterTenantOwner: tenant_id sudah diketahui, jadi kueri
+-- ini tetap tunduk pada aturan tenant-scope seperti kueri lain.
+INSERT INTO users (id, tenant_id, name, email, password_hash, role)
+VALUES ($1, $2, $3, $4, $5, sqlc.arg('role')::varchar)
+RETURNING id, name, email, role, is_active, created_at;
+
+-- name: ListStaff :many
+-- Daftar karyawan untuk layar Pengaturan. TIDAK menyertakan password_hash
+-- maupun pin_hash — keduanya tidak pernah keluar dari server.
+SELECT id, name, email, role, is_active, (pin_hash IS NOT NULL)::boolean AS punya_pin
+FROM users
+WHERE tenant_id = $1
+ORDER BY is_active DESC, role, name;
+
+-- name: SetStaffActive :execrows
+-- Karyawan yang berhenti DINONAKTIFKAN, tidak dihapus: transaksi, refund,
+-- dan ledger stok yang ia catat tetap merujuk namanya. Owner tidak bisa
+-- menonaktifkan dirinya sendiri (dicegah di handler) — tenant tanpa satu
+-- pun akun aktif tidak bisa dibuka siapa pun lagi.
+UPDATE users
+SET is_active = sqlc.arg('is_active')::boolean
+WHERE tenant_id = $1 AND id = $2;
+

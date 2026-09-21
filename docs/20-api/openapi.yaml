@@ -311,6 +311,40 @@ paths:
   /variants/{variantId}:
     parameters:
       - { name: variantId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+    get:
+      tags: [variants]
+      summary: Isian layar "Ubah barang" (termasuk HPP)
+      description: >
+        Owner & manager. **`cost_price` hanya dikirim ke owner** — dan itulah alasan
+        endpoint ini ada: HPP sengaja TIDAK ikut /sync/pull, karena apa pun yang
+        disinkronkan ikut menetap di IndexedDB setiap ponsel kasir, yang hanya dijaga
+        kunci layar ponsel. Margin adalah informasi paling sensitif bagi pemilik UMKM
+        (SECURITY.md §3).
+      responses:
+        "200":
+          description: "Detail varian"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { $ref: "#/components/schemas/ULID" }
+                      name: { type: string }
+                      sku: { type: string, nullable: true }
+                      barcode: { type: string, nullable: true }
+                      price: { type: string, format: decimal }
+                      cost_price: { type: string, format: decimal, description: "HANYA untuk owner; tidak ada di respons peran lain" }
+                      min_stock_alert: { type: string, format: decimal }
+                      uom: { type: string }
+                      uom_precision: { type: integer }
+                      is_active: { type: boolean }
+                      stock_uom: { type: string, description: "\"\" = satuan stok sama dengan satuan jual" }
+                      stock_factor: { type: string, format: decimal }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: VARIANT_NOT_FOUND }
     patch:
       tags: [variants]
       summary: Ubah harga/HPP/barcode/batas stok varian
@@ -319,6 +353,15 @@ paths:
         "Ubah HPP & harga jual"). Kolom yang tidak dikirim tidak berubah.
         `sku`/`barcode` = "" mengosongkan (NULL). Angka dikirim sebagai string
         desimal; nilai yang tidak bisa dibaca DITOLAK 422, bukan diabaikan.
+
+
+        `stock_factor` mengoreksi konversi satuan jual → satuan stok (ADR-0012), mis.
+        gram per ml hasil timbang ulang. Mengubahnya TIDAK menyentuh sisa stok yang
+        sudah ada — hanya penjualan berikutnya. `stock_uom` hanya berlaku saat barang
+        BELUM punya konversi; menggantinya ditolak 422, karena seluruh ledger
+        stock_events barang itu sudah tercatat dalam satuan lama dan mencampurnya
+        membuat gram dan mililiter berjumlah di kolom yang sama tanpa satu baris pun
+        terlihat salah.
       requestBody:
         required: true
         content:
@@ -505,6 +548,280 @@ paths:
   # ═══════════════════════════════════════════════════════════════
   # STOCK — FR-30..35
   # ═══════════════════════════════════════════════════════════════
+  /users:
+    get:
+      tags: [admin]
+      summary: Daftar karyawan tenant
+      description: Owner saja (RBAC-MODEL §Administrasi). Tidak pernah memuat password_hash maupun pin_hash.
+      responses:
+        "200":
+          description: "Daftar karyawan"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { $ref: "#/components/schemas/ULID" }
+                        name: { type: string }
+                        email: { type: string }
+                        role: { type: string, enum: [owner, manager, cashier, warehouse, sales_floor] }
+                        is_active: { type: boolean }
+                        punya_pin: { type: boolean, description: "PIN persetujuan sudah diatur" }
+        "403": { description: "FORBIDDEN_ROLE — owner saja" }
+    post:
+      tags: [admin]
+      summary: Tambah karyawan
+      description: >
+        Owner saja. Karyawan baru otomatis ditugaskan ke SELURUH outlet tenant dalam
+        transaksi yang sama — tanpa itu GET /outlets miliknya kosong dan ia tidak bisa
+        membuka shift sama sekali. Peran "owner" tidak bisa dibuat lewat sini.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, role]
+              properties:
+                name: { type: string, maxLength: 200 }
+                email: { type: string }
+                password: { type: string, minLength: 8 }
+                role: { type: string, enum: [manager, cashier, warehouse, sales_floor] }
+      responses:
+        "201": { description: "Karyawan dibuat" }
+        "403": { description: FORBIDDEN_ROLE }
+        "409": { description: "EMAIL_ALREADY_EXISTS — email unik GLOBAL, karena login tidak meminta tenant_id" }
+        "422": { description: "VALIDATION_ERROR / PASSWORD_TOO_SHORT" }
+
+  /users/{userId}:
+    patch:
+      tags: [admin]
+      summary: Aktifkan / nonaktifkan karyawan
+      description: >
+        Owner saja. Karyawan yang berhenti DINONAKTIFKAN, tidak dihapus — transaksi,
+        refund, dan ledger stok yang ia catat tetap merujuk namanya. Owner tidak bisa
+        menonaktifkan dirinya sendiri.
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active: { type: boolean }
+      responses:
+        "200": { description: "Karyawan diperbarui" }
+        "403": { description: FORBIDDEN_ROLE }
+        "404": { description: USER_NOT_FOUND }
+        "422": { description: "VALIDATION_ERROR — termasuk menonaktifkan diri sendiri" }
+
+  /me/pin:
+    patch:
+      tags: [admin]
+      summary: Atur / hapus PIN persetujuan sendiri
+      description: >
+        Owner & manager saja. Password diminta LAGI meski sesi hidup: PIN ini kelak
+        menyetujui uang keluar TANPA login, jadi sesi terbuka yang ditemukan orang lain
+        tidak boleh cukup untuk menanam PIN. `pin` kosong = hapus PIN.
+
+
+        PATCH, bukan PUT: seluruh API ini hanya memakai GET/POST/PATCH/DELETE, dan daftar
+        itu pula yang diizinkan middleware CORS — satu PUT akan gagal di preflight.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+                pin: { type: string, pattern: "^[0-9]{4,8}$", description: "kosong = hapus PIN" }
+      responses:
+        "200":
+          description: "PIN disimpan"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      punya_pin: { type: boolean }
+        "401": { description: "INVALID_CREDENTIALS — password salah" }
+        "403": { description: "FORBIDDEN_ROLE — hanya owner & manager" }
+        "422": { description: "VALIDATION_ERROR — PIN harus 4–8 angka" }
+
+  /approvers:
+    get:
+      tags: [admin]
+      summary: Owner/manager yang bisa dimintai PIN
+      description: >
+        Terbuka untuk semua peran yang login — yang MEMBUTUHKAN daftar ini justru kasir.
+        Isinya hanya nama, peran, dan apakah PIN sudah diatur; tidak ada hash atau email.
+      responses:
+        "200":
+          description: "Daftar penyetuju"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { $ref: "#/components/schemas/ULID" }
+                        name: { type: string }
+                        role: { type: string, enum: [owner, manager] }
+                        punya_pin: { type: boolean }
+
+  /approvals/verify:
+    post:
+      tags: [admin]
+      summary: Periksa PIN manager tanpa mengubah apa pun
+      description: >
+        Dipakai gerbang diskon besar di layar kasir (RBAC-MODEL §Matriks "Diskon manual
+        >20%"). Berbeda dari refund/void, diskon diputuskan SEBELUM transaksi ada, jadi
+        tidak ada payload tempat menitipkan PIN.
+
+
+        Batasnya jujur: ini gerbang di KLIEN. Transaksi offline selalu diterima server
+        (invarian §6 #4), jadi endpoint ini mencegah penyalahgunaan biasa — bukan kasir
+        yang sengaja mematikan koneksi.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approver_user_id, pin]
+              properties:
+                approver_user_id: { $ref: "#/components/schemas/ULID" }
+                pin: { type: string }
+      responses:
+        "200": { description: "PIN sah" }
+        "401": { description: INVALID_PIN }
+        "403": { description: MANAGER_PIN_REQUIRED }
+
+  /customers/lookup:
+    get:
+      tags: [crm]
+      summary: Cari SATU member dari kode atau nomor WA
+      description: >
+        Owner, manager, kasir, dan sales (RBAC-MODEL §CRM "Daftarkan pelanggan baru").
+        Kasir sengaja termasuk di sini meski ia dikecualikan dari GET /members: mengenali
+        member yang berdiri di depannya adalah pekerjaannya, membaca total belanjanya bukan —
+        jawaban ini tidak memuat riwayat belanja sama sekali.
+
+
+        Endpoint ini menjembatani member yang mendaftar SENDIRI lewat QR nota di web toko:
+        ia lahir di server, sedangkan cermin IndexedDB perangkat kasir baru memuatnya pada
+        /sync/pull berikutnya — dan sync berkala hanya berjalan bila ada antrean lokal.
+        Tanpa ini, pelanggan yang baru saja mendaftar ditolak di meja kasir.
+
+
+        Dicocokkan PERSIS, bukan sebagian: endpoint ini menjawab "siapa pemilik kode/nomor
+        ini", bukan "siapa saja yang mirip". Pencocokan sebagian akan menjadikannya cara
+        menelusuri daftar pelanggan satu per satu dari akun kasir.
+      parameters:
+        - { name: q, in: query, required: true, description: "kode member (M-XXXXXX) atau nomor WA", schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: "Member ditemukan — kolomnya sama persis dengan /sync/pull"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { $ref: "#/components/schemas/ULID" }
+                      name: { type: string, nullable: true }
+                      phone: { type: string }
+                      member_code: { type: string }
+                      social_handle: { type: string, nullable: true }
+                      follows_store_social: { type: boolean }
+                      merchandise_given_at: { type: string, format: date-time, nullable: true }
+        "403": { description: FORBIDDEN_ROLE }
+        "404": { description: CUSTOMER_NOT_FOUND }
+        "422": { description: "VALIDATION_ERROR — q wajib diisi" }
+
+  /members:
+    get:
+      tags: [crm]
+      summary: Daftar member
+      description: >
+        Owner, manager, dan sales (RBAC-MODEL §CRM "Lihat riwayat belanja pelanggan" —
+        kasir ⚠️ terbatas, dan daftar ini menampilkan total belanja). Email & tanggal
+        lahir tidak pernah ikut (DATA-MODEL §5). Maksimal 200 baris.
+      parameters:
+        - { name: cari, in: query, description: "nama, nomor WA, atau kode member", schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: "Daftar member + ringkasan belanja"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { $ref: "#/components/schemas/ULID" }
+                        name: { type: string, nullable: true }
+                        phone: { type: string, description: "bentuk baku 62xxxxxxxxxx" }
+                        member_code: { type: string }
+                        social_handle: { type: string, nullable: true }
+                        follows_store_social: { type: boolean }
+                        merchandise_given_at: { type: string, format: date-time, nullable: true }
+                        first_seen_at: { type: string, format: date-time }
+                        last_seen_at: { type: string, format: date-time, nullable: true }
+                        jumlah_transaksi: { type: integer }
+                        total_belanja: { type: string, format: decimal }
+        "403": { description: FORBIDDEN_ROLE }
+
+  /members/{customerId}:
+    patch:
+      tags: [crm]
+      summary: Koreksi data member
+      description: >
+        Nomor WA ikut bisa diperbaiki (dibakukan dengan aturan yang sama seperti saat
+        mendaftar). **Kode member tidak bisa diubah** dan sengaja tidak ada di payload:
+        barcodenya sudah tercetak di nota yang dipegang pelanggan.
+      parameters:
+        - { name: customerId, in: path, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 200 }
+                phone: { type: string }
+                social_handle: { type: string, maxLength: 100 }
+                merchandise_given: { type: boolean, description: "false = cabut penandanya" }
+      responses:
+        "200": { description: "Member diperbarui" }
+        "403": { description: FORBIDDEN_ROLE }
+        "404": { description: CUSTOMER_NOT_FOUND }
+        "409": { description: PHONE_ALREADY_EXISTS }
+        "422": { description: VALIDATION_ERROR }
+
   /stock/events:
     post:
       tags: [stock]
@@ -593,6 +910,107 @@ paths:
                             uom: { type: string }
                             total: { type: string, format: decimal }
                             jumlah_baris: { type: integer }
+        "422": { description: VALIDATION_ERROR }
+
+  /reports/daily:
+    get:
+      tags: [reports]
+      summary: Laporan penjualan harian (tutup buku / Z-Report)
+      description: >
+        Hanya owner & manager (RBAC-MODEL §"Laporan & BI" — "Omzet outletnya").
+        Kasir memakai POST /shifts/{shiftId}/close untuk kas lacinya sendiri.
+
+
+        Waktu laporan memakai versi TERKOREKSI jam perangkat
+        (`COALESCE(offline_created_at_adj, offline_created_at, created_at)`): transaksi
+        yang dibuat offline pukul 20.00 lalu terkirim pukul 23.00 milik hari ia terjadi.
+
+
+        Angka utamanya MENGECUALIKAN `is_late_arrival`, yang dilaporkan di embernya
+        sendiri (`terlambat`). Itulah yang membuat laporan yang sudah dicetak tidak pernah
+        berubah — invarian CLAUDE.md §6 #5. `is_sandbox` dikecualikan seluruhnya.
+
+
+        Refund dihitung dari TANGGAL REFUND-nya, bukan tanggal nota aslinya: uangnya
+        keluar dari laci hari ini.
+      parameters:
+        - { name: outlet_id, in: query, required: true, schema: { $ref: "#/components/schemas/ULID" } }
+        - { name: dari, in: query, schema: { type: string, format: date } }
+        - { name: sampai, in: query, description: "inklusif", schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: "Laporan tutup buku satu outlet"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      periode:
+                        type: object
+                        properties:
+                          dari: { type: string, format: date-time }
+                          sampai: { type: string, format: date-time, description: "batas EKSKLUSIF" }
+                      ringkasan:
+                        type: object
+                        properties:
+                          transaksi: { type: integer }
+                          baris_barang: { type: integer, description: "jumlah BARIS, bukan penjumlahan kuantitas" }
+                          penjualan_kotor: { type: string, format: decimal }
+                          diskon: { type: string, format: decimal }
+                          pajak: { type: string, format: decimal }
+                          penjualan_bersih: { type: string, format: decimal }
+                          void_jumlah: { type: integer }
+                          void_nilai: { type: string, format: decimal }
+                          refund_jumlah: { type: integer }
+                          refund_nilai: { type: string, format: decimal }
+                      kas:
+                        type: object
+                        properties:
+                          tunai: { type: string, format: decimal, description: "penjualan bermetode cash" }
+                          kas_masuk: { type: string, format: decimal }
+                          kas_keluar: { type: string, format: decimal }
+                      pembayaran:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            payment_method: { type: string, enum: [cash, qris, transfer, debit, credit] }
+                            payment_count: { type: integer }
+                            total: { type: string, format: decimal }
+                      terlambat:
+                        type: object
+                        description: "Transaksi hari itu yang tiba SETELAH shift ditutup; TIDAK termasuk angka di atas"
+                        properties:
+                          jumlah: { type: integer }
+                          nilai: { type: string, format: decimal }
+                      shift:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            opened_at: { type: string, format: date-time }
+                            closed_at: { type: string, format: date-time, nullable: true }
+                            opening_cash: { type: string, format: decimal }
+                            expected_cash: { type: string, format: decimal, nullable: true }
+                            counted_cash: { type: string, format: decimal, nullable: true }
+                            variance: { type: string, format: decimal, nullable: true }
+                            status: { type: string, enum: [open, closed] }
+                            cashier_name: { type: string, nullable: true }
+                      terlaris:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            product_name: { type: string }
+                            variant_name: { type: string }
+                            uom: { type: string, description: "satuan JUAL (ml), bukan satuan stok (g)" }
+                            quantity_sold: { type: string, format: decimal }
+                            revenue: { type: string, format: decimal }
+        "403": { description: "FORBIDDEN_ROLE — hanya owner & manager" }
+        "404": { description: OUTLET_NOT_FOUND }
         "422": { description: VALIDATION_ERROR }
 
   /stock/levels:
@@ -861,6 +1279,21 @@ paths:
                             uom: { type: string }
                             subtotal: { type: string, format: decimal }
                       member_signup_open: { type: boolean }
+                      member:
+                        type: object
+                        nullable: true
+                        description: >
+                          Kartu member — ADA hanya bila nota ini terkait member, lewat dua jalan:
+                          kasir menempelkannya saat checkout, ATAU orang itu mendaftar DARI nota ini.
+                          Isinya sengaja dibatasi pada apa yang SUDAH tercetak di kertas nota
+                          ("Member M-XXXXXX (Nama)" + barcode), ditambah penanda merchandise.
+                          **Nomor WhatsApp tidak pernah ikut** dan tidak boleh ditambahkan: ia tidak
+                          pernah tercetak, dan nota yang tertinggal di meja akan mengidentifikasi
+                          pemiliknya.
+                        properties:
+                          code: { type: string, example: "M-AB12CD" }
+                          name: { type: string }
+                          merchandise_given: { type: boolean }
         "404": { description: "NOTA_NOT_FOUND (id salah / tenant lain / belum tersinkron — tidak dibedakan)" }
         "429": { description: RATE_LIMITED }
 
@@ -1117,6 +1550,8 @@ components:
         cost_price: { type: string, format: decimal, description: "DECIMAL(14,2) ≥ 0; owner saja" }
         min_stock_alert: { type: string, format: decimal, description: "DECIMAL(14,3) ≥ 0, dalam SATUAN STOK (ADR-0012)" }
         is_active: { type: boolean }
+        stock_uom: { type: string, maxLength: 10, description: "hanya bila barang BELUM punya konversi; wajib bersama stock_factor" }
+        stock_factor: { type: string, format: decimal, description: "DECIMAL(14,4) > 0 — berapa satuan stok per 1 satuan jual (mis. 0,92 g per ml)" }
 
     SaleInput:
       type: object

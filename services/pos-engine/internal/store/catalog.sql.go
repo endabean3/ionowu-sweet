@@ -79,6 +79,67 @@ func (q *Queries) GetBomComponents(ctx context.Context, arg GetBomComponentsPara
 	return items, nil
 }
 
+const getVariantDetail = `-- name: GetVariantDetail :one
+SELECT v.id, v.name, v.sku, v.barcode, v.price, v.cost_price,
+       v.min_stock_alert, v.uom, v.uom_precision, v.is_active,
+       COALESCE(sc.to_uom, '')::VARCHAR  AS stock_uom,
+       COALESCE(sc.factor, 0)::DECIMAL   AS stock_factor
+FROM variants v
+LEFT JOIN LATERAL (
+    SELECT c.to_uom, c.factor
+    FROM uom_conversions c
+    WHERE c.tenant_id = v.tenant_id AND c.variant_id = v.id AND c.from_uom = v.uom
+    ORDER BY c.created_at
+    LIMIT 1
+) sc ON TRUE
+WHERE v.tenant_id = $1 AND v.id = $2
+`
+
+type GetVariantDetailParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+type GetVariantDetailRow struct {
+	ID            string          `db:"id" json:"id"`
+	Name          string          `db:"name" json:"name"`
+	Sku           *string         `db:"sku" json:"sku"`
+	Barcode       *string         `db:"barcode" json:"barcode"`
+	Price         decimal.Decimal `db:"price" json:"price"`
+	CostPrice     decimal.Decimal `db:"cost_price" json:"cost_price"`
+	MinStockAlert decimal.Decimal `db:"min_stock_alert" json:"min_stock_alert"`
+	Uom           string          `db:"uom" json:"uom"`
+	UomPrecision  int16           `db:"uom_precision" json:"uom_precision"`
+	IsActive      bool            `db:"is_active" json:"is_active"`
+	StockUom      string          `db:"stock_uom" json:"stock_uom"`
+	StockFactor   decimal.Decimal `db:"stock_factor" json:"stock_factor"`
+}
+
+// Isian layar "Ubah barang". Termasuk HPP, yang SENGAJA tidak ikut
+// /sync/pull: margin usaha adalah informasi paling sensitif bagi pemilik
+// UMKM (SECURITY.md §3), dan apa pun yang disinkronkan ikut tersimpan di
+// IndexedDB setiap ponsel kasir — yang hanya dijaga kunci layar ponsel
+// (lihat lib/auth/access.ts). Pemanggil WAJIB menyaringnya per peran.
+func (q *Queries) GetVariantDetail(ctx context.Context, arg GetVariantDetailParams) (GetVariantDetailRow, error) {
+	row := q.db.QueryRow(ctx, getVariantDetail, arg.TenantID, arg.ID)
+	var i GetVariantDetailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Sku,
+		&i.Barcode,
+		&i.Price,
+		&i.CostPrice,
+		&i.MinStockAlert,
+		&i.Uom,
+		&i.UomPrecision,
+		&i.IsActive,
+		&i.StockUom,
+		&i.StockFactor,
+	)
+	return i, err
+}
+
 const getVariantForCheckout = `-- name: GetVariantForCheckout :one
 SELECT
     v.id, v.item_type, v.uom, v.uom_precision, COALESCE(o.price, v.price) AS price,
@@ -131,6 +192,41 @@ func (q *Queries) GetVariantForCheckout(ctx context.Context, arg GetVariantForCh
 		&i.StockFactor,
 	)
 	return i, err
+}
+
+const insertUomConversion = `-- name: InsertUomConversion :execrows
+INSERT INTO uom_conversions (id, tenant_id, variant_id, from_uom, to_uom, factor)
+SELECT $1::varchar, v.tenant_id, v.id, v.uom,
+       $2::varchar, $3::decimal
+FROM variants v
+WHERE v.tenant_id = $4::varchar
+  AND v.id        = $5::varchar
+ON CONFLICT DO NOTHING
+`
+
+type InsertUomConversionParams struct {
+	ConversionID string          `db:"conversion_id" json:"conversion_id"`
+	ToUom        string          `db:"to_uom" json:"to_uom"`
+	Factor       decimal.Decimal `db:"factor" json:"factor"`
+	TenantID     string          `db:"tenant_id" json:"tenant_id"`
+	VariantID    string          `db:"variant_id" json:"variant_id"`
+}
+
+// Konversi satuan jual → satuan stok (ADR-0012): bibit dijual per ml,
+// stoknya gram. from_uom diambil dari varian itu sendiri supaya tidak
+// mungkin menyimpan konversi yang tidak akan pernah terpakai.
+func (q *Queries) InsertUomConversion(ctx context.Context, arg InsertUomConversionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertUomConversion,
+		arg.ConversionID,
+		arg.ToUom,
+		arg.Factor,
+		arg.TenantID,
+		arg.VariantID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listCatalogForSync = `-- name: ListCatalogForSync :many
@@ -409,6 +505,35 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (i
 		arg.Description,
 		arg.IsActive,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateUomConversionFactor = `-- name: UpdateUomConversionFactor :execrows
+UPDATE uom_conversions c
+SET factor = $3::decimal
+FROM variants v
+WHERE c.tenant_id = $1
+  AND c.variant_id = $2
+  AND v.tenant_id = c.tenant_id
+  AND v.id = c.variant_id
+  AND c.from_uom = v.uom
+`
+
+type UpdateUomConversionFactorParams struct {
+	TenantID  string          `db:"tenant_id" json:"tenant_id"`
+	VariantID string          `db:"variant_id" json:"variant_id"`
+	Factor    decimal.Decimal `db:"factor" json:"factor"`
+}
+
+// HANYA faktornya. `to_uom` tidak pernah diubah lewat sini: seluruh ledger
+// stock_events barang ini sudah tercatat dalam satuan itu, dan menggantinya
+// membuat gram dan mililiter berjumlah di kolom yang sama tanpa satu pun
+// baris yang terlihat salah.
+func (q *Queries) UpdateUomConversionFactor(ctx context.Context, arg UpdateUomConversionFactorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUomConversionFactor, arg.TenantID, arg.VariantID, arg.Factor)
 	if err != nil {
 		return 0, err
 	}

@@ -44,6 +44,8 @@ interface POSCartProps {
   emptyExtra?: React.ReactNode;
   /** Member yang ditempelkan ke transaksi, di atas daftar barang. */
   memberSlot?: React.ReactNode;
+  /** Tombol/ringkasan diskon transaksi, tepat di atas Total Bayar. */
+  diskonSlot?: React.ReactNode;
   /**
    * true = dirender di dalam panel bawah (ponsel). Judul sudah ada di bilah
    * panel, daftar ikut digulir panel, dan ringkasan+tombol bayar menempel di
@@ -62,6 +64,7 @@ export function POSCart({
   onCheckout,
   emptyExtra,
   memberSlot,
+  diskonSlot,
   embedded = false,
 }: POSCartProps) {
   const handleCheckoutClick = () => {
@@ -249,10 +252,10 @@ export function POSCart({
             : "mt-4 border-t-2 border-card-border pt-4"
         }
       >
-        {/* Rincian Subtotal + pajak hanya bila ada pajak. Tanpa pajak,
-           subtotal SAMA dengan total — dua angka kembar hanya menambah
-           baris yang harus dibaca kasir. */}
-        {!totals.taxTotal.isZero() && (
+        {/* Rincian Subtotal + pajak + diskon hanya bila ADA. Tanpa pajak dan
+           tanpa diskon, subtotal SAMA dengan total — dua angka kembar hanya
+           menambah baris yang harus dibaca kasir. */}
+        {(!totals.taxTotal.isZero() || !totals.discountTotal.isZero()) && (
           <div className="space-y-1.5 font-sans text-sm text-main">
             <div className="flex justify-between">
               <span>Subtotal</span>
@@ -260,14 +263,26 @@ export function POSCart({
                 Rp {Number(totals.subtotal.toString()).toLocaleString("id-ID")}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>Pajak</span>
-              <span className="font-mono font-semibold tabular-nums">
-                Rp {Number(totals.taxTotal.toString()).toLocaleString("id-ID")}
-              </span>
-            </div>
+            {!totals.discountTotal.isZero() && (
+              <div className="flex justify-between">
+                <span>Diskon</span>
+                <span className="font-mono font-semibold tabular-nums">
+                  −Rp {Number(totals.discountTotal.toString()).toLocaleString("id-ID")}
+                </span>
+              </div>
+            )}
+            {!totals.taxTotal.isZero() && (
+              <div className="flex justify-between">
+                <span>Pajak</span>
+                <span className="font-mono font-semibold tabular-nums">
+                  Rp {Number(totals.taxTotal.toString()).toLocaleString("id-ID")}
+                </span>
+              </div>
+            )}
           </div>
         )}
+
+        {diskonSlot}
 
         {/* Blok --primary tinta hitam (pages/kasir.md §Warna): "Total belanja
            memakai blok --primary dengan tinta hitam, bukan teks pink" —

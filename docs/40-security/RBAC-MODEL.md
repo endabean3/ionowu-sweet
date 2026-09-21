@@ -87,6 +87,20 @@ menggantikan manager, itu keliru: SPG adalah staf lantai penjualan, bukan penyel
 | Ubah profil toko & struk (alamat, telepon, penutup struk) | ✅ | ✅ (outletnya) | ❌ | ❌ | ❌ |
 | Kelola distributor | ✅ | ✅ | ❌ | ✅ | ❌ |
 
+> ### ⚠️ Batas gerbang diskon
+>
+> "Diskon manual >20% → PIN manager" ditegakkan **di klien** (`lib/pos/diskon.ts` +
+> `POST /approvals/verify`), bukan di server. Itu bukan kelalaian: **transaksi offline
+> selalu diterima** (CLAUDE.md §6 invarian #4 — barangnya sudah keluar, menolak sync berarti
+> menghapus penjualan nyata), jadi tidak ada titik di server tempat diskon besar bisa ditolak
+> tanpa membuang transaksi yang benar-benar terjadi.
+>
+> Artinya gerbang ini mencegah penyalahgunaan biasa, **bukan** kasir yang sengaja mematikan
+> koneksi. Pengawasan sesungguhnya ada di laporan: diskon per transaksi terlihat di
+> [tutup buku](../50-operations/GO-LIVE.md) harian, dan pola diskon besar oleh satu kasir
+> akan menonjol di sana. Bila kelak dibutuhkan penegakan yang lebih keras, jalurnya adalah
+> mencatat `approved_by` pada transaksi (butuh migrasi), bukan menolak sync.
+
 > ### ⚠️ Konflik yang harus diputuskan: Gudang vs HPP
 >
 > Gudang menerima barang dari distributor — dan penerimaan barang **mencantumkan harga beli**.

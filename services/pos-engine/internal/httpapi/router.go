@@ -71,6 +71,7 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 		r.Get("/products", catalogHandler.GetProducts)
 		r.Post("/products", catalogHandler.PostProduct)
 		r.Patch("/products/{id}", catalogHandler.PatchProduct)
+		r.Get("/variants/{id}", catalogHandler.GetVariant)
 		r.Patch("/variants/{id}", catalogHandler.PatchVariant)
 
 		catalogImportHandler := NewCatalogImportHandler(pool)
@@ -91,6 +92,24 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 
 		analyticsHandler := NewAnalyticsHandler(pool)
 		r.Get("/analytics/dashboard", analyticsHandler.GetDashboard)
+
+		reportHandler := NewReportHandler(pool)
+		r.Get("/reports/daily", reportHandler.GetDailyReport)
+
+		approverHandler := NewApproverHandler(pool)
+		r.Get("/approvers", approverHandler.GetApprovers)
+		r.Patch("/me/pin", approverHandler.PatchMyPin)
+		r.Post("/approvals/verify", approverHandler.PostVerifyPin)
+
+		staffHandler := NewStaffHandler(pool)
+		r.Get("/users", staffHandler.GetStaff)
+		r.Post("/users", staffHandler.PostStaff)
+		r.Patch("/users/{id}", staffHandler.PatchStaff)
+
+		memberAdmin := NewMemberAdminHandler(pool)
+		r.Get("/members", memberAdmin.GetMembers)
+		r.Get("/customers/lookup", memberAdmin.GetMemberLookup)
+		r.Patch("/members/{id}", memberAdmin.PatchMember)
 
 		salesHistory := NewSalesHistoryHandler(pool)
 		r.Get("/sales", salesHistory.GetSales)

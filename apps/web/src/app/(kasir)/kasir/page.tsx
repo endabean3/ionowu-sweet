@@ -1,10 +1,12 @@
 "use client";
 
 import { type CartLine, POSCart } from "@/components/pos/cart";
+import { DiskonModal } from "@/components/pos/diskon-modal";
 import { POSHeader } from "@/components/pos/header";
 import { LastReceipt } from "@/components/pos/last-receipt";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
 import { MemberPanel } from "@/components/pos/member-panel";
+import { PinManager } from "@/components/pos/pin-manager";
 import { PrinterPicker } from "@/components/pos/printer-picker";
 import { QtyKeypad } from "@/components/pos/qty-keypad";
 import { Receipt, type ReceiptData } from "@/components/pos/receipt";
@@ -13,13 +15,17 @@ import { Modal } from "@/components/ui/modal";
 import { playPop, playSuccessChord } from "@/lib/audio/haptics";
 import { useAuth } from "@/lib/auth/context";
 import { profilTerakhir } from "@/lib/auth/profile";
+import { cariBarangByKode, cocokPencarian } from "@/lib/catalog/cari";
 import { isCurah } from "@/lib/catalog/quantity";
 import { type LocalCustomer, db } from "@/lib/db";
+import { lookupMember } from "@/lib/member/api";
 import { formatWA, looksLikeMemberCode } from "@/lib/member/member";
 import { calculateCart } from "@/lib/money/calc";
 import { barBawah } from "@/lib/motion/tokens";
+import { butuhPersetujuan, persenDiskon } from "@/lib/pos/diskon";
 import { useReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { notaWebLink } from "@/lib/receipt/format";
+import { verifikasiPin } from "@/lib/sales/api";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -33,7 +39,7 @@ import { type PaymentBreakdown, PaymentModal } from "./payment-modal";
 import { ShiftModal } from "./shift-modal";
 
 export default function KasirPage() {
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   /** Sesi hidup bila ada; kalau tidak, identitas terakhir di perangkat ini
    *  (lib/auth/profile.ts) — kasir offline tetap punya tenant yang benar. */
   const identitas = user ?? profilTerakhir();
@@ -45,9 +51,17 @@ export default function KasirPage() {
   const [memberPanelOpen, setMemberPanelOpen] = useState(false);
   /** Panel bawah keranjang (ponsel). */
   const [keranjangTerbuka, setKeranjangTerbuka] = useState(false);
+  /** Diskon seluruh transaksi, nominal rupiah sebagai string. Dilepas lagi
+   *  setelah bayar — potongan tidak "menempel" ke pembeli berikutnya. */
+  const [diskon, setDiskon] = useState("0");
+  const [diskonTerbuka, setDiskonTerbuka] = useState(false);
+  /** Nominal yang menunggu persetujuan manager (>20% bagi kasir). */
+  const [diskonMenungguPin, setDiskonMenungguPin] = useState<string | null>(null);
   // Scanner mengetik kode lalu menekan Enter. Tanpa jeda ini, Enter itu
-  // membuka pembayaran tepat setelah kartu member dipindai.
-  const memberScanAt = useRef(0);
+  // membuka pembayaran tepat setelah kartu member ATAU barang dipindai —
+  // pada barang akibatnya lebih buruk: memindai barang kedua justru
+  // melunasi transaksi yang baru berisi satu barang.
+  const scanAt = useRef(0);
   const [cartItems, setCartItems] = useState<CartLine[]>([]);
   // Keranjang kosong (dihapus satu-satu atau lunas) menutup panelnya, supaya
   // barang berikutnya tidak membuka panel yang tertinggal terbuka.
@@ -146,6 +160,11 @@ export default function KasirPage() {
         // Dari server lewat /sync/pull, bukan ditebak dari nama satuan.
         uom: v.uom ?? "pcs",
         uomPrecision: v.uom_precision ?? 0,
+        // Ikut dibawa ke layar: tanpa dua kolom ini kolom "scan barcode"
+        // hanya bisa mencocokkan NAMA, jadi memindai barang tidak pernah
+        // menemukan apa pun meski barcode-nya sudah terisi di Katalog.
+        barcode: v.barcode || undefined,
+        sku: v.sku || undefined,
       };
     });
   }, [dbProducts, dbVariants]);
@@ -166,7 +185,7 @@ export default function KasirPage() {
           unitPrice: it.unitPrice,
           discount: it.discount || "0",
         })),
-        discount: "0",
+        discount: diskon,
         // TANPA PPN: Warung Wangi (dan kebanyakan UMKM) bukan PKP, jadi
         // menambah 11% berarti menagih pembeli lebih mahal dari label harga.
         // Server tidak menghitung pajak sendiri — ia memakai `tax` yang
@@ -174,7 +193,7 @@ export default function KasirPage() {
         // kelak ada tenant PKP, tarif ini pindah ke Pengaturan toko.
         taxRate: "0",
       }),
-    [cartItems],
+    [cartItems, diskon],
   );
 
   // Jumlah BARIS, bukan penjumlahan kuantitas: menjumlahkan 30 ml dengan
@@ -195,8 +214,12 @@ export default function KasirPage() {
         e.key === "Enter" &&
         !isCheckingOut &&
         !showShiftModal &&
+        // Dialog jumlah punya Enter-nya sendiri (konfirmasi jumlah). Tanpa
+        // gerbang ini, memindai barang curah membuka dialog jumlah DAN
+        // modal pembayaran sekaligus.
+        !qtyTarget &&
         cartItems.length > 0 &&
-        Date.now() - memberScanAt.current > 600
+        Date.now() - scanAt.current > 600
       ) {
         e.preventDefault();
         setIsCheckingOut(true);
@@ -219,7 +242,7 @@ export default function KasirPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cartItems, isCheckingOut, showShiftModal]);
+  }, [cartItems, isCheckingOut, showShiftModal, qtyTarget]);
 
   /** Menaruh kuantitas PERSIS ke keranjang (menimpa, bukan menambah). */
   const setQuantity = (product: MacaronProduct, quantity: string) => {
@@ -382,7 +405,7 @@ export default function KasirPage() {
           // menolak PAYMENT_AMOUNT_MISMATCH — setiap checkout pasti gagal
           // sync, ditemukan lewat sync push nyata (bukan asumsi kode benar
           // karena "terlihat lengkap").
-          discount: "0",
+          discount: diskon,
           tax: breakdown.taxTotal,
           payments: [
             {
@@ -431,6 +454,7 @@ export default function KasirPage() {
           uom: it.uom,
         })),
         subtotal: breakdown.subtotal,
+        discountTotal: breakdown.discountTotal,
         taxTotal: breakdown.taxTotal,
         grandTotal: breakdown.grandTotal,
         method,
@@ -474,6 +498,7 @@ export default function KasirPage() {
 
       setCartItems([]);
       setMember(null);
+      setDiskon("0");
       setIsCheckingOut(false);
       barcodeInputRef.current?.focus();
     } catch (err) {
@@ -483,13 +508,11 @@ export default function KasirPage() {
     }
   };
 
-  const filteredProducts = products.filter((p) => {
-    const matchesCat = selectedCategory === "Semua" || p.category === selectedCategory;
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesSearch;
-  });
+  const filteredProducts = products.filter(
+    (p) =>
+      (selectedCategory === "Semua" || p.category === selectedCategory) &&
+      cocokPencarian(p, searchQuery),
+  );
 
   const memberSlot = member && (
     <div className="flex items-center gap-2 rounded-2xl border-2 border-card-border bg-sweet-matcha px-3 py-2">
@@ -509,6 +532,41 @@ export default function KasirPage() {
       </button>
     </div>
   );
+
+  /** Tombol diskon di atas Total Bayar, di kedua tata letak keranjang. */
+  const diskonSlot = (
+    <button
+      type="button"
+      onClick={() => setDiskonTerbuka(true)}
+      disabled={cartItems.length === 0}
+      className="mochi-button pos-touch-target mt-2 flex w-full items-center justify-between rounded-pill border-2 border-card-border bg-card px-4 font-sans text-sm font-bold text-main shadow-hard-sm disabled:opacity-50"
+    >
+      <span>{new Decimal(diskon).isZero() ? "Beri diskon" : "Ubah diskon"}</span>
+      <span className="font-mono tabular-nums">
+        {new Decimal(diskon).isZero()
+          ? "—"
+          : `−Rp ${new Decimal(diskon).toNumber().toLocaleString("id-ID")}`}
+      </span>
+    </button>
+  );
+
+  /**
+   * Menetapkan diskon, lewat gerbang persetujuan bila perlu.
+   *
+   * Gerbangnya ada di KLIEN dan memang hanya bisa di sana: transaksi offline
+   * selalu diterima server (invarian §6 #4), jadi tidak ada titik di server
+   * tempat diskon besar bisa ditolak tanpa membuang penjualan nyata.
+   */
+  const terapkanDiskon = (nominal: Decimal) => {
+    const persen = persenDiskon(nominal, cartTotals.subtotal);
+    if (butuhPersetujuan(identitas?.role, persen)) {
+      setDiskonMenungguPin(nominal.toString());
+      setDiskonTerbuka(false);
+      return;
+    }
+    setDiskon(nominal.toString());
+    setDiskonTerbuka(false);
+  };
 
   // Panel bawah keranjang (ponsel): dibuka dengan mengetuk ringkasan ATAU
   // mengusap bar ke atas. Tertutup sendiri saat keranjang kosong.
@@ -551,21 +609,57 @@ export default function KasirPage() {
                   // produk: kode yang cocok langsung menempel ke transaksi.
                   if (looksLikeMemberCode(v) && identitas?.tenant_id) {
                     const kode = v.trim().toUpperCase();
+                    const pakai = (c: LocalCustomer) => {
+                      scanAt.current = Date.now();
+                      setMember(c);
+                      setSearchQuery("");
+                      playPop();
+                      toast.success(`Member ${c.member_code} dipakai`, {
+                        description: c.name ?? formatWA(c.phone),
+                      });
+                    };
                     void db.customers
                       .where("member_code")
                       .equals(kode)
                       .filter((c) => c.tenant_id === identitas.tenant_id)
                       .first()
-                      .then((c) => {
-                        if (!c) return;
-                        memberScanAt.current = Date.now();
-                        setMember(c);
-                        setSearchQuery("");
-                        playPop();
-                        toast.success(`Member ${c.member_code} dipakai`, {
-                          description: c.name ?? formatWA(c.phone),
-                        });
+                      .then(async (c) => {
+                        if (c) {
+                          pakai(c);
+                          return;
+                        }
+                        // Tidak ada di perangkat ini. Pelanggan yang mendaftar
+                        // sendiri lewat QR nota di web toko baru sampai ke
+                        // sini pada /sync/pull berikutnya — dan sync berkala
+                        // hanya jalan bila ada antrean lokal. Tanpa jalur ini
+                        // kartu member yang baru dibuat tidak bisa dipindai
+                        // di kasir sama sekali.
+                        if (!accessToken || !navigator.onLine) return;
+                        const dariServer = await lookupMember(accessToken, kode).catch(() => null);
+                        if (!dariServer) return;
+                        const lokal = { ...dariServer, tenant_id: identitas.tenant_id };
+                        // Disimpan supaya pemindaian berikutnya jalan offline.
+                        await db.customers.put(lokal).catch(() => undefined);
+                        pakai(lokal);
                       });
+                    return;
+                  }
+                  // Barang: barcode/SKU yang cocok persis langsung masuk
+                  // keranjang dan kolomnya dikosongkan, siap untuk barang
+                  // berikutnya. Kasir memindai beruntun tanpa menyentuh
+                  // layar sama sekali.
+                  const barang = cariBarangByKode(products, v);
+                  if (!barang) return;
+                  scanAt.current = Date.now();
+                  setSearchQuery("");
+                  playPop();
+                  // Barang curah membuka dialog jumlah (handleAddToCart) —
+                  // memindai botol parfum tidak berarti "1 ml". Toastnya
+                  // ditahan supaya tidak mengaku menambah barang yang
+                  // jumlahnya belum ditentukan.
+                  handleAddToCart(barang);
+                  if (!isCurah(barang.uomPrecision)) {
+                    toast.success(`${barang.name} ditambahkan`);
                   }
                 }}
                 className="pos-touch-target w-full rounded-pill border-2 border-card-border bg-card py-2 pl-4 pr-11 font-sans text-base font-bold text-main placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sweet-strawberry"
@@ -659,6 +753,7 @@ export default function KasirPage() {
             onClearCart={handleClearCart}
             onCheckout={() => setIsCheckingOut(true)}
             memberSlot={memberSlot}
+            diskonSlot={diskonSlot}
             emptyExtra={
               lastReceipt && (
                 <div className="hidden rounded-squircle-sm border-2 border-card-border bg-card p-3 lg:block">
@@ -775,8 +870,47 @@ export default function KasirPage() {
               setIsCheckingOut(true);
             }}
             memberSlot={memberSlot}
+            diskonSlot={diskonSlot}
           />
         </Modal>
+      )}
+
+      {diskonTerbuka && (
+        <DiskonModal
+          subtotal={cartTotals.subtotal}
+          nilaiAwal={diskon}
+          perluPersetujuan={(n) =>
+            butuhPersetujuan(identitas?.role, persenDiskon(n, cartTotals.subtotal))
+          }
+          onClose={() => setDiskonTerbuka(false)}
+          onSimpan={terapkanDiskon}
+        />
+      )}
+
+      {diskonMenungguPin !== null && (
+        <PinManager
+          accessToken={accessToken}
+          judul="Diskon butuh PIN manager"
+          keterangan={`Potongan Rp ${new Decimal(diskonMenungguPin)
+            .toNumber()
+            .toLocaleString("id-ID")} dari belanja Rp ${cartTotals.subtotal
+            .toNumber()
+            .toLocaleString("id-ID")}`}
+          onBatal={() => setDiskonMenungguPin(null)}
+          onSetuju={(p) => {
+            const nominal = diskonMenungguPin;
+            setDiskonMenungguPin(null);
+            if (!accessToken || !nominal) return;
+            void verifikasiPin(accessToken, p)
+              .then(() => {
+                setDiskon(nominal);
+                toast.success("Diskon disetujui manager");
+              })
+              .catch((err) => {
+                toast.error(err instanceof Error ? err.message : "PIN ditolak");
+              });
+          }}
+        />
       )}
 
       {qtyTarget && (
@@ -820,6 +954,7 @@ export default function KasirPage() {
           tenantId={identitas.tenant_id}
           outletId={activeShift?.outlet_id ?? ""}
           storeHandle={outlet?.social_handle}
+          accessToken={accessToken}
           onClose={() => setMemberPanelOpen(false)}
           onSelect={(c) => {
             setMember(c);
