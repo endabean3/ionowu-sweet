@@ -164,11 +164,51 @@ export async function bukaShiftBilaPerlu(page: Page, modal = "150000") {
 }
 
 /**
+ * Buka dialog diskon, di kedua tata letak.
+ *
+ * Tombolnya hidup DI DALAM keranjang. Di layar lebar keranjang selalu
+ * tampak; di ponsel (< lg) ia ada di panel bawah yang harus dibuka dulu
+ * lewat bar ringkasan. Keranjang versi desktop tetap ter-render tapi
+ * tersembunyi, jadi `.first()` polos akan memilih tombol yang tidak bisa
+ * diklik dan uji menunggu 30 detik sampai timeout — persis kegagalan yang
+ * hanya muncul di project Mobile Chrome.
+ */
+export async function bukaDiskon(page: Page) {
+  const tombol = page
+    .getByRole("button", { name: /Beri diskon|Ubah diskon/ })
+    .filter({ visible: true });
+  if ((await tombol.count()) === 0) {
+    await page.getByRole("button", { name: /^Buka keranjang:/ }).click();
+  }
+  await tombol.first().click();
+}
+
+/** Teks yang TERLIHAT — menghindari kembaran tersembunyi dari tata letak lain. */
+export function teksTerlihat(page: Page, teks: string | RegExp) {
+  return page.getByText(teks).filter({ visible: true }).first();
+}
+
+/**
  * Klik tombol bayar yang TERLIHAT. Layar lebar: "Bayar Sekarang" di keranjang
  * samping. Ponsel (< lg): "Bayar" di bar bawah — keranjang samping
  * disembunyikan dan hanya muncul sebagai panel bawah.
+ *
+ * Bila panel keranjang sedang TERBUKA (mis. kasir baru memberi diskon dari
+ * dalamnya), tombol yang dipakai adalah yang ada DI DALAM panel itu. Bar
+ * bawah tetap "terlihat" bagi Playwright tetapi tertutup lapisan modal, jadi
+ * mengkliknya hanya menunggu 30 detik sampai timeout — dan itu pula yang
+ * dilakukan kasir sungguhan: ia membayar dari panel yang sedang ia buka,
+ * bukan menutupnya dulu.
  */
 export async function klikBayar(page: Page) {
+  const diPanel = page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Bayar/ })
+    .filter({ visible: true });
+  if ((await diPanel.count()) > 0) {
+    await diPanel.first().click();
+    return;
+  }
   await page
     .getByRole("button", { name: /^Bayar/ })
     .filter({ visible: true })

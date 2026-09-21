@@ -91,7 +91,12 @@ test.describe("Member daftar sendiri di web, lalu belanja di kasir", () => {
     // Dan nomor WA-nya juga bisa dipakai, karena pelanggan sering lupa kode.
     await page.getByRole("button", { name: new RegExp(`Member ${kode}`) }).click();
     await page.getByLabel("Kode member, nomor WA, atau nama").fill("081299998888");
-    await expect(page.getByText("Pak Budi").first()).toBeVisible({ timeout: 15000 });
+    // Dicari DI DALAM dialog: nama member juga tampil di keranjang versi
+    // desktop, yang di ponsel tetap ter-render tapi tersembunyi — dan
+    // `.first()` polos akan memilih kembaran tersembunyi itu lalu gagal.
+    await expect(page.getByRole("dialog").getByText("Pak Budi").first()).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   // Gerakan yang paling wajar di meja kasir: memindai barcode kartu member

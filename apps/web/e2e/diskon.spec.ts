@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 import {
   type TenantFixture,
+  bukaDiskon,
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
   pinUji,
   provisionTenant,
   tambahProduk,
+  teksTerlihat,
 } from "./helpers";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -31,12 +33,6 @@ test.describe("Diskon transaksi", () => {
     await page.getByText(NAMA).first().click();
   });
 
-  const bukaDiskon = async (page: import("@playwright/test").Page) =>
-    page
-      .getByRole("button", { name: /Beri diskon|Ubah diskon/ })
-      .first()
-      .click();
-
   test("nominal rupiah mengurangi total dan tercetak di nota", async ({ page }) => {
     await bukaDiskon(page);
     const dialog = page.getByRole("dialog", { name: "Diskon transaksi" });
@@ -44,7 +40,7 @@ test.describe("Diskon transaksi", () => {
     await dialog.getByRole("button", { name: "Simpan diskon" }).click();
 
     // Total turun dari 20.000 ke 15.000.
-    await expect(page.getByText("15.000").first()).toBeVisible();
+    await expect(teksTerlihat(page, "15.000")).toBeVisible();
 
     await klikBayar(page);
     await page.click("text=Tunai");
@@ -91,7 +87,7 @@ test.describe("Diskon transaksi", () => {
     // Pratinjau menyebut nominalnya sebelum disimpan.
     await expect(dialog.getByText(/Potongan Rp 2\.000/)).toBeVisible();
     await dialog.getByRole("button", { name: "Simpan diskon" }).click();
-    await expect(page.getByText("18.000").first()).toBeVisible();
+    await expect(teksTerlihat(page, "18.000")).toBeVisible();
   });
 
   test("diskon melebihi belanja ditolak sebelum disimpan", async ({ page }) => {
@@ -109,7 +105,7 @@ test.describe("Diskon transaksi", () => {
     await dialog.getByLabel("Diskon", { exact: true }).fill("50%");
     await expect(dialog.getByRole("button", { name: "Simpan diskon" })).toBeVisible();
     await dialog.getByRole("button", { name: "Simpan diskon" }).click();
-    await expect(page.getByText("10.000").first()).toBeVisible();
+    await expect(teksTerlihat(page, "10.000")).toBeVisible();
   });
 });
 
@@ -140,10 +136,7 @@ test.describe("Diskon besar oleh kasir", () => {
     await page.getByText(NAMA).first().click();
 
     // 20% masih bebas.
-    await page
-      .getByRole("button", { name: /Beri diskon/ })
-      .first()
-      .click();
+    await bukaDiskon(page);
     let dialog = page.getByRole("dialog", { name: "Diskon transaksi" });
     await dialog.getByLabel("Diskon", { exact: true }).fill("20%");
     await expect(dialog.getByRole("button", { name: "Simpan diskon" })).toBeVisible();
@@ -157,13 +150,10 @@ test.describe("Diskon besar oleh kasir", () => {
     await pinDialog.getByRole("textbox", { name: "PIN manager" }).fill(PIN);
     await pinDialog.getByRole("button", { name: "Setujui" }).click();
     await expect(page.getByText("Diskon disetujui manager")).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText("15.000").first()).toBeVisible();
+    await expect(teksTerlihat(page, "15.000")).toBeVisible();
 
     // PIN salah tidak mengubah diskon yang berlaku.
-    await page
-      .getByRole("button", { name: /Ubah diskon/ })
-      .first()
-      .click();
+    await bukaDiskon(page);
     dialog = page.getByRole("dialog", { name: "Diskon transaksi" });
     await dialog.getByLabel("Diskon", { exact: true }).fill("80%");
     await dialog.getByRole("button", { name: "Minta PIN manager" }).click();
@@ -171,6 +161,6 @@ test.describe("Diskon besar oleh kasir", () => {
     await pin2.getByRole("textbox", { name: "PIN manager" }).fill("000000");
     await pin2.getByRole("button", { name: "Setujui" }).click();
     await expect(page.getByText("PIN salah")).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText("15.000").first()).toBeVisible();
+    await expect(teksTerlihat(page, "15.000")).toBeVisible();
   });
 });
