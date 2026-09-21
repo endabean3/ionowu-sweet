@@ -3,7 +3,8 @@ import { code128Bars } from "./code128";
 import { PANJANG_KODE, kodeProdukBaru, rapikanKodeProduk } from "./kode-produk";
 
 /** Acak palsu yang bisa diramal, supaya ujinya tidak berubah-ubah. */
-const tetap = (nilai: number[]) => (n: number) => Uint8Array.from({ length: n }, (_, i) => nilai[i % nilai.length]);
+const tetap = (nilai: number[]) => (n: number) =>
+  Uint8Array.from({ length: n }, (_, i) => nilai[i % nilai.length]);
 
 describe("kode produk", () => {
   it("panjangnya 8 dan hanya memakai abjad tanpa I, L, O, U", () => {

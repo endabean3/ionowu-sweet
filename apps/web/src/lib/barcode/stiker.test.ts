@@ -32,7 +32,7 @@ describe("lembar stiker A4", () => {
   it("161 produk jadi 6 lembar, lembar terakhir tidak penuh", () => {
     const lembar = keLembar(Array.from({ length: 161 }, (_, i) => i));
     expect(lembar).toHaveLength(6);
-    expect(lembar.at(-1)).toHaveLength(161 - 5 * 30);
+    expect(lembar[lembar.length - 1]).toHaveLength(161 - 5 * 30);
   });
 });
 
@@ -56,7 +56,7 @@ describe("CODE128 diputar", () => {
     const batang = batangTegak("ABCD1234", panjang, STRIP_CODE128 - 2);
     expect(batang.length).toBeGreaterThan(0);
     const pertama = batang[0];
-    const terakhir = batang.at(-1)!;
+    const terakhir = batang[batang.length - 1];
     // Zona tenang 10 modul di awal…
     expect(pertama.y).toBeGreaterThan(lebarModulMm("ABCD1234", panjang) * 9);
     // …dan simbol selesai sebelum ujung, menyisakan zona tenang di akhir.
