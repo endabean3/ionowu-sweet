@@ -12,11 +12,13 @@ import {
   ClipboardList,
   DollarSign,
   History,
+  Receipt,
   Settings,
   ShieldCheck,
   ShoppingBag,
   Store,
   TrendingUp,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -100,6 +102,20 @@ export default function DashboardPage() {
             <Button variant="secondary" size="sm" className="gap-2 shadow-hard-sm">
               <Boxes className="h-4 w-4" aria-hidden="true" />
               <span>Stok</span>
+            </Button>
+          </Link>
+          {/* Tutup buku ditaruh SEBELUM laporan stok: inilah yang dibuka
+             pemilik tiap malam sebelum menutup toko. */}
+          <Link href="/member">
+            <Button variant="ghost" size="sm" className="gap-2 pos-touch-target">
+              <UserRound className="h-4 w-4" aria-hidden="true" />
+              <span>Member</span>
+            </Button>
+          </Link>
+          <Link href="/laporan-harian">
+            <Button variant="secondary" size="sm" className="gap-2 shadow-hard-sm">
+              <Receipt className="h-4 w-4" aria-hidden="true" />
+              <span>Tutup buku</span>
             </Button>
           </Link>
           <Link href="/laporan-stok">

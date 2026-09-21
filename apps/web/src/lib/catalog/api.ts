@@ -103,10 +103,59 @@ export interface VariantPatch {
   name?: string;
   /** String desimal ("25000"), bukan number — uang tidak pernah float. */
   price?: string;
+  /** Harga modal. Owner saja (RBAC-MODEL §Matriks "Ubah HPP & harga jual"). */
+  cost_price?: string;
   /** "" = kosongkan barcode. */
   barcode?: string;
   min_stock_alert?: string;
   is_active?: boolean;
+  /** Satuan stok (ADR-0012). Hanya boleh DITETAPKAN sekali; server menolak
+   *  penggantiannya karena ledger stok sudah tercatat dalam satuan itu. */
+  stock_uom?: string;
+  /** Berapa satuan stok per 1 satuan jual — 0,9 g per ml untuk bibit. */
+  stock_factor?: string;
+}
+
+/**
+ * Isian layar "Ubah barang" langsung dari server.
+ *
+ * Endpoint ini ada karena **HPP sengaja TIDAK ikut `/sync/pull`**: apa pun
+ * yang disinkronkan ikut menetap di IndexedDB setiap ponsel kasir, yang
+ * hanya dijaga kunci layar ponsel. Margin usaha adalah informasi paling
+ * sensitif bagi pemilik UMKM (SECURITY.md §3), jadi ia hanya diambil saat
+ * dibutuhkan, oleh owner, lewat jaringan.
+ */
+export interface VariantDetail {
+  id: string;
+  name: string;
+  sku: string | null;
+  barcode: string | null;
+  price: string;
+  /** Hanya terisi untuk owner; manager menerima respons tanpa field ini. */
+  cost_price?: string;
+  min_stock_alert: string;
+  uom: string;
+  uom_precision: number;
+  is_active: boolean;
+  /** "" = satuan stok sama dengan satuan jual. */
+  stock_uom: string;
+  stock_factor: string;
+}
+
+export async function fetchVariantDetail(accessToken: string, id: string): Promise<VariantDetail> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/variants/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new JaringanError();
+  }
+  const b = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new KatalogError(b?.error?.message ?? "Gagal memuat barang", b?.error?.code);
+  }
+  return b?.data as VariantDetail;
 }
 
 export interface ProductPatch {

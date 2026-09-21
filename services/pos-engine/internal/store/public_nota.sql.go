@@ -18,6 +18,14 @@ SELECT
     s.id, s.receipt_number, s.grand_total, s.payment_status,
     COALESCE(s.offline_created_at_adj, s.offline_created_at, s.created_at)::timestamptz AS sold_at,
     (s.customer_id IS NOT NULL)::BOOLEAN AS has_member,
+    -- Kartu member untuk halaman nota (opsi tanpa login). NULL bila nota ini
+    -- bukan atas nama member. ` + "`" + `merchandise_given` + "`" + ` tidak tercetak di kertas,
+    -- tetapi ia hanya menjawab "apakah merchandise perdana sudah diambil"
+    -- untuk member yang notanya sedang dipegang — tidak membuka riwayat
+    -- belanja apa pun.
+    cust.member_code,
+    cust.name AS member_name,
+    (cust.merchandise_given_at IS NOT NULL)::BOOLEAN AS member_merchandise_given,
     EXISTS (
         SELECT 1 FROM refunds r WHERE r.tenant_id = s.tenant_id AND r.transaction_id = s.id
     )::BOOLEAN AS refunded,
@@ -28,6 +36,16 @@ SELECT
     o.warranty_days, o.social_handle, o.timezone
 FROM sales_transactions s
 JOIN outlets o ON o.id = s.outlet_id AND o.tenant_id = s.tenant_id
+LEFT JOIN LATERAL (
+    SELECT c.member_code, c.name, c.merchandise_given_at
+    FROM customers c
+    WHERE c.tenant_id = s.tenant_id
+      AND c.is_active
+      AND c.merged_into_id IS NULL
+      AND (c.id = s.customer_id OR c.signup_sale_id = s.id)
+    ORDER BY (c.id = s.customer_id) DESC
+    LIMIT 1
+) cust ON TRUE
 WHERE s.tenant_id = $1 AND s.id = $2 AND NOT s.is_sandbox
 `
 
@@ -37,28 +55,52 @@ type GetPublicNotaParams struct {
 }
 
 type GetPublicNotaRow struct {
-	ID            string             `db:"id" json:"id"`
-	ReceiptNumber string             `db:"receipt_number" json:"receipt_number"`
-	GrandTotal    decimal.Decimal    `db:"grand_total" json:"grand_total"`
-	PaymentStatus string             `db:"payment_status" json:"payment_status"`
-	SoldAt        pgtype.Timestamptz `db:"sold_at" json:"sold_at"`
-	HasMember     bool               `db:"has_member" json:"has_member"`
-	Refunded      bool               `db:"refunded" json:"refunded"`
-	SignupUsed    bool               `db:"signup_used" json:"signup_used"`
-	OutletName    string             `db:"outlet_name" json:"outlet_name"`
-	OutletAddress *string            `db:"outlet_address" json:"outlet_address"`
-	OutletPhone   *string            `db:"outlet_phone" json:"outlet_phone"`
-	WarrantyDays  int16              `db:"warranty_days" json:"warranty_days"`
-	SocialHandle  *string            `db:"social_handle" json:"social_handle"`
-	Timezone      string             `db:"timezone" json:"timezone"`
+	ID                     string             `db:"id" json:"id"`
+	ReceiptNumber          string             `db:"receipt_number" json:"receipt_number"`
+	GrandTotal             decimal.Decimal    `db:"grand_total" json:"grand_total"`
+	PaymentStatus          string             `db:"payment_status" json:"payment_status"`
+	SoldAt                 pgtype.Timestamptz `db:"sold_at" json:"sold_at"`
+	HasMember              bool               `db:"has_member" json:"has_member"`
+	MemberCode             *string            `db:"member_code" json:"member_code"`
+	MemberName             *string            `db:"member_name" json:"member_name"`
+	MemberMerchandiseGiven bool               `db:"member_merchandise_given" json:"member_merchandise_given"`
+	Refunded               bool               `db:"refunded" json:"refunded"`
+	SignupUsed             bool               `db:"signup_used" json:"signup_used"`
+	OutletName             string             `db:"outlet_name" json:"outlet_name"`
+	OutletAddress          *string            `db:"outlet_address" json:"outlet_address"`
+	OutletPhone            *string            `db:"outlet_phone" json:"outlet_phone"`
+	WarrantyDays           int16              `db:"warranty_days" json:"warranty_days"`
+	SocialHandle           *string            `db:"social_handle" json:"social_handle"`
+	Timezone               string             `db:"timezone" json:"timezone"`
 }
 
 // Halaman nota publik (ADR-0013). Dibaca TANPA login oleh server web toko,
 // berbekal (tenant_id, id nota) dari QR di nota. Aturan emas tetap berlaku:
 // setiap kueri memfilter tenant_id — id nota saja TIDAK cukup.
 //
-// Yang boleh keluar dari sini: data toko & isi nota. Yang TIDAK: identitas
-// pelanggan, kasir, HPP, atau apa pun milik nota lain.
+// Yang boleh keluar dari sini: data toko, isi nota, dan APA YANG SUDAH
+// TERCETAK DI KERTAS NOTA ITU SENDIRI. Yang TIDAK: kasir, HPP, riwayat
+// belanja, nomor WhatsApp, atau apa pun milik nota lain.
+//
+// Batas "sudah tercetak di kertas" itu yang mengizinkan kode & nama member
+// ikut keluar (lihat GetPublicNota): nota member mencetak
+// "Member M-XXXXXX (Nama)" beserta barcode CODE128-nya (escpos.ts), jadi
+// siapa pun yang bisa menyusun URL ini SUDAH memegang kertas yang memuat
+// keduanya. Nomor WA TIDAK pernah tercetak, dan karena itu tidak pernah
+// dikembalikan — meski ia kolom yang bersebelahan di tabel yang sama.
+// Member yang terkait nota ini, lewat DUA jalan yang keduanya berarti
+// "orang yang memegang kertas ini":
+//  1. kasir menempelkan member saat checkout  → s.customer_id
+//  2. ia mendaftar DARI nota ini di halaman publik → signup_sale_id
+//
+// Jalan kedua wajib ada: pendaftaran lewat nota TIDAK mengisi customer_id
+// nota itu, jadi tanpa ini kartu member justru tidak pernah muncul bagi
+// orang yang baru saja mendaftar — satu-satunya saat ia paling ingin
+// menyimpan kodenya.
+//
+// Keduanya tidak bisa terisi sekaligus: nota yang sudah atas nama member
+// tidak pernah boleh dipakai mendaftar (bolehDaftar di public_nota.go),
+// dan LIMIT 1 membuat hasilnya tetap deterministik bila kelak berubah.
 func (q *Queries) GetPublicNota(ctx context.Context, arg GetPublicNotaParams) (GetPublicNotaRow, error) {
 	row := q.db.QueryRow(ctx, getPublicNota, arg.TenantID, arg.ID)
 	var i GetPublicNotaRow
@@ -69,6 +111,9 @@ func (q *Queries) GetPublicNota(ctx context.Context, arg GetPublicNotaParams) (G
 		&i.PaymentStatus,
 		&i.SoldAt,
 		&i.HasMember,
+		&i.MemberCode,
+		&i.MemberName,
+		&i.MemberMerchandiseGiven,
 		&i.Refunded,
 		&i.SignupUsed,
 		&i.OutletName,

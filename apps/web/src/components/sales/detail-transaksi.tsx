@@ -1,12 +1,19 @@
 "use client";
 
+import { PinManager } from "@/components/pos/pin-manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { JaringanError } from "@/lib/auth/api";
 import { formatQuantity } from "@/lib/catalog/quantity";
 import { METHOD_LABEL, type ReceiptData } from "@/lib/receipt/format";
-import { RiwayatError, type SaleDetail, batalkanTransaksi, kirimRefund } from "@/lib/sales/api";
+import {
+  type Persetujuan,
+  RiwayatError,
+  type SaleDetail,
+  batalkanTransaksi,
+  kirimRefund,
+} from "@/lib/sales/api";
 import Decimal from "decimal.js";
 import { Ban, Printer, Undo2 } from "lucide-react";
 import { useState } from "react";
@@ -63,9 +70,15 @@ export function DetailTransaksi({
   const sudahRefund = new Decimal(sale.refunded_total || 0);
   const sisaRefund = new Decimal(sale.grand_total).minus(sudahRefund);
   const isVoid = sale.payment_status === "void";
-  // RBAC-MODEL: kasir butuh PIN manager. Layar ini belum punya alur PIN, jadi
-  // tombolnya disembunyikan dari kasir — server tetap menolaknya.
-  const bolehUbah = role === "owner" || role === "manager";
+  // RBAC-MODEL §"Void transaksi": owner/manager menyetujui sendiri; kasir
+  // butuh PIN manager, yang kini bisa dimasukkan langsung di layar ini
+  // (sebelumnya kasir harus memanggil pemilik untuk LOGIN, dan transaksi
+  // salah menganggur sampai itu terjadi).
+  const sendiri = role === "owner" || role === "manager";
+  const butuhPin = role === "cashier";
+  const bolehUbah = sendiri || butuhPin;
+  /** Terisi saat kasir sudah menyerahkan layar ke manager. */
+  const [mintaPin, setMintaPin] = useState(false);
   const bisaVoid = bolehUbah && !isVoid && sudahRefund.isZero() && sale.shift_open;
   const bisaRefund = bolehUbah && !isVoid && sisaRefund.gt(0);
 
@@ -96,7 +109,23 @@ export function DetailTransaksi({
   const nominalSah = /^\d{1,12}([.,]\d{1,2})?$/.test(nominal.trim());
   const nominalDec = nominalSah ? new Decimal(nominal.trim().replace(",", ".")) : null;
 
-  const jalankan = async () => {
+  /** Isian sudah lengkap? Dipakai sebelum meminta PIN — memanggil manager
+   *  untuk sebuah form yang ternyata belum diisi hanya membuang waktunya. */
+  const isianSah =
+    alasan.trim().length >= 3 &&
+    (aksi !== "refund" || (!!nominalDec && nominalDec.gt(0) && nominalDec.lte(sisaRefund)));
+
+  const kirim = () => {
+    setCoba(true);
+    if (!isianSah) return;
+    if (butuhPin) {
+      setMintaPin(true);
+      return;
+    }
+    void jalankan();
+  };
+
+  const jalankan = async (persetujuan?: Persetujuan) => {
     setCoba(true);
     if (!accessToken || menyimpan) return;
     if (alasan.trim().length < 3) return;
@@ -105,7 +134,7 @@ export function DetailTransaksi({
     setMenyimpan(true);
     try {
       if (aksi === "void") {
-        await batalkanTransaksi(accessToken, sale.id, alasan.trim());
+        await batalkanTransaksi(accessToken, sale.id, alasan.trim(), persetujuan);
         toast.success("Transaksi dibatalkan", { description: `Nota ${sale.receipt_number}` });
       } else {
         const penuh = nominalDec?.equals(sisaRefund) && sudahRefund.isZero();
@@ -126,6 +155,7 @@ export function DetailTransaksi({
                   amount: it.subtotal,
                 }))
               : undefined,
+          ...persetujuan,
         });
         toast.success("Refund tersimpan", { description: rupiah(nominalDec as Decimal) });
       }
@@ -207,7 +237,7 @@ export function DetailTransaksi({
               variant={aksi === "void" ? "destructive" : "primary"}
               className="flex-1"
               disabled={menyimpan}
-              onClick={jalankan}
+              onClick={kirim}
             >
               {menyimpan
                 ? "Menyimpan…"
@@ -329,7 +359,12 @@ export function DetailTransaksi({
 
         {aksi === "lihat" && !bolehUbah && (
           <p className="font-sans text-xs text-main">
-            Refund dan pembatalan perlu akun owner atau manager.
+            Peran ini tidak bisa melakukan refund atau pembatalan.
+          </p>
+        )}
+        {aksi === "lihat" && butuhPin && (
+          <p className="font-sans text-xs text-main">
+            Refund dan pembatalan butuh PIN manager — manager mengetiknya langsung di layar ini.
           </p>
         )}
         {aksi === "lihat" && bolehUbah && !isVoid && !sale.shift_open && (
@@ -338,6 +373,23 @@ export function DetailTransaksi({
           </p>
         )}
       </div>
+
+      {mintaPin && (
+        <PinManager
+          accessToken={accessToken}
+          judul={aksi === "void" ? "Pembatalan butuh PIN manager" : "Refund butuh PIN manager"}
+          keterangan={
+            aksi === "void"
+              ? `Membatalkan nota ${sale.receipt_number} (${rupiah(sale.grand_total)})`
+              : `Refund ${nominalDec ? rupiah(nominalDec) : ""} dari nota ${sale.receipt_number}`
+          }
+          onBatal={() => setMintaPin(false)}
+          onSetuju={(p) => {
+            setMintaPin(false);
+            void jalankan(p);
+          }}
+        />
+      )}
     </Modal>
   );
 }

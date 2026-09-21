@@ -572,6 +572,55 @@ type InsertStockEventsParams struct {
 	ActorUserID   *string         `db:"actor_user_id" json:"actor_user_id"`
 }
 
+const listApprovers = `-- name: ListApprovers :many
+SELECT id, name, role, (pin_hash IS NOT NULL)::boolean AS punya_pin
+FROM users
+WHERE tenant_id = $1
+  AND is_active
+  AND role IN ('owner', 'manager')
+ORDER BY role, name
+`
+
+type ListApproversRow struct {
+	ID       string `db:"id" json:"id"`
+	Name     string `db:"name" json:"name"`
+	Role     string `db:"role" json:"role"`
+	PunyaPin bool   `db:"punya_pin" json:"punya_pin"`
+}
+
+// Siapa yang bisa dimintai PIN saat kasir perlu persetujuan (refund, void,
+// diskon besar). Hanya nama & peran — TIDAK ADA pin_hash di sini; daftar ini
+// dikirim ke perangkat kasir, dan hash PIN tidak boleh ikut keluar dari
+// server dalam keadaan apa pun.
+//
+// Manager yang BELUM mengatur PIN tetap ditampilkan, ditandai lewat
+// `punya_pin`: kasir yang memanggil manajer ke kasir lalu menemukan PIN-nya
+// belum ada akan menyalahkan aplikasi, bukan pengaturan akunnya.
+func (q *Queries) ListApprovers(ctx context.Context, tenantID string) ([]ListApproversRow, error) {
+	rows, err := q.db.Query(ctx, listApprovers, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListApproversRow{}
+	for rows.Next() {
+		var i ListApproversRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Role,
+			&i.PunyaPin,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const saveSyncReceipt = `-- name: SaveSyncReceipt :exec
 INSERT INTO sync_receipts (
     idempotency_key, tenant_id, outlet_id, device_id,

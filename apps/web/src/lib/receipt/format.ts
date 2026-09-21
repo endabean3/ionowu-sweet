@@ -50,6 +50,8 @@ export interface ReceiptData {
   cashierName: string;
   lines: ReceiptLine[];
   subtotal: string;
+  /** Diskon seluruh transaksi. "0"/kosong = tidak dicetak. */
+  discountTotal?: string;
   taxTotal: string;
   grandTotal: string;
   method: string;

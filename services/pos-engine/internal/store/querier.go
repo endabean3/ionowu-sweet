@@ -36,6 +36,10 @@ type Querier interface {
 	// benar-benar dijalankan pertama kali, lihat queries/README.md).
 	CloseShift(ctx context.Context, arg CloseShiftParams) (CloseShiftRow, error)
 	ConvertUom(ctx context.Context, arg ConvertUomParams) (decimal.Decimal, error)
+	// Jumlah BARIS barang terjual, bukan penjumlahan kuantitas: menjumlahkan
+	// 30 ml dengan 2 botol menghasilkan angka yang tidak berarti apa-apa
+	// (alasan yang sama dengan totalItemCount di layar kasir).
+	CountReportItems(ctx context.Context, arg CountReportItemsParams) (int32, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (string, error)
 	CreateOutlet(ctx context.Context, arg CreateOutletParams) (string, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (string, error)
@@ -80,6 +84,10 @@ type Querier interface {
 	// selamanya di antrean lokal sampai IndexedDB penuh — satu-satunya jalur
 	// menuju "kasir tidak bisa berjualan".
 	CreateSaleIdempotent(ctx context.Context, arg CreateSaleIdempotentParams) (CreateSaleIdempotentRow, error)
+	// Karyawan baru di tenant yang SUDAH ADA (owner menambah kasir/manager).
+	// Berbeda dari RegisterTenantOwner: tenant_id sudah diketahui, jadi kueri
+	// ini tetap tunduk pada aturan tenant-scope seperti kueri lain.
+	CreateStaffUser(ctx context.Context, arg CreateStaffUserParams) (CreateStaffUserRow, error)
 	// Kueri untuk cmd/seed SAJA — bukan jalur produksi.
 	//
 	// Kenapa lewat sqlc, bukan SQL mentah di dalam cmd/seed: supaya seeder memakai
@@ -120,6 +128,10 @@ type Querier interface {
 	GetApproverForPin(ctx context.Context, arg GetApproverForPinParams) (GetApproverForPinRow, error)
 	GetBomComponents(ctx context.Context, arg GetBomComponentsParams) ([]GetBomComponentsRow, error)
 	GetDailySummary(ctx context.Context, tenantID string) (GetDailySummaryRow, error)
+	// Ember terpisah invarian §6 #5: transaksi hari itu yang baru tiba SETELAH
+	// shift-nya ditutup. Nyata dan sah, tetapi tidak boleh menggeser angka yang
+	// sudah dicetak. Pemilik melihatnya sebagai baris tersendiri.
+	GetLateArrivalBucket(ctx context.Context, arg GetLateArrivalBucketParams) (GetLateArrivalBucketRow, error)
 	// Shift kasir. Kasir tidak bisa bertransaksi tanpa shift terbuka (FR-30).
 	// HOT PATH — dipanggil di awal setiap checkout untuk memperoleh shift_id.
 	// Memakai indeks unik parsial idx_shifts_one_open.
@@ -128,8 +140,28 @@ type Querier interface {
 	// berbekal (tenant_id, id nota) dari QR di nota. Aturan emas tetap berlaku:
 	// setiap kueri memfilter tenant_id — id nota saja TIDAK cukup.
 	//
-	// Yang boleh keluar dari sini: data toko & isi nota. Yang TIDAK: identitas
-	// pelanggan, kasir, HPP, atau apa pun milik nota lain.
+	// Yang boleh keluar dari sini: data toko, isi nota, dan APA YANG SUDAH
+	// TERCETAK DI KERTAS NOTA ITU SENDIRI. Yang TIDAK: kasir, HPP, riwayat
+	// belanja, nomor WhatsApp, atau apa pun milik nota lain.
+	//
+	// Batas "sudah tercetak di kertas" itu yang mengizinkan kode & nama member
+	// ikut keluar (lihat GetPublicNota): nota member mencetak
+	// "Member M-XXXXXX (Nama)" beserta barcode CODE128-nya (escpos.ts), jadi
+	// siapa pun yang bisa menyusun URL ini SUDAH memegang kertas yang memuat
+	// keduanya. Nomor WA TIDAK pernah tercetak, dan karena itu tidak pernah
+	// dikembalikan — meski ia kolom yang bersebelahan di tabel yang sama.
+	// Member yang terkait nota ini, lewat DUA jalan yang keduanya berarti
+	// "orang yang memegang kertas ini":
+	//   1. kasir menempelkan member saat checkout  → s.customer_id
+	//   2. ia mendaftar DARI nota ini di halaman publik → signup_sale_id
+	// Jalan kedua wajib ada: pendaftaran lewat nota TIDAK mengisi customer_id
+	// nota itu, jadi tanpa ini kartu member justru tidak pernah muncul bagi
+	// orang yang baru saja mendaftar — satu-satunya saat ia paling ingin
+	// menyimpan kodenya.
+	//
+	// Keduanya tidak bisa terisi sekaligus: nota yang sudah atas nama member
+	// tidak pernah boleh dipakai mendaftar (bolehDaftar di public_nota.go),
+	// dan LIMIT 1 membuat hasilnya tetap deterministik bila kelak berubah.
 	GetPublicNota(ctx context.Context, arg GetPublicNotaParams) (GetPublicNotaRow, error)
 	// Verifikasi refresh token. Kembalikan error bila sudah direvokasi atau expired.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
@@ -144,6 +176,28 @@ type Querier interface {
 	// Validasi item yang mau di-restock benar-benar milik transaksi ini
 	// (mencegah refund_items menunjuk ke sales_item transaksi/tenant lain).
 	GetSalesItemForRefund(ctx context.Context, arg GetSalesItemForRefundParams) (GetSalesItemForRefundRow, error)
+	// Laporan penjualan harian / tutup buku (Z-Report).
+	//
+	// DUA aturan yang membentuk seluruh berkas ini:
+	//
+	//  1. **Waktu laporan = waktu TERKOREKSI perangkat**, bukan waktu server.
+	//     `COALESCE(offline_created_at_adj, offline_created_at, created_at)` —
+	//     transaksi yang dibuat offline pukul 20.00 lalu terkirim pukul 23.00
+	//     milik hari ia terjadi, bukan hari ia sampai. (skema 00005 baris
+	//     "Laporan memakai versi terkoreksi; audit memakai yang mentah")
+	//
+	//  2. **Z-Report yang sudah dicetak tidak pernah berubah** (invarian §6 #5).
+	//     Karena itu `is_late_arrival` DIKECUALIKAN dari semua angka utama dan
+	//     dilaporkan di embernya sendiri — sama seperti CalculateExpectedCash.
+	//     Tanpa pengecualian itu, laporan kemarin yang sudah ditandatangani
+	//     kasir bisa berubah sendiri hari ini.
+	//
+	// `is_sandbox` dikecualikan di mana-mana: data percobaan onboarding tidak
+	// pernah masuk laporan mana pun.
+	// Angka induk laporan. Void dihitung terpisah — barangnya kembali dan
+	// uangnya tidak pernah jadi pendapatan, tetapi pemilik tetap perlu tahu
+	// berapa banyak yang dibatalkan hari itu.
+	GetSalesReportSummary(ctx context.Context, arg GetSalesReportSummaryParams) (GetSalesReportSummaryRow, error)
 	// Satuan tempat stock_quantity dihitung: satuan STOK bila varian punya
 	// konversi (bibit: gram), selain itu satuan jual. Dipakai untuk mengisi
 	// stock_events.uom — ledger stok tidak boleh menebak satuan.
@@ -170,12 +224,23 @@ type Querier interface {
 	// seluruh kueri berikutnya tetap memfilter tenant_id dari hasil di sini —
 	// bukan dari input klien, yang justru lebih ketat daripada sebelumnya.
 	GetUserByEmailGlobal(ctx context.Context, email string) (GetUserByEmailGlobalRow, error)
+	// Verifikasi password SEBELUM mengubah PIN sendiri. Password diminta lagi
+	// meski sesi sudah hidup, dan itu disengaja: PIN inilah yang kelak dipakai
+	// menyetujui refund TANPA login. Siapa pun yang menemukan ponsel manager
+	// dalam keadaan terbuka tidak boleh bisa menanam PIN miliknya sendiri.
+	GetUserForPinChange(ctx context.Context, arg GetUserForPinChangeParams) (GetUserForPinChangeRow, error)
 	// Setelah login sukses, ambil info tenant untuk disertakan dalam JWT claims.
 	GetUserWithTenant(ctx context.Context, id string) (GetUserWithTenantRow, error)
 	// Satuan jual + konversi ke satuan stok, TANPA filter is_active: void atau
 	// refund atas barang yang sudah dinonaktifkan tetap harus mengembalikan stok
 	// dalam satuan yang benar.
 	GetVariantConversion(ctx context.Context, arg GetVariantConversionParams) (GetVariantConversionRow, error)
+	// Isian layar "Ubah barang". Termasuk HPP, yang SENGAJA tidak ikut
+	// /sync/pull: margin usaha adalah informasi paling sensitif bagi pemilik
+	// UMKM (SECURITY.md §3), dan apa pun yang disinkronkan ikut tersimpan di
+	// IndexedDB setiap ponsel kasir — yang hanya dijaga kunci layar ponsel
+	// (lihat lib/auth/access.ts). Pemanggil WAJIB menyaringnya per peran.
+	GetVariantDetail(ctx context.Context, arg GetVariantDetailParams) (GetVariantDetailRow, error)
 	GetVariantForCheckout(ctx context.Context, arg GetVariantForCheckoutParams) (GetVariantForCheckoutRow, error)
 	// Kebalikan DecrementStockAllowNegative — barang fisik kembali ke rak.
 	// item_type dibatasi sama seperti pemotongan stok checkout.
@@ -215,11 +280,32 @@ type Querier interface {
 	InsertStockEvents(ctx context.Context, arg []InsertStockEventsParams) (int64, error)
 	InsertStockOpname(ctx context.Context, arg InsertStockOpnameParams) (string, error)
 	InsertStockOpnameItem(ctx context.Context, arg InsertStockOpnameItemParams) (InsertStockOpnameItemRow, error)
+	// Konversi satuan jual → satuan stok (ADR-0012): bibit dijual per ml,
+	// stoknya gram. from_uom diambil dari varian itu sendiri supaya tidak
+	// mungkin menyimpan konversi yang tidak akan pernah terpakai.
+	InsertUomConversion(ctx context.Context, arg InsertUomConversionParams) (int64, error)
+	// Siapa yang bisa dimintai PIN saat kasir perlu persetujuan (refund, void,
+	// diskon besar). Hanya nama & peran — TIDAK ADA pin_hash di sini; daftar ini
+	// dikirim ke perangkat kasir, dan hash PIN tidak boleh ikut keluar dari
+	// server dalam keadaan apa pun.
+	//
+	// Manager yang BELUM mengatur PIN tetap ditampilkan, ditandai lewat
+	// `punya_pin`: kasir yang memanggil manajer ke kasir lalu menemukan PIN-nya
+	// belum ada akan menyalahkan aplikasi, bukan pengaturan akunnya.
+	ListApprovers(ctx context.Context, tenantID string) ([]ListApproversRow, error)
 	ListCatalogForSync(ctx context.Context, arg ListCatalogForSyncParams) ([]ListCatalogForSyncRow, error)
 	// Yang dikirim ke perangkat kasir HANYA nama, WA, kode member, akun sosial
 	// media, dan status merchandise — bukan email/tanggal lahir/catatan
 	// (DATA-MODEL §5 "jangan simpan email & tanggal lahir di perangkat").
 	ListCustomersForSync(ctx context.Context, tenantID string) ([]ListCustomersForSyncRow, error)
+	// Daftar member untuk layar /member. Berbeda dari ListCustomersForSync:
+	// yang ini dibaca pemilik di satu layar (bukan dicermin ke tiap perangkat),
+	// jadi ia boleh mencari, menghitung belanja, dan dibatasi halaman.
+	//
+	// Email & tanggal lahir TETAP tidak ikut — bukan karena perangkat, tetapi
+	// karena tidak ada satu pun fitur yang memakainya (DATA-MODEL §5). Kolom
+	// yang tidak pernah dibaca lebih baik tidak pernah dikirim.
+	ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error)
 	ListOutlets(ctx context.Context, tenantID string) ([]ListOutletsRow, error)
 	// MULTI-OUTLET.md §3: "Ini adalah celah keamanan, bukan fitur Fase 2" — tanpa
 	// ini, GET /outlets mengembalikan SELURUH outlet tenant ke siapa pun yang
@@ -239,16 +325,39 @@ type Querier interface {
 	// supaya layar riwayat bisa menandai "sudah direfund" tanpa N+1 kueri.
 	// Data percobaan (is_sandbox) dikecualikan, sama seperti seluruh laporan.
 	ListSales(ctx context.Context, arg ListSalesParams) ([]ListSalesRow, error)
+	// Satu baris per shift: siapa kasirnya, berapa kas diharapkan, berapa yang
+	// dihitung, dan selisihnya. Shift yang MASIH TERBUKA ikut tampil dengan
+	// nilai kosong — pemilik perlu tahu laporannya belum final.
+	ListShiftsForReport(ctx context.Context, arg ListShiftsForReportParams) ([]ListShiftsForReportRow, error)
+	// Daftar karyawan untuk layar Pengaturan. TIDAK menyertakan password_hash
+	// maupun pin_hash — keduanya tidak pernah keluar dari server.
+	ListStaff(ctx context.Context, tenantID string) ([]ListStaffRow, error)
 	// Laporan pergerakan stok (ledger append-only = KEBENARAN stok, DATA-MODEL
 	// §4C). Dipakai pemilik untuk melihat stok keluar bibit dalam gram.
 	ListStockEvents(ctx context.Context, arg ListStockEventsParams) ([]ListStockEventsRow, error)
 	// `uom` di sini adalah satuan STOK (satuan tempat stock_quantity dihitung):
 	// gram untuk bibit yang dijual per ml (ADR-0012), selain itu satuan jual.
 	ListStockLevels(ctx context.Context, tenantID string) ([]ListStockLevelsRow, error)
+	// Barang terlaris periode ini, dalam SATUAN JUAL (ml untuk bibit) — ini
+	// laporan penjualan, bukan laporan stok. Pergerakan gram ada di
+	// /laporan-stok yang membaca ledger stock_events.
+	ListTopProductsForReport(ctx context.Context, arg ListTopProductsForReportParams) ([]ListTopProductsForReportRow, error)
 	// Opname: baca stok tersimpan sambil mengunci barisnya. Selisih dihitung dari
 	// angka INI, bukan dari angka yang dikirim klien — angka klien bisa basi
 	// (dibaca sebelum penjualan terakhir) atau dipalsukan.
 	LockVariantStock(ctx context.Context, arg LockVariantStockParams) (decimal.Decimal, error)
+	// Satu member dari kode ATAU nomor WA, untuk layar kasir.
+	//
+	// Endpoint ini ada karena cermin lokal perangkat hanya diperbarui saat
+	// /sync/pull. Member yang baru mendaftar sendiri lewat QR nota di web toko
+	// ada di SERVER, bukan di antrean perangkat — jadi kasir yang mengetik
+	// kodenya lima menit kemudian tidak menemukan siapa pun, dan pelanggan yang
+	// baru saja mendaftar ditolak di meja kasir.
+	//
+	// Kolomnya PERSIS sama dengan ListCustomersForSync: tidak ada riwayat
+	// belanja, email, atau tanggal lahir. Kasir boleh mengenali member, bukan
+	// membaca berapa uang yang pernah ia belanjakan (RBAC-MODEL §CRM).
+	LookupMember(ctx context.Context, arg LookupMemberParams) (LookupMemberRow, error)
 	LookupVariantByBarcode(ctx context.Context, arg LookupVariantByBarcodeParams) (LookupVariantByBarcodeRow, error)
 	// Dipanggil di transaksi penjualan yang sama. merchandise_given_at hanya
 	// diisi SEKALI — pada transaksi pertama member — dan tidak pernah ditimpa.
@@ -277,18 +386,46 @@ type Querier interface {
 	// Retensi 7 hari; dibersihkan job harian. (RETENTION §2)
 	SaveSyncReceipt(ctx context.Context, arg SaveSyncReceiptParams) error
 	SearchVariants(ctx context.Context, arg SearchVariantsParams) ([]SearchVariantsRow, error)
+	// Karyawan yang berhenti DINONAKTIFKAN, tidak dihapus: transaksi, refund,
+	// dan ledger stok yang ia catat tetap merujuk namanya. Owner tidak bisa
+	// menonaktifkan dirinya sendiri (dicegah di handler) — tenant tanpa satu
+	// pun akun aktif tidak bisa dibuka siapa pun lagi.
+	SetStaffActive(ctx context.Context, arg SetStaffActiveParams) (int64, error)
 	// Opname: stok DITETAPKAN sama dengan hasil timbang, bukan ditambah.
 	SetStock(ctx context.Context, arg SetStockParams) (decimal.Decimal, error)
+	// Hanya untuk DIRI SENDIRI (pemanggil mengirim id dari klaim JWT-nya).
+	// NULL = PIN dihapus; manager itu tidak bisa menyetujui apa pun lagi.
+	SetUserPin(ctx context.Context, arg SetUserPinParams) (int64, error)
+	// Kas masuk/keluar di luar penjualan (FR-31 petty cash): ambil uang belanja,
+	// setor ke bank. Tanpa ini, selisih laci tidak pernah bisa dijelaskan.
+	SumCashMovementsForReport(ctx context.Context, arg SumCashMovementsForReportParams) (SumCashMovementsForReportRow, error)
+	// Rincian per metode bayar. Inilah yang dicocokkan pemilik dengan isi laci
+	// (tunai) dan mutasi rekening (transfer/QRIS).
+	SumPaymentsByMethodForReport(ctx context.Context, arg SumPaymentsByMethodForReportParams) ([]SumPaymentsByMethodForReportRow, error)
+	// Refund dihitung dari TANGGAL REFUND-nya, bukan tanggal transaksi aslinya:
+	// uang keluar dari laci hari ini, jadi ia mengurangi kas hari ini. Nota
+	// yang direfund bisa saja terbit minggu lalu.
+	SumRefundsForReport(ctx context.Context, arg SumRefundsForReportParams) (SumRefundsForReportRow, error)
 	// Refund SEBELUMNYA pada transaksi yang sama — dijumlahkan dengan permintaan
 	// baru lewat money.RemainingRefundable sebelum refund ini disimpan.
 	SumRefundsForTransaction(ctx context.Context, arg SumRefundsForTransactionParams) (decimal.Decimal, error)
 	// Ringkasan per jenis + satuan: "terjual 412,5 g" dalam satu baris, tanpa
 	// menjumlahkan gram dengan pcs.
 	SumStockEventsByType(ctx context.Context, arg SumStockEventsByTypeParams) ([]SumStockEventsByTypeRow, error)
+	// Koreksi data member dari layar /member. Nomor WA IKUT bisa diperbaiki —
+	// salah ketik satu digit berarti pengingat WA kelak sampai ke orang lain.
+	// Kode member TIDAK pernah diubah: barcodenya sudah tercetak di nota yang
+	// dipegang pelanggan.
+	UpdateMember(ctx context.Context, arg UpdateMemberParams) (int64, error)
 	// :execrows, bukan :exec — id yang salah atau milik tenant lain harus
 	// menjadi 404, bukan "Outlet diupdate" yang tidak mengubah apa pun.
 	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (int64, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)
+	// HANYA faktornya. `to_uom` tidak pernah diubah lewat sini: seluruh ledger
+	// stock_events barang ini sudah tercatat dalam satuan itu, dan menggantinya
+	// membuat gram dan mililiter berjumlah di kolom yang sama tanpa satu pun
+	// baris yang terlihat salah.
+	UpdateUomConversionFactor(ctx context.Context, arg UpdateUomConversionFactorParams) (int64, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (int64, error)
 	// Telemetri perangkat ikut bersama sync. storage_used_pct adalah peringatan dini
 	// sebelum IndexedDB penuh — server bisa tampak sehat sempurna sementara sebuah

@@ -238,3 +238,19 @@ RETURNING id;
 INSERT INTO refund_items (id, tenant_id, refund_id, sales_item_id, quantity, amount)
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id;
+
+-- name: ListApprovers :many
+-- Siapa yang bisa dimintai PIN saat kasir perlu persetujuan (refund, void,
+-- diskon besar). Hanya nama & peran — TIDAK ADA pin_hash di sini; daftar ini
+-- dikirim ke perangkat kasir, dan hash PIN tidak boleh ikut keluar dari
+-- server dalam keadaan apa pun.
+--
+-- Manager yang BELUM mengatur PIN tetap ditampilkan, ditandai lewat
+-- `punya_pin`: kasir yang memanggil manajer ke kasir lalu menemukan PIN-nya
+-- belum ada akan menyalahkan aplikasi, bukan pengaturan akunnya.
+SELECT id, name, role, (pin_hash IS NOT NULL)::boolean AS punya_pin
+FROM users
+WHERE tenant_id = $1
+  AND is_active
+  AND role IN ('owner', 'manager')
+ORDER BY role, name;

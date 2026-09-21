@@ -156,6 +156,15 @@ body {
     background: #fff;
   }
 
+  /* Laporan tutup buku dicetak sebagai teks siap-pakai: barisnya sudah
+     disusun selebar kolom printer oleh lib/reports/zreport.ts, jadi browser
+     tidak boleh membungkusnya ulang — pembungkusan ganda mematahkan kolom
+     angka yang sudah rata. */
+  .receipt-pre {
+    white-space: pre;
+    margin: 0;
+  }
+
   .receipt-center {
     text-align: center;
   }

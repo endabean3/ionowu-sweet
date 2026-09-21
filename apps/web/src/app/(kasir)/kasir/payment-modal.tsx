@@ -14,6 +14,8 @@ import React, { useState } from "react";
  * subtotal/pajak dari nominal pembayaran saja. */
 export interface PaymentBreakdown {
   subtotal: string;
+  /** Diskon transaksi; ikut dicetak di nota dan dikirim ke server. */
+  discountTotal: string;
   taxTotal: string;
   grandTotal: string;
   /** Uang yang benar-benar diserahkan pembeli. Berbeda dari nominal yang
@@ -165,6 +167,7 @@ export function PaymentModal({ totals, onClose, onPay }: PaymentModalProps) {
               // PAYMENT_AMOUNT_MISMATCH karena jumlah pembayaran ≠ total.
               await onPay(method, grandTotal, {
                 subtotal: totals.subtotal.toString(),
+                discountTotal: totals.discountTotal.toString(),
                 taxTotal: totals.taxTotal.toString(),
                 grandTotal: totals.grandTotal.toString(),
                 // Non-tunai tidak punya kembalian: yang diserahkan persis

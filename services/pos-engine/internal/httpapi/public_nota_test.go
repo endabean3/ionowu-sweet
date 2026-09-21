@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,5 +91,53 @@ func TestUlidPola(t *testing.T) {
 		if ulidPola.MatchString(rusak) {
 			t.Errorf("%q harus ditolak", rusak)
 		}
+	}
+}
+
+// TestKartuMemberTidakBocor menjaga batas endpoint TANPA login ini: jawaban
+// boleh memuat apa yang SUDAH tercetak di kertas nota (kode & nama member),
+// dan tidak lebih.
+//
+// Diuji lewat JSON yang benar-benar dikirim, bukan lewat daftar field di
+// kepala: menambah satu kolom ke publicNotaMember kelak — nomor WA ada di
+// baris yang bersebelahan di tabel customers — akan menjatuhkan uji ini.
+func TestKartuMemberTidakBocor(t *testing.T) {
+	var out publicNota
+	out.HasMember = true
+	out.Member = &publicNotaMember{
+		Code: "M-AB12CD", Name: "Ibu Sari", MerchandiseGiven: true,
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	js := string(b)
+
+	for _, wajib := range []string{`"code":"M-AB12CD"`, `"name":"Ibu Sari"`, `"merchandise_given":true`} {
+		if !strings.Contains(js, wajib) {
+			t.Errorf("kartu member kehilangan %s: %s", wajib, js)
+		}
+	}
+	// Nomor WA TIDAK pernah tercetak di nota, jadi ia tidak pernah boleh
+	// keluar dari sini — meski ia kolom sebelah di tabel yang sama.
+	// Dicocokkan sebagai KUNCI JSON (`"phone":`), bukan substring: "wa"
+	// polos juga cocok dengan "warranty", dan uji yang gagal karena alasan
+	// yang salah akan dimatikan orang berikutnya alih-alih dipercaya.
+	for _, kunci := range []string{"phone", "cost_price", "unit_cost", "total_belanja", "last_seen_at", "cashier_name"} {
+		if strings.Contains(js, `"`+kunci+`":`) {
+			t.Errorf("jawaban publik memuat kunci %q: %s", kunci, js)
+		}
+	}
+}
+
+// Nota tanpa member tidak boleh mengirim kartu kosong — klien membedakan
+// "belum member" dari "member" lewat ADA atau TIDAKNYA objek ini.
+func TestKartuMemberDihilangkanBilaBukanMember(t *testing.T) {
+	b, err := json.Marshal(publicNota{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"member"`) {
+		t.Errorf("nota non-member tetap mengirim kunci member: %s", b)
 	}
 }

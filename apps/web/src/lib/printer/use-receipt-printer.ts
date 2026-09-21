@@ -1,5 +1,6 @@
 "use client";
 
+import type { BarisCetak, PaperWidth } from "@/lib/receipt/escpos";
 import type { ReceiptData } from "@/lib/receipt/format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import {
   loadAutoPrint,
   loadSavedPrinter,
   printReceiptBluetooth,
+  printReportBluetooth,
   printTestPageBluetooth,
   printerErrorMessage,
   saveAutoPrint,
@@ -128,6 +130,34 @@ export function useReceiptPrinter() {
     [jalankan],
   );
 
+  /**
+   * Laporan tutup buku. Berbeda dari struk dalam satu hal penting: bila
+   * belum ada printer Bluetooth, laporan TIDAK diantrekan menunggu printer
+   * dipilih — ia dicetak lewat dialog cetak sistem. Laporan dibaca pemilik
+   * di atas meja, bukan diserahkan ke pembeli yang sedang menunggu, jadi
+   * kertas A4 dari printer biasa sama sahnya dengan nota termal.
+   *
+   * `susun` menerima LEBAR KOLOM printer tujuan dan mengembalikan barisnya.
+   * Lebar itu hanya diketahui di sini (printer.paper), sedangkan yang tahu
+   * cara menyusun laporan adalah pemanggil — karena itu fungsi, bukan data.
+   */
+  const cetakLaporan = useCallback(
+    async (susun: (lebar: PaperWidth) => BarisCetak[], target: SavedPrinter | null = printer) => {
+      if (!isBluetoothPrintingAvailable() || !target) {
+        window.print();
+        return;
+      }
+      kerjaUlang.current = () => cetakLaporan(susun, target);
+      await jalankan(
+        target,
+        () => printReportBluetooth(target, susun(target.paper)),
+        "Laporan tercetak",
+        () => setPickerOpen(true),
+      );
+    },
+    [printer, jalankan],
+  );
+
   const pilihPrinter = useCallback(
     (p: SavedPrinter) => {
       savePrinter(p);
@@ -166,6 +196,7 @@ export function useReceiptPrinter() {
     setAutoPrint,
     cetak,
     cetakUji,
+    cetakLaporan,
   };
 }
 

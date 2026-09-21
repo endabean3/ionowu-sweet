@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { type LocalCustomer, db } from "@/lib/db";
+import { lookupMember } from "@/lib/member/api";
 import { formatWA, memberCodeFromUlid, normalizeHandle, normalizeWA } from "@/lib/member/member";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Search, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ulid } from "ulid";
 
 /**
@@ -24,6 +25,7 @@ export function MemberPanel({
   tenantId,
   outletId,
   storeHandle,
+  accessToken,
   onClose,
   onSelect,
 }: {
@@ -31,6 +33,9 @@ export function MemberPanel({
   outletId: string;
   /** Akun TikTok toko dari Pengaturan; kosong = kalimat umum. */
   storeHandle?: string | null;
+  /** Untuk mencari member yang belum ada di perangkat ini; null = offline
+   *  atau sesi habis, dan pencarian tetap berjalan secara lokal. */
+  accessToken?: string | null;
   onClose: () => void;
   onSelect: (member: LocalCustomer) => void;
 }) {
@@ -53,6 +58,60 @@ export function MemberPanel({
         c.phone.includes(kunci.replace(/\D/g, "") || "#"),
     )
     .slice(0, 20);
+
+  /**
+   * Member yang ADA DI SERVER tetapi belum ada di perangkat ini.
+   *
+   * Pelanggan yang mendaftar sendiri lewat QR nota di web toko tercatat di
+   * server, sedangkan cermin IndexedDB perangkat baru memuatnya pada
+   * /sync/pull berikutnya — dan sync berkala hanya berjalan bila ada antrean
+   * lokal (lib/sync/provider.tsx). Tanpa penelusuran ini, pelanggan yang baru
+   * saja mendaftar ditolak di meja kasir dengan "tidak ada member yang cocok".
+   *
+   * Hanya dijalankan bila pencarian lokal KOSONG dan kuncinya spesifik (kode
+   * member atau nomor WA utuh) — mengetik nama tidak pernah memanggil server.
+   */
+  const [dariServer, setDariServer] = useState<LocalCustomer | null>(null);
+  const [mencari, setMencari] = useState(false);
+  const layakDicari =
+    hasil.length === 0 && (kunciWA !== "" || /^m-[a-z0-9]{4,}$/i.test(cari.trim()));
+
+  useEffect(() => {
+    setDariServer(null);
+    if (!layakDicari || !accessToken || !navigator.onLine) return;
+    let batal = false;
+    const t = setTimeout(() => {
+      setMencari(true);
+      void lookupMember(accessToken, cari)
+        .then((c) => {
+          // tenant_id diisi di sini, bukan dari server: perangkat sudah tahu
+          // tenant-nya, dan kolom itu yang dipakai memfilter data lokal.
+          if (!batal && c) setDariServer({ ...c, tenant_id: tenantId });
+        })
+        .catch(() => {
+          // Offline atau server bermasalah: pencarian lokal tetap berlaku,
+          // dan kasir selalu bisa mendaftarkan member baru.
+        })
+        .finally(() => {
+          if (!batal) setMencari(false);
+        });
+    }, 350);
+    return () => {
+      batal = true;
+      clearTimeout(t);
+    };
+  }, [cari, layakDicari, accessToken, tenantId]);
+
+  /** Menempelkan member dari server SAMBIL menyimpannya ke perangkat, supaya
+   *  transaksi berikutnya tidak perlu jaringan lagi. */
+  const pakaiDariServer = async (c: LocalCustomer) => {
+    try {
+      await db.customers.put(c);
+    } catch {
+      // Gagal menyimpan cermin lokal bukan alasan menolak transaksi ini.
+    }
+    onSelect(c);
+  };
 
   return (
     <Modal title="Member" onClose={onClose}>
@@ -88,7 +147,30 @@ export function MemberPanel({
               placeholder="M-… atau 0812…"
               autoFocus
             />
-            {semua && hasil.length === 0 && (
+            {dariServer && (
+              <button
+                type="button"
+                onClick={() => void pakaiDariServer(dariServer)}
+                className="mochi-button pos-touch-target flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-card-border bg-sweet-matcha px-4 py-3 text-left shadow-hard-sm"
+              >
+                <span className="min-w-0">
+                  <span className="block font-mono font-bold text-main">
+                    {dariServer.member_code}
+                  </span>
+                  <span className="block truncate font-sans text-sm text-main">
+                    {dariServer.name ? `${dariServer.name} · ` : ""}
+                    {formatWA(dariServer.phone)}
+                  </span>
+                  <span className="block font-sans text-xs text-main">
+                    Baru mendaftar — belum tersimpan di perangkat ini
+                  </span>
+                </span>
+              </button>
+            )}
+            {mencari && !dariServer && (
+              <p className="font-sans text-sm text-main">Mencari di server…</p>
+            )}
+            {semua && hasil.length === 0 && !dariServer && !mencari && (
               <p className="font-sans text-sm text-main">
                 {semua.length === 0
                   ? "Belum ada member di perangkat ini."

@@ -19,6 +19,12 @@ export interface MacaronProduct {
   uom: string;
   /** 0 = dijual utuh; > 0 = curah/timbang dan butuh input jumlah. */
   uomPrecision: number;
+  /** Kode yang ditempel di barang dan dipindai kasir (migrasi 00003,
+   *  unik per tenant). Kosong untuk barang tanpa label. */
+  barcode?: string;
+  /** Kode internal toko. Ikut dicari karena sebagian toko mengetiknya
+   *  manual ketika label barcode-nya rusak atau terlepas. */
+  sku?: string;
 }
 
 interface MacaronItemProps {

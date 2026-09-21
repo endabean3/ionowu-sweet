@@ -87,6 +87,18 @@ Alur kasir harus bisa diselesaikan **tanpa menyentuh layar sama sekali**:
 Fokus harus selalu kembali ke kolom scan setelah aksi apa pun. Kalau kasir
 harus mengklik kolom scan lagi, alurnya salah.
 
+Kolom yang sama menerima **tiga** jenis kode: barcode/SKU barang, kode member
+(`M-XXXXXX`), dan ketikan nama biasa. Aturannya:
+
+* **Cocok PERSIS** dengan barcode atau SKU → barang masuk keranjang, kolom
+  dikosongkan. Pencocokan sebagian TIDAK menambah apa pun — ia hanya menyaring
+  grid, supaya kasir yang sedang mengetik nama tidak kejatuhan barang.
+* **Barang curah** (`uom_precision > 0`, mis. bibit per ml) yang dipindai
+  membuka dialog jumlah, bukan "1 ml". Memindai botol parfum tidak pernah
+  berarti menjual satu mililiter.
+* Setelah pindaian, `Enter` dari pemindai **diabaikan 600 ms**. Tanpa jeda itu,
+  memindai barang kedua justru melunasi transaksi yang baru berisi satu barang.
+
 ## Warna
 
 - Kontras dinaikkan: hindari `text-muted-foreground` untuk informasi yang perlu

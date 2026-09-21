@@ -46,6 +46,54 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 	return err
 }
 
+const createStaffUser = `-- name: CreateStaffUser :one
+INSERT INTO users (id, tenant_id, name, email, password_hash, role)
+VALUES ($1, $2, $3, $4, $5, $6::varchar)
+RETURNING id, name, email, role, is_active, created_at
+`
+
+type CreateStaffUserParams struct {
+	ID           string `db:"id" json:"id"`
+	TenantID     string `db:"tenant_id" json:"tenant_id"`
+	Name         string `db:"name" json:"name"`
+	Email        string `db:"email" json:"email"`
+	PasswordHash string `db:"password_hash" json:"password_hash"`
+	Role         string `db:"role" json:"role"`
+}
+
+type CreateStaffUserRow struct {
+	ID        string             `db:"id" json:"id"`
+	Name      string             `db:"name" json:"name"`
+	Email     string             `db:"email" json:"email"`
+	Role      string             `db:"role" json:"role"`
+	IsActive  bool               `db:"is_active" json:"is_active"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// Karyawan baru di tenant yang SUDAH ADA (owner menambah kasir/manager).
+// Berbeda dari RegisterTenantOwner: tenant_id sudah diketahui, jadi kueri
+// ini tetap tunduk pada aturan tenant-scope seperti kueri lain.
+func (q *Queries) CreateStaffUser(ctx context.Context, arg CreateStaffUserParams) (CreateStaffUserRow, error) {
+	row := q.db.QueryRow(ctx, createStaffUser,
+		arg.ID,
+		arg.TenantID,
+		arg.Name,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Role,
+	)
+	var i CreateStaffUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getRefreshTokenByHash = `-- name: GetRefreshTokenByHash :one
 SELECT id, tenant_id, user_id, expires_at, revoked_at
 FROM refresh_tokens
@@ -166,6 +214,40 @@ func (q *Queries) GetUserByEmailGlobal(ctx context.Context, email string) (GetUs
 	return i, err
 }
 
+const getUserForPinChange = `-- name: GetUserForPinChange :one
+SELECT id, role, password_hash, is_active
+FROM users
+WHERE tenant_id = $1 AND id = $2
+`
+
+type GetUserForPinChangeParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+}
+
+type GetUserForPinChangeRow struct {
+	ID           string `db:"id" json:"id"`
+	Role         string `db:"role" json:"role"`
+	PasswordHash string `db:"password_hash" json:"password_hash"`
+	IsActive     bool   `db:"is_active" json:"is_active"`
+}
+
+// Verifikasi password SEBELUM mengubah PIN sendiri. Password diminta lagi
+// meski sesi sudah hidup, dan itu disengaja: PIN inilah yang kelak dipakai
+// menyetujui refund TANPA login. Siapa pun yang menemukan ponsel manager
+// dalam keadaan terbuka tidak boleh bisa menanam PIN miliknya sendiri.
+func (q *Queries) GetUserForPinChange(ctx context.Context, arg GetUserForPinChangeParams) (GetUserForPinChangeRow, error) {
+	row := q.db.QueryRow(ctx, getUserForPinChange, arg.TenantID, arg.ID)
+	var i GetUserForPinChangeRow
+	err := row.Scan(
+		&i.ID,
+		&i.Role,
+		&i.PasswordHash,
+		&i.IsActive,
+	)
+	return i, err
+}
+
 const getUserWithTenant = `-- name: GetUserWithTenant :one
 SELECT
     u.id         AS user_id,
@@ -207,6 +289,51 @@ func (q *Queries) GetUserWithTenant(ctx context.Context, id string) (GetUserWith
 		&i.PlanStatus,
 	)
 	return i, err
+}
+
+const listStaff = `-- name: ListStaff :many
+SELECT id, name, email, role, is_active, (pin_hash IS NOT NULL)::boolean AS punya_pin
+FROM users
+WHERE tenant_id = $1
+ORDER BY is_active DESC, role, name
+`
+
+type ListStaffRow struct {
+	ID       string `db:"id" json:"id"`
+	Name     string `db:"name" json:"name"`
+	Email    string `db:"email" json:"email"`
+	Role     string `db:"role" json:"role"`
+	IsActive bool   `db:"is_active" json:"is_active"`
+	PunyaPin bool   `db:"punya_pin" json:"punya_pin"`
+}
+
+// Daftar karyawan untuk layar Pengaturan. TIDAK menyertakan password_hash
+// maupun pin_hash — keduanya tidak pernah keluar dari server.
+func (q *Queries) ListStaff(ctx context.Context, tenantID string) ([]ListStaffRow, error) {
+	rows, err := q.db.Query(ctx, listStaff, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaffRow{}
+	for rows.Next() {
+		var i ListStaffRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Email,
+			&i.Role,
+			&i.IsActive,
+			&i.PunyaPin,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const registerTenantOwner = `-- name: RegisterTenantOwner :one
@@ -275,4 +402,50 @@ type RevokeRefreshTokenParams struct {
 func (q *Queries) RevokeRefreshToken(ctx context.Context, arg RevokeRefreshTokenParams) error {
 	_, err := q.db.Exec(ctx, revokeRefreshToken, arg.TenantID, arg.TokenHash)
 	return err
+}
+
+const setStaffActive = `-- name: SetStaffActive :execrows
+UPDATE users
+SET is_active = $3::boolean
+WHERE tenant_id = $1 AND id = $2
+`
+
+type SetStaffActiveParams struct {
+	TenantID string `db:"tenant_id" json:"tenant_id"`
+	ID       string `db:"id" json:"id"`
+	IsActive bool   `db:"is_active" json:"is_active"`
+}
+
+// Karyawan yang berhenti DINONAKTIFKAN, tidak dihapus: transaksi, refund,
+// dan ledger stok yang ia catat tetap merujuk namanya. Owner tidak bisa
+// menonaktifkan dirinya sendiri (dicegah di handler) — tenant tanpa satu
+// pun akun aktif tidak bisa dibuka siapa pun lagi.
+func (q *Queries) SetStaffActive(ctx context.Context, arg SetStaffActiveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setStaffActive, arg.TenantID, arg.ID, arg.IsActive)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setUserPin = `-- name: SetUserPin :execrows
+UPDATE users
+SET pin_hash = $3
+WHERE tenant_id = $1 AND id = $2
+`
+
+type SetUserPinParams struct {
+	TenantID string  `db:"tenant_id" json:"tenant_id"`
+	ID       string  `db:"id" json:"id"`
+	PinHash  *string `db:"pin_hash" json:"pin_hash"`
+}
+
+// Hanya untuk DIRI SENDIRI (pemanggil mengirim id dari klaim JWT-nya).
+// NULL = PIN dihapus; manager itu tidak bisa menyetujui apa pun lagi.
+func (q *Queries) SetUserPin(ctx context.Context, arg SetUserPinParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserPin, arg.TenantID, arg.ID, arg.PinHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

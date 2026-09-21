@@ -5,7 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { MoneyInput } from "@/components/ui/money-input";
 import { JaringanError } from "@/lib/auth/api";
-import { KatalogError, type VariantPatch, patchProduct, patchVariant } from "@/lib/catalog/api";
+import {
+  KatalogError,
+  type VariantDetail,
+  type VariantPatch,
+  fetchVariantDetail,
+  patchProduct,
+  patchVariant,
+} from "@/lib/catalog/api";
 import { type LocalProduct, type LocalVariant, db } from "@/lib/db";
 import Decimal from "decimal.js";
 import { useEffect, useState } from "react";
@@ -16,8 +23,13 @@ interface BarisVarian {
   name: string;
   /** Rupiah bulat sebagai teks, mis. "25000". */
   price: string;
+  /** Harga modal. "" selama belum dimuat dari server, atau bila pengguna
+   *  bukan owner — HPP tidak pernah dikirim ke peran lain. */
+  hpp: string;
   barcode: string;
   minStock: string;
+  /** Berapa satuan stok per 1 satuan jual (ADR-0012); "" = tanpa konversi. */
+  faktor: string;
   aktif: boolean;
 }
 
@@ -26,14 +38,18 @@ function keBaris(v: LocalVariant): BarisVarian {
     id: v.id,
     name: v.name ?? "",
     price: new Decimal(v.price || 0).toDecimalPlaces(2).toString(),
+    hpp: "",
     barcode: v.barcode ?? "",
     minStock: new Decimal(v.min_stock_alert || 0).toString(),
+    faktor: "",
     aktif: v.is_active !== false,
   };
 }
 
 const UANG = /^\d{1,12}(\.\d{1,2})?$/;
 const KUANTITAS = /^\d{1,11}([.,]\d{1,3})?$/;
+/** Faktor konversi: DECIMAL(14,4) dan WAJIB > 0 (skema 00003). */
+const FAKTOR = /^\d{1,10}([.,]\d{1,4})?$/;
 
 /**
  * Ubah barang dari Katalog: nama, harga jual, barcode, batas stok menipis,
@@ -73,6 +89,44 @@ export function UbahBarang({
   const [coba, setCoba] = useState(false);
   const [offline, setOffline] = useState(false);
 
+  // Detail dari server: HPP dan faktor satuan stok. Keduanya TIDAK ada di
+  // Dexie — HPP karena sengaja tidak disinkronkan (margin tidak boleh
+  // menetap di ponsel kasir), faktor karena hanya dipakai di server saat
+  // memotong stok. Dimuat sekali saat dialog dibuka.
+  const [detail, setDetail] = useState<Record<string, VariantDetail> | null>(null);
+  useEffect(() => {
+    if (!accessToken) return;
+    let batal = false;
+    void (async () => {
+      try {
+        const hasil = await Promise.all(variants.map((v) => fetchVariantDetail(accessToken, v.id)));
+        if (batal) return;
+        const peta = Object.fromEntries(hasil.map((d) => [d.id, d]));
+        setDetail(peta);
+        setBaris((bs) =>
+          bs.map((b) => {
+            const d = peta[b.id];
+            if (!d) return b;
+            return {
+              ...b,
+              hpp: d.cost_price ? new Decimal(d.cost_price).toDecimalPlaces(2).toString() : "",
+              faktor: d.stock_uom ? new Decimal(d.stock_factor).toString() : "",
+            };
+          }),
+        );
+      } catch {
+        // Gagal memuat detail bukan alasan menutup dialog: nama, harga jual,
+        // dan barcode tetap bisa diubah. Kolom HPP & faktor yang tidak
+        // terisi dibiarkan kosong dan TIDAK ikut dikirim saat simpan, jadi
+        // nilai yang ada di server tidak pernah tertimpa nol.
+        if (!batal) setDetail({});
+      }
+    })();
+    return () => {
+      batal = true;
+    };
+  }, [accessToken, variants]);
+
   useEffect(() => {
     const cek = () => setOffline(!navigator.onLine);
     cek();
@@ -91,9 +145,15 @@ export function UbahBarang({
   const galatNama = nama.trim() === "" ? "Nama barang wajib diisi" : undefined;
   const galatBaris = baris.map((b) => ({
     price: UANG.test(b.price.trim()) ? undefined : "Isi harga, mis. 1000",
+    // HPP boleh kosong (belum pernah diisi / bukan owner); yang diisi wajib angka.
+    hpp: b.hpp.trim() === "" || UANG.test(b.hpp.trim()) ? undefined : "Isi angka, mis. 8000",
     minStock: KUANTITAS.test(b.minStock.trim()) ? undefined : "Isi angka, mis. 50",
+    faktor:
+      b.faktor.trim() === "" || FAKTOR.test(b.faktor.trim())
+        ? undefined
+        : "Isi angka lebih dari 0, mis. 0,9",
   }));
-  const sah = !galatNama && galatBaris.every((g) => !g.price && !g.minStock);
+  const sah = !galatNama && galatBaris.every((g) => !g.price && !g.hpp && !g.minStock && !g.faktor);
 
   const ubahBaris = (i: number, isian: Partial<BarisVarian>) =>
     setBaris((bs) => bs.map((b, j) => (j === i ? { ...b, ...isian } : b)));
@@ -119,6 +179,27 @@ export function UbahBarang({
           p.price = new Decimal(b.price.trim()).toString();
         }
         if (b.barcode.trim() !== lama.barcode) p.barcode = b.barcode.trim();
+        // HPP: hanya bila owner, kolomnya terisi, DAN nilainya benar-benar
+        // berubah. Mengirim nilai yang sama akan menaikkan permintaan ke
+        // gerbang peran tanpa alasan — dan manager yang menyimpan nama
+        // barang akan ditolak 403 gara-gara HPP yang tidak ia sentuh.
+        const hppLama = detail?.[v.id]?.cost_price;
+        if (bolehHarga && b.hpp.trim() !== "" && hppLama !== undefined) {
+          if (!new Decimal(b.hpp.trim()).equals(new Decimal(hppLama))) {
+            p.cost_price = new Decimal(b.hpp.trim()).toString();
+          }
+        }
+        // Faktor satuan stok: hanya untuk barang yang MEMANG punya satuan
+        // stok berbeda. Menetapkannya pertama kali dari layar ini sengaja
+        // tidak disediakan — itu keputusan bentuk data, bukan koreksi angka,
+        // dan jalurnya tetap impor CSV.
+        const d = detail?.[v.id];
+        if (d?.stock_uom && b.faktor.trim() !== "") {
+          const faktorBaru = new Decimal(b.faktor.trim().replace(",", "."));
+          if (!faktorBaru.equals(new Decimal(d.stock_factor))) {
+            p.stock_factor = faktorBaru.toString();
+          }
+        }
         const minBaru = new Decimal(b.minStock.trim().replace(",", "."));
         if (!minBaru.equals(lama.minStock)) p.min_stock_alert = minBaru.toString();
         // Produk nonaktif = semua varian ikut tidak dijual; mengaktifkannya
@@ -246,6 +327,61 @@ export function UbahBarang({
                       : "Berlaku di semua kasir setelah sync."}
                 </p>
               </div>
+              {/* HPP hanya untuk owner. Untuk peran lain kolomnya TIDAK
+                 dirender sama sekali — bukan sekadar dinonaktifkan: server
+                 memang tidak mengirim nilainya, jadi kolom kosong yang
+                 terkunci hanya akan terbaca seperti "HPP-nya nol". */}
+              {bolehHarga && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={`hpp-${b.id}`} className="text-sm font-medium text-main">
+                    Harga modal (HPP) per {v.uom}
+                  </label>
+                  <MoneyInput
+                    id={`hpp-${b.id}`}
+                    value={b.hpp}
+                    onChange={(e) => ubahBaris(i, { hpp: e.target.value })}
+                    disabled={detail === null}
+                    min={0}
+                    aria-invalid={coba && g.hpp ? true : undefined}
+                    aria-describedby={`hpp-${b.id}-hint`}
+                  />
+                  <p
+                    id={`hpp-${b.id}-hint`}
+                    className={`text-xs ${coba && g.hpp ? "font-semibold text-red-700" : "text-main"}`}
+                  >
+                    {detail === null
+                      ? "Memuat…"
+                      : coba && g.hpp
+                        ? g.hpp
+                        : "Dipakai menghitung laba. Tidak pernah tampil di kasir atau nota."}
+                  </p>
+                </div>
+              )}
+
+              {/* Faktor konversi hanya muncul bila barang ini MEMANG dijual
+                 dalam satuan berbeda dari stoknya (ADR-0012). */}
+              {detail?.[b.id]?.stock_uom && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={`faktor-${b.id}`} className="text-sm font-medium text-main">
+                    1 {v.uom} = berapa {detail[b.id].stock_uom}?
+                  </label>
+                  <Input
+                    id={`faktor-${b.id}`}
+                    value={b.faktor}
+                    onChange={(e) => ubahBaris(i, { faktor: e.target.value })}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    error={coba ? g.faktor : undefined}
+                  />
+                  <p className="text-xs text-main">
+                    Dijual per {v.uom}, stoknya dihitung {detail[b.id].stock_uom}. Mengubah angka
+                    ini TIDAK mengubah sisa stok yang sudah ada — hanya penjualan berikutnya. Satuan
+                    stoknya sendiri tidak bisa diganti: seluruh riwayat stok barang ini sudah
+                    tercatat dalam {detail[b.id].stock_uom}.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   label={`Stok menipis (${satuanStok})`}

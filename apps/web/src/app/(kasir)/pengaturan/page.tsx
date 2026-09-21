@@ -1,7 +1,9 @@
 "use client";
 
 import { PrinterPicker } from "@/components/pos/printer-picker";
+import { KaryawanToko } from "@/components/settings/karyawan";
 import { LogoNotaField } from "@/components/settings/logo-nota-field";
+import { PinPersetujuan } from "@/components/settings/pin-persetujuan";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,6 +96,8 @@ export default function PengaturanPage() {
   const [form, setForm] = useState<Form>(kosong);
   const [offline, setOffline] = useState(false);
   const [menyimpan, setMenyimpan] = useState(false);
+  /** Dinaikkan saat PIN persetujuan berubah → kartu Karyawan memuat ulang. */
+  const [versiKaryawan, setVersiKaryawan] = useState(0);
 
   useEffect(() => {
     let batal = false;
@@ -236,8 +240,8 @@ export default function PengaturanPage() {
     identitas?.name,
     garansiHari,
     garansiSah,
-    racikan,
-    racikanSah,
+    // racikan/racikanSah SENGAJA tidak ada di sini: sejak resep tidak lagi
+    // dicetak di nota (CHANGELOG 1.30.0), pratinjau tidak membacanya.
     notaUrlBersih,
     notaUrlSah,
     form.receipt_logo,
@@ -516,6 +520,23 @@ export default function PengaturanPage() {
             Terang paling mudah dibaca di bawah sinar matahari. Berlaku di perangkat ini saja.
           </p>
         </Card>
+
+        {identitas?.role === "owner" && (
+          // `key` sengaja: menaikkannya me-mount ulang kartu Karyawan, yang
+          // memuat ulang daftarnya. Lebih jujur daripada prop "versi" yang
+          // tidak pernah dibaca komponennya.
+          <KaryawanToko key={versiKaryawan} accessToken={accessToken} />
+        )}
+
+        {/* Hanya owner/manager yang punya PIN persetujuan — kasir yang
+           melihat kartu ini akan mengira ia bisa menyetujui refundnya
+           sendiri, yang justru kebalikan dari maksud fitur ini. */}
+        {(identitas?.role === "owner" || identitas?.role === "manager") && (
+          <PinPersetujuan
+            accessToken={accessToken}
+            onTersimpan={() => setVersiKaryawan((v) => v + 1)}
+          />
+        )}
 
         <Card variant="solid" className="p-4 sm:p-5">
           <h2 className="mb-3 font-sans text-lg font-bold">Akun</h2>

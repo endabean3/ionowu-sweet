@@ -4,6 +4,165 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.34.0] — 2026-09-21
+
+### Ditambahkan
+* **Kasir menemukan member yang mendaftar sendiri di web** — `GET /customers/lookup?q=`.
+  Ini menutup rantai yang selama ini PUTUS di tengah: pelanggan mendaftar lewat QR nota,
+  membernya lahir di SERVER, tetapi cermin IndexedDB perangkat kasir baru memuatnya pada
+  `/sync/pull` berikutnya — dan sync berkala hanya berjalan bila ada **antrean lokal**
+  (`lib/sync/provider.tsx`). Kasir yang mengetik kodenya lima menit kemudian menemukan
+  "tidak ada member yang cocok", dan pelanggan yang baru mendaftar ditolak di meja kasir.
+  * Dipakai di DUA tempat: panel Member (mencari bila hasil lokal kosong dan kuncinya
+    spesifik) dan **kolom cari utama kasir**, tempat barcode kartu member dipindai.
+  * Member yang ditemukan **disimpan ke perangkat**, jadi pemindaian berikutnya jalan offline.
+  * Dicocokkan PERSIS, bukan sebagian — pencocokan sebagian akan menjadikannya cara
+    menelusuri daftar pelanggan satu per satu dari akun kasir.
+  * Kolomnya sama persis dengan `/sync/pull`: tidak ada riwayat belanja. Kasir boleh
+    mengenali member, bukan membaca berapa yang pernah ia belanjakan (RBAC-MODEL §CRM).
+* **Kartu member di halaman nota publik** — `GET /public/v1/nota/{tenant}/{nota}` kini
+  mengembalikan objek `member` bila nota itu terkait member. Dipakai web Warung Wangi
+  (repo terpisah `endabean3/warungwangi`) untuk menampilkan kartu member **tanpa login**.
+  * **Batasnya ditetapkan oleh kertasnya sendiri:** yang boleh keluar hanya apa yang SUDAH
+    tercetak di nota — "Member M-XXXXXX (Nama)" beserta barcode CODE128-nya — ditambah satu
+    penanda merchandise. Siapa pun yang bisa menyusun URL ini sudah memegang kertas itu, jadi
+    tidak ada yang baru terbuka. **Nomor WhatsApp tidak pernah ikut** meski ia kolom
+    bersebelahan di tabel yang sama; nota yang tertinggal di meja tidak boleh
+    mengidentifikasi pemiliknya.
+  * Kartu muncul lewat **dua jalan**: kasir menempelkan member saat checkout
+    (`sales_transactions.customer_id`), ATAU orang itu mendaftar DARI nota ini
+    (`customers.signup_sale_id`). Jalan kedua wajib ada — pendaftaran lewat nota TIDAK
+    mengisi `customer_id` nota itu, jadi tanpanya kartu justru tidak pernah muncul bagi
+    orang yang baru saja mendaftar, satu-satunya saat ia paling ingin menyimpan kodenya.
+  * Member nonaktif atau yang sudah digabung (`merged_into_id`) tidak menghasilkan kartu:
+    lebih baik kosong daripada memberi kode yang tidak berlaku lagi di kasir.
+  * Dijaga dua uji yang memeriksa **JSON yang benar-benar dikirim**, bukan daftar field:
+    menambahkan nomor WA ke kartu kelak akan menjatuhkannya.
+
+---
+
+## [1.33.0] — 2026-09-21
+
+Empat item backlog "Sedang" sekaligus, karena ketiganya bersandar pada satu penemuan:
+**tidak ada cara membuat akun karyawan sama sekali**. `POST /auth/register` selalu membuat
+tenant BARU beserta ownernya, jadi setiap toko di produksi hanya punya satu akun, peran
+`cashier` tidak pernah benar-benar ada, dan seluruh aturan RBAC yang membedakan kasir dari
+owner — termasuk PIN persetujuan yang servernya sudah lama siap — tidak pernah bisa dipakai
+siapa pun.
+
+### Ditambahkan
+* **Karyawan** (`GET/POST /users`, `PATCH /users/{id}`, kartu di Pengaturan, owner saja).
+  Kasir masuk dengan akunnya sendiri, jadi setiap nota dan mutasi stok tercatat atas namanya.
+  Karyawan yang berhenti **dinonaktifkan, tidak dihapus**; owner tidak bisa menonaktifkan
+  dirinya sendiri (tenant tanpa akun pengelola tidak bisa dipulihkan dari dalam aplikasi).
+  * Karyawan baru **otomatis ditugaskan ke seluruh outlet dalam transaksi yang sama**.
+    Tanpa itu `GET /outlets` miliknya kosong dan tombol "Buka Shift" tidak pernah bisa
+    ditekan — akun yang mati sejak lahir, tanpa satu pun pesan galat yang menjelaskannya.
+* **PIN persetujuan manager** (`PATCH /me/pin`, `GET /approvers`, `POST /approvals/verify`).
+  * **Mengatur PIN sendiri** dari Pengaturan (owner & manager). Sebelum ini `users.pin_hash`
+    hanya pernah diisi seeder data contoh.
+  * **Password diminta lagi** meski sesi hidup: PIN ini menyetujui uang keluar TANPA login,
+    jadi sesi terbuka yang ditemukan orang lain tidak boleh cukup untuk menanam PIN.
+  * **Kasir kini bisa refund & void sendiri** dengan manager mengetik PIN di layar yang sama
+    — alurnya "manajer datang ke mesin kasir", bukan "kasir login sebagai manajer". Token
+    yang dipakai tetap milik kasir; `approved_by` menyebut manajernya.
+* **Diskon per transaksi** di layar kasir. Nilainya sebelumnya selalu "0".
+  * Satu kolom menerima **nominal ("5000") maupun persen ("10%")** — kasir mengetik apa yang
+    diucapkan pembeli. Hasil persen dibulatkan ke rupiah utuh.
+  * **Batas 20% untuk kasir** (RBAC-MODEL §Matriks); di atasnya butuh PIN manager. Karena PIN
+    diperiksa di server, diskon besar hanya bisa diberikan saat online — batas yang jujur:
+    gerbangnya ada di KLIEN, sebab transaksi offline selalu diterima (invarian §6 #4).
+  * Diskon tampil di keranjang **dan tercetak di nota** (termal & browser). Pembeli yang
+    membayar kurang dari jumlah harga barang harus bisa melihat alasannya di kertas.
+* **Daftar member** (`GET /members`, `PATCH /members/{id}`, layar `/member`). Sebelumnya
+  member hanya bisa DICARI dari kolom kasir.
+  * Cari nama/WA/kode, total belanja & jumlah transaksi per member, dan **penanda
+    merchandise perdana** yang bisa dicabut bila ternyata belum sempat diserahkan.
+  * Nomor WA bisa diperbaiki — dibakukan dengan aturan yang sama seperti saat mendaftar,
+    supaya satu orang tidak pernah menjadi dua baris. **Kode member tidak bisa diubah**:
+    barcodenya sudah tercetak di nota yang dipegang pelanggan.
+* **Ubah HPP dari layar Katalog** (`GET /variants/{id}`, owner saja). Endpoint baru itu ada
+  justru karena **HPP sengaja tidak ikut `/sync/pull`**: apa pun yang disinkronkan menetap di
+  IndexedDB tiap ponsel kasir, yang hanya dijaga kunci layar ponsel.
+* **Ubah faktor gram per ml** dari layar Katalog (sebelumnya hanya lewat impor CSV).
+  Mengubah faktor **tidak menyentuh sisa stok yang sudah ada** — hanya penjualan berikutnya.
+  **Satuan stoknya sendiri tidak bisa diganti**: seluruh ledger `stock_events` barang itu
+  sudah tercatat dalam satuan lama, dan mencampurnya membuat gram dan mililiter berjumlah di
+  kolom yang sama tanpa satu baris pun terlihat salah.
+
+### Diperbaiki
+* **`PUT` tidak pernah bisa dipakai di API ini**: middleware CORS hanya mengizinkan
+  GET/POST/PATCH/DELETE, jadi satu-satunya `PUT` yang sempat ditulis gagal di **preflight** —
+  peramban menolaknya sebelum ada permintaan yang sampai ke server, log server bersih, dan
+  yang terlihat hanyalah tombol yang "tidak melakukan apa-apa". Endpoint PIN memakai PATCH.
+* Kartu Karyawan di Pengaturan kini menyegarkan diri setelah PIN disimpan; sebelumnya ia
+  tetap berbunyi "PIN belum diatur" padahal PIN-nya baru saja dibuat.
+
+---
+
+## [1.32.0] — 2026-09-20
+
+### Ditambahkan
+* **Laporan penjualan harian / tutup buku (Z-Report)** — `GET /reports/daily` + layar
+  `/laporan-harian`. Sebelumnya hanya ada dasbor ringkasan dan tutup shift; tidak ada laporan
+  akhir hari yang bisa dicetak dan ditandatangani.
+  * **Isi:** penjualan kotor/diskon/pajak/bersih, jumlah transaksi & baris barang, rincian per
+    metode bayar, kas laci (tunai + kas masuk/keluar), void & refund, daftar shift dengan
+    kas diharapkan vs dihitung dan selisihnya, serta 10 barang terlaris dalam SATUAN JUAL.
+  * **Invarian §6 #5 ditegakkan di kueri, bukan di catatan:** transaksi `is_late_arrival`
+    dikecualikan dari SELURUH angka utama dan dilaporkan di embernya sendiri, lengkap dengan
+    kalimat "TIDAK termasuk angka di atas" di kertas. Laporan yang sudah dicetak dan
+    ditandatangani kasir tidak bisa berubah sendiri esok hari.
+  * **Waktu laporan = jam perangkat yang sudah dikoreksi**
+    (`COALESCE(offline_created_at_adj, offline_created_at, created_at)`): transaksi yang dibuat
+    offline pukul 20.00 dan terkirim pukul 23.00 milik hari ia terjadi.
+  * **Refund dihitung dari tanggal refund-nya**, bukan tanggal nota aslinya — uangnya keluar
+    dari laci hari ini, meski notanya terbit minggu lalu.
+  * **Pratinjau = hasil cetak.** Keduanya disusun `lib/reports/zreport.ts` dengan lebar kolom
+    printer yang benar-benar terpasang; jalur termal hanya menambah ESC/POS di atasnya. Ada
+    ruang tanda tangan kasir & pemilik di kaki laporan.
+  * Tanpa printer Bluetooth, laporan dicetak lewat dialog cetak sistem — laporan dibaca di
+    atas meja, jadi kertas A4 sama sahnya dengan nota termal.
+  * **Hanya owner & manager** (RBAC-MODEL §"Laporan & BI"); kasir tetap memakai tutup shift
+    untuk kas lacinya sendiri.
+  * Mengganti tanggal MEMBUANG data lama lebih dulu — angka kemarin tidak pernah tampil di
+    bawah judul hari ini, walau sepersekian detik.
+  * 7 kueri baru (`30-data/queries/reports.sql`), 12 uji unit, 2 uji Playwright, 2 uji Go.
+
+### Diperbaiki
+* **Gerbang lint yang sudah merah sebelum pekerjaan ini**: `useExhaustiveDependencies` di
+  Pengaturan menyebut `racikan`/`racikanSah`, sisa dari 1.30.0 ketika resep berhenti dicetak
+  di nota. `make lint` kini kembali hijau (Go 0 issues, biome bersih).
+* **Vitest tidak bisa memuat modul yang mengimpor lewat `@/…`** — alias yang ada di
+  `tsconfig.json` tidak pernah didaftarkan di `vitest.config.ts`. Akibatnya setiap modul yang
+  memakai bentuk impor standar aplikasi ini tidak bisa diuji sama sekali; penulis uji terpaksa
+  memilih antara impor relatif yang tidak konsisten dengan kode produksi, atau tidak menguji.
+
+---
+
+## [1.31.0] — 2026-09-20
+
+### Diperbaiki
+* **Scan barcode BARANG di kasir akhirnya berfungsi.** Kolomnya bertuliskan "scan barcode"
+  sejak awal dan [pages/kasir.md](./70-design-system/pages/kasir.md) memang menuntutnya, tetapi
+  pencocokannya hanya menyentuh NAMA — memindai barang tidak pernah menemukan apa pun.
+  * Penyebabnya satu langkah yang putus di ujung, bukan data yang hilang: server sudah
+    mengirim `sku` + `barcode` di `/sync/pull` dan Dexie sudah mengindeks keduanya, tetapi
+    transformasi ke `MacaronProduct` di layar kasir membuang kedua kolom itu.
+  * **Cocok persis → langsung masuk keranjang** dan kolom dikosongkan untuk pindaian
+    berikutnya. **Cocok sebagian hanya menyaring grid** — kasir yang mengetik nama tidak boleh
+    kejatuhan barang hanya karena ketikannya sempat melewati sebuah kode yang sah.
+  * SKU ikut diterima (label barcode yang terkelupas masih bisa diketik kodenya), dan spasi/CR
+    yang disisipkan pemindai serta perbedaan huruf besar-kecil diabaikan.
+  * **Barang curah yang dipindai membuka dialog jumlah**, bukan "1 ml".
+  * `Enter` dari pemindai diabaikan 600 ms setelah pindaian barang — jeda yang sudah ada untuk
+    kartu member. Tanpa itu, memindai barang kedua justru melunasi transaksi yang baru berisi
+    satu barang. `Enter` juga tidak lagi menembus dialog jumlah yang sedang terbuka.
+  * Aturan pencocokan dipindah ke modul murni `lib/catalog/cari.ts` (11 uji unit) dan ditutup
+    Playwright `e2e/scan-barang.spec.ts` (4 uji).
+
+---
+
 ## [1.30.0] — 2026-09-20
 
 ### Diubah

@@ -88,16 +88,28 @@ export function Receipt({ data }: { data: ReceiptData }) {
         })}
 
         <div className="receipt-sep" />
-        {new Decimal(data.taxTotal || "0").gt(0) && (
+        {/* Sama persis dengan jalur termal (lib/receipt/escpos.ts): rincian
+           muncul bila ada pajak ATAU ada diskon. Pembeli yang membayar
+           kurang dari jumlah harga barang harus melihat alasannya. */}
+        {(new Decimal(data.taxTotal || "0").gt(0) ||
+          new Decimal(data.discountTotal || "0").gt(0)) && (
           <>
             <div className="receipt-row">
               <span>Subtotal</span>
               <span>{rupiah(data.subtotal)}</span>
             </div>
-            <div className="receipt-row">
-              <span>Pajak</span>
-              <span>{rupiah(data.taxTotal)}</span>
-            </div>
+            {new Decimal(data.discountTotal || "0").gt(0) && (
+              <div className="receipt-row">
+                <span>Diskon</span>
+                <span>-{rupiah(data.discountTotal as string)}</span>
+              </div>
+            )}
+            {new Decimal(data.taxTotal || "0").gt(0) && (
+              <div className="receipt-row">
+                <span>Pajak</span>
+                <span>{rupiah(data.taxTotal)}</span>
+              </div>
+            )}
           </>
         )}
         <div className="receipt-row receipt-bold">
