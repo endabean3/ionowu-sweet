@@ -143,7 +143,7 @@ diperbaiki di `.devcontainer/Dockerfile` + `docker-compose.dev.yml`; jangan diba
 ## 7. Kondisi Saat Ini
 
 ```
-95 dokumen .md di docs/ · 11 folder · 13 ADR diterima (0001–0013)
+96 dokumen .md di docs/ · 11 folder · 13 ADR diterima (0001–0013)
 16 migrasi · 47 tabel · 65 indeks · 101 kueri SQL
 ```
 
@@ -265,6 +265,12 @@ eksplisit), dan skenario uji [OFFLINE-SYNC-SPEC](./docs/30-data/OFFLINE-SYNC-SPE
 yang sudah ada di `e2e/` (mis. 10.000 transaksi, offline 7 hari, jam mundur).
 
 **Aturan pembulatan uang belum resmi.** `internal/money` (Go) dan `src/lib/money/` (TS) memakai round-half-up sebagai ASUMSI implementasi — belum ada ADR atau keputusan produk yang menetapkannya. Kini ada transaksi produksi yang dihitung dengan aturan ini, jadi mengubahnya nanti lebih mahal.
+
+> **Apa yang belum ada, dan mana yang duluan:** [BACKLOG.md](./docs/00-product/BACKLOG.md) —
+> status FR-01…FR-51 yang diaudit dari KODE, bukan dari ingatan. Tiga hal yang selama ini
+> tidak tercatat di mana pun: **FR-02 (login PIN kasir) belum ada sama sekali**, **FR-22
+> (split payment) belum ada** meski server sudah mendukungnya, dan **FR-21 baru separuh**
+> (`+`/`−`/`Delete` belum dibuat). Perbarui berkas itu tiap kali sebuah FR berubah status.
 
 ### Langkah berikutnya yang paling masuk akal
 1. Selesaikan runbook deploy §5 D–E di ponsel sungguhan (butuh pemilik, bukan kode)
