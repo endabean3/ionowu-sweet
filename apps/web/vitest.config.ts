@@ -10,6 +10,11 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  // Runtime JSX otomatis, sama dengan yang dipakai Next saat membangun.
+  // Tanpa ini komponen apa pun gagal dengan "React is not defined" saat
+  // dirender di uji, sehingga tata letak yang HARUS dilihat — seperti lembar
+  // stiker yang dicetak di kertas sungguhan — tidak bisa diperiksa sama sekali.
+  esbuild: { jsx: "automatic" },
   test: {
     // Tanpa konfigurasi eksplisit, glob bawaan Vitest
     // (`**/*.{test,spec}.?(c|m)[jt]s?(x)`) ikut memungut spesifikasi

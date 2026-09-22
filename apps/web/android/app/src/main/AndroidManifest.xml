@@ -49,4 +49,13 @@
     <!-- Tidak wajib: aplikasi tetap bisa dipasang dan berjualan di perangkat
          tanpa Bluetooth, hanya tanpa cetak struk langsung. -->
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
+    <!-- Pemindai barcode di kasir (components/pos/pindai-kamera.tsx).
+         BarcodeDetector membaca dari aliran kamera, jadi izin ini wajib.
+         android.hardware.camera SENGAJA required="false": tablet kasir tanpa
+         kamera belakang tetap boleh memasang aplikasinya, tombol pindainya
+         saja yang tidak muncul. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
 </manifest>
