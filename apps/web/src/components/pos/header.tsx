@@ -1,14 +1,24 @@
 "use client";
 
+import { AntreanGagal } from "@/components/pos/antrean-gagal";
 import { useAuth } from "@/lib/auth/context";
-import { db } from "@/lib/db";
+import { type SyncQueueEntry, db } from "@/lib/db";
 import { naikMasukTegas } from "@/lib/motion/tokens";
 import type { ReceiptPrinter } from "@/lib/printer/use-receipt-printer";
 import { useSync } from "@/lib/sync/provider";
 import { simpanTema, temaGelapTersimpan, terapkanTema } from "@/lib/theme";
 import { useLiveQuery } from "dexie-react-hooks";
 import { m } from "framer-motion";
-import { Moon, Printer, RefreshCw, Settings, Sun, Wifi, WifiOff } from "lucide-react";
+import {
+  AlertTriangle,
+  Moon,
+  Printer,
+  RefreshCw,
+  Settings,
+  Sun,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -48,6 +58,11 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
   // offline akan melihat "Online" palsu. "Memeriksa…" jujur untuk keduanya.
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
+  // Dipisah dari pendingCount: "sedang antre" dan "DITOLAK server" tidak
+  // boleh terlihat sama. Yang pertama beres sendiri, yang kedua tidak akan
+  // pernah beres tanpa seseorang membaca alasannya.
+  const [gagal, setGagal] = useState<SyncQueueEntry[]>([]);
+  const [daftarTerbuka, setDaftarTerbuka] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(false);
 
   const outlet = useLiveQuery(() => (outletId ? db.outlets.get(outletId) : undefined), [outletId]);
@@ -76,6 +91,7 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
       try {
         const count = await db.syncQueue.where("status").anyOf(["pending", "failed"]).count();
         setPendingCount(count);
+        setGagal(await db.syncQueue.where("status").equals("failed").toArray());
       } catch {}
     }, 3000);
 
@@ -225,23 +241,44 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
         {/* Sync Queue Badge */}
         {/* Tanpa AnimatePresence — alasannya di kasir/page.tsx: anak tunggal
            bersyarat meninggalkan node tersangkut yang menelan ketukan. */}
-        {pendingCount > 0 && (
-          <m.div
-            key="antrean"
+        {gagal.length > 0 ? (
+          /* DITOLAK server: merah dan bisa diketuk. Versi lama memakai lencana
+             netral yang sama dengan "sedang antre", sehingga penolakan yang
+             tidak akan pernah beres sendiri terlihat seperti antrean biasa. */
+          <m.button
+            key="gagal"
+            type="button"
+            onClick={() => setDaftarTerbuka(true)}
             variants={naikMasukTegas}
             initial="sembunyi"
             animate="tampil"
             aria-live="polite"
-            className="hidden h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-sweet-custard sm:flex px-3 font-sans text-xs font-bold text-main shadow-hard-sm"
+            className="mochi-button flex h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-sweet-strawberry px-3 font-sans text-xs font-bold text-main shadow-hard-sm"
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
-              aria-hidden="true"
-            />
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
             <span>
-              {pendingCount} <span className="sr-only">transaksi </span>belum terkirim
+              {gagal.length} gagal <span className="hidden sm:inline">terkirim</span>
             </span>
-          </m.div>
+          </m.button>
+        ) : (
+          pendingCount > 0 && (
+            <m.div
+              key="antrean"
+              variants={naikMasukTegas}
+              initial="sembunyi"
+              animate="tampil"
+              aria-live="polite"
+              className="hidden h-11 items-center gap-1.5 whitespace-nowrap rounded-pill border-2 border-card-border bg-sweet-custard sm:flex px-3 font-sans text-xs font-bold text-main shadow-hard-sm"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              <span>
+                {pendingCount} <span className="sr-only">transaksi </span>belum terkirim
+              </span>
+            </m.div>
+          )
         )}
 
         {printer && (
@@ -290,6 +327,14 @@ export function POSHeader({ outletId, printer }: HeaderProps) {
           )}
         </button>
       </div>
+      {daftarTerbuka && (
+        <AntreanGagal
+          items={gagal}
+          sedangKirim={isSyncing}
+          onKirimUlang={() => syncNow()}
+          onTutup={() => setDaftarTerbuka(false)}
+        />
+      )}
     </header>
   );
 }
