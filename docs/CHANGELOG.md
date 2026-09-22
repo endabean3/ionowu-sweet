@@ -4,6 +4,35 @@ Perubahan struktural pada dokumentasi. Bukan changelog produk.
 
 ---
 
+## [1.35.0] — 2026-09-22
+
+### Ditambahkan
+* **[BACKLOG.md](./00-product/BACKLOG.md)** — status FR-01…FR-51 yang **diaudit langsung dari
+  kode**, plus urutan kerja. ROADMAP menjawab *fase apa*; berkas ini menjawab *besok kerjakan
+  apa*.
+  * Keduanya ditulis sebelum kode ada, jadi tak satu pun bisa menjawab "mana yang sudah jalan
+    di produksi". Menjawabnya dari ingatan sudah terbukti berbahaya: selama berbulan-bulan
+    `cashier` diperlakukan sebagai peran yang ada, padahal tidak ada cara membuat akun
+    karyawan sama sekali — dan tidak ada dokumen yang menyebutnya, karena semua menganggapnya
+    sudah ada.
+  * Hasil audit: **13 ✅ · 6 🟡 · 5 ❌ · 2 ⛔**. Tiga temuan yang sebelumnya tidak tercatat
+    di mana pun:
+    * **FR-02 belum ada sama sekali** — `auth.go` tidak menyentuh `pin_hash`. PIN yang ada
+      adalah PIN *persetujuan*, bukan PIN *login*; pergantian shift masih mengetik
+      email+password di ponsel.
+    * **FR-22 belum ada** — payload penjualan selalu mengirim TEPAT satu pembayaran, padahal
+      skema `payments` dan server sudah mendukung banyak baris. Pembeli yang membayar
+      sebagian tunai dan sebagian transfer tidak punya jalan yang jujur.
+    * **FR-21 setengah jalan** — hanya `Enter`/`Escape`/`F2` yang ada; `+`/`−`/`Delete` yang
+      dituntut dokumen desain belum pernah dibuat.
+  * FR-42 sengaja ditandai 🟡, bukan ✅: sync berkala hanya berjalan bila ada antrean LOKAL,
+    jadi perubahan yang lahir di server tidak pernah ditarik sampai aplikasi dibuka ulang.
+    Untuk member sudah ditambal per-kasus lewat `GET /customers/lookup`; katalog dan harga
+    masih punya lubang yang sama, dengan gejala yang sama — perangkat menampilkan data lama
+    dengan penuh percaya diri, tanpa satu pun pesan galat.
+
+---
+
 ## [1.34.0] — 2026-09-21
 
 ### Ditambahkan

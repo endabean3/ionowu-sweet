@@ -56,6 +56,7 @@ RBAC), itu tanda dokumen harus dipecah.
 | Visi & Ruang Lingkup | `00-product/VISION-SCOPE.md` | 🟡 Draft baru | Masalah, posisi, **Non-Goals**, asumsi |
 | Persona & JTBD | `00-product/PERSONAS-JTBD.md` | 🟡 Draft baru | 3 persona + anti-persona + sehari penuh |
 | Roadmap | `00-product/ROADMAP.md` | 🟡 Draft baru | Fase 0–3 + kriteria lulus |
+| **Backlog & prioritas** | `00-product/BACKLOG.md` | ✅ Baseline | Status FR-01…FR-51 **diaudit dari kode** + urutan kerja |
 | Metrik Keberhasilan | `00-product/SUCCESS-METRICS.md` | 🟡 Draft baru | North Star + guardrail |
 | Taksonomi Event | `00-product/ANALYTICS-EVENTS.md` | 🟡 Draft baru | Katalog event + aturan offline |
 | Onboarding & Aktivasi | `00-product/ONBOARDING-ACTIVATION.md` | 🟡 Draft baru | Jalur ke transaksi pertama |
