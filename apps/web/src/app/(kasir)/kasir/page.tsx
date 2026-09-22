@@ -7,6 +7,7 @@ import { LastReceipt } from "@/components/pos/last-receipt";
 import { MacaronItem, type MacaronProduct } from "@/components/pos/macaron-item";
 import { MemberPanel } from "@/components/pos/member-panel";
 import { PinManager } from "@/components/pos/pin-manager";
+import { PindaiKamera, bisaPindaiKamera } from "@/components/pos/pindai-kamera";
 import { PrinterPicker } from "@/components/pos/printer-picker";
 import { QtyKeypad } from "@/components/pos/qty-keypad";
 import { Receipt, type ReceiptData } from "@/components/pos/receipt";
@@ -30,7 +31,17 @@ import { enqueueOfflineAction } from "@/lib/sync/queue";
 import Decimal from "decimal.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { type PanInfo, m } from "framer-motion";
-import { ArrowLeft, Barcode, ChevronUp, Layers, Search, UserRound, Wallet, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Barcode,
+  ChevronUp,
+  Layers,
+  ScanLine,
+  Search,
+  UserRound,
+  Wallet,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -85,6 +96,7 @@ export default function KasirPage() {
   } | null>(null);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const [pindaiTerbuka, setPindaiTerbuka] = useState(false);
   const processingPaymentRef = useRef(false);
 
   // Data katalog hidup di IndexedDB, yang tidak ada di server. Tanpa gerbang
@@ -243,6 +255,76 @@ export default function KasirPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cartItems, isCheckingOut, showShiftModal, qtyTarget]);
+
+  /**
+   * Satu-satunya jalur masuk kode ke kasir, dipakai kolom ketik MAUPUN
+   * pemindai kamera.
+   *
+   * Dipisah dari onChange supaya hasil pindai kamera melewati logika yang
+   * PERSIS sama — kode member menempel ke transaksi, barcode barang
+   * langsung masuk keranjang. Menyalin logikanya ke pemindai akan membuat
+   * dua jalur yang lambat laun berbeda, dan kasir tidak akan tahu yang
+   * mana yang sedang dipakai.
+   */
+  const tanganiMasukan = (v: string) => {
+    setSearchQuery(v);
+    // Kartu/nota member dipindai ke kolom yang sama dengan
+    // produk: kode yang cocok langsung menempel ke transaksi.
+    if (looksLikeMemberCode(v) && identitas?.tenant_id) {
+      const kode = v.trim().toUpperCase();
+      const pakai = (c: LocalCustomer) => {
+        scanAt.current = Date.now();
+        setMember(c);
+        setSearchQuery("");
+        playPop();
+        toast.success(`Member ${c.member_code} dipakai`, {
+          description: c.name ?? formatWA(c.phone),
+        });
+      };
+      void db.customers
+        .where("member_code")
+        .equals(kode)
+        .filter((c) => c.tenant_id === identitas.tenant_id)
+        .first()
+        .then(async (c) => {
+          if (c) {
+            pakai(c);
+            return;
+          }
+          // Tidak ada di perangkat ini. Pelanggan yang mendaftar
+          // sendiri lewat QR nota di web toko baru sampai ke
+          // sini pada /sync/pull berikutnya — dan sync berkala
+          // hanya jalan bila ada antrean lokal. Tanpa jalur ini
+          // kartu member yang baru dibuat tidak bisa dipindai
+          // di kasir sama sekali.
+          if (!accessToken || !navigator.onLine) return;
+          const dariServer = await lookupMember(accessToken, kode).catch(() => null);
+          if (!dariServer) return;
+          const lokal = { ...dariServer, tenant_id: identitas.tenant_id };
+          // Disimpan supaya pemindaian berikutnya jalan offline.
+          await db.customers.put(lokal).catch(() => undefined);
+          pakai(lokal);
+        });
+      return;
+    }
+    // Barang: barcode/SKU yang cocok persis langsung masuk
+    // keranjang dan kolomnya dikosongkan, siap untuk barang
+    // berikutnya. Kasir memindai beruntun tanpa menyentuh
+    // layar sama sekali.
+    const barang = cariBarangByKode(products, v);
+    if (!barang) return;
+    scanAt.current = Date.now();
+    setSearchQuery("");
+    playPop();
+    // Barang curah membuka dialog jumlah (handleAddToCart) —
+    // memindai botol parfum tidak berarti "1 ml". Toastnya
+    // ditahan supaya tidak mengaku menambah barang yang
+    // jumlahnya belum ditentukan.
+    handleAddToCart(barang);
+    if (!isCurah(barang.uomPrecision)) {
+      toast.success(`${barang.name} ditambahkan`);
+    }
+  };
 
   /** Menaruh kuantitas PERSIS ke keranjang (menimpa, bukan menambah). */
   const setQuantity = (product: MacaronProduct, quantity: string) => {
@@ -602,70 +684,21 @@ export default function KasirPage() {
                 aria-label="Cari produk atau scan barcode (pintasan F2)"
                 aria-keyshortcuts="F2"
                 value={searchQuery}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSearchQuery(v);
-                  // Kartu/nota member dipindai ke kolom yang sama dengan
-                  // produk: kode yang cocok langsung menempel ke transaksi.
-                  if (looksLikeMemberCode(v) && identitas?.tenant_id) {
-                    const kode = v.trim().toUpperCase();
-                    const pakai = (c: LocalCustomer) => {
-                      scanAt.current = Date.now();
-                      setMember(c);
-                      setSearchQuery("");
-                      playPop();
-                      toast.success(`Member ${c.member_code} dipakai`, {
-                        description: c.name ?? formatWA(c.phone),
-                      });
-                    };
-                    void db.customers
-                      .where("member_code")
-                      .equals(kode)
-                      .filter((c) => c.tenant_id === identitas.tenant_id)
-                      .first()
-                      .then(async (c) => {
-                        if (c) {
-                          pakai(c);
-                          return;
-                        }
-                        // Tidak ada di perangkat ini. Pelanggan yang mendaftar
-                        // sendiri lewat QR nota di web toko baru sampai ke
-                        // sini pada /sync/pull berikutnya — dan sync berkala
-                        // hanya jalan bila ada antrean lokal. Tanpa jalur ini
-                        // kartu member yang baru dibuat tidak bisa dipindai
-                        // di kasir sama sekali.
-                        if (!accessToken || !navigator.onLine) return;
-                        const dariServer = await lookupMember(accessToken, kode).catch(() => null);
-                        if (!dariServer) return;
-                        const lokal = { ...dariServer, tenant_id: identitas.tenant_id };
-                        // Disimpan supaya pemindaian berikutnya jalan offline.
-                        await db.customers.put(lokal).catch(() => undefined);
-                        pakai(lokal);
-                      });
-                    return;
-                  }
-                  // Barang: barcode/SKU yang cocok persis langsung masuk
-                  // keranjang dan kolomnya dikosongkan, siap untuk barang
-                  // berikutnya. Kasir memindai beruntun tanpa menyentuh
-                  // layar sama sekali.
-                  const barang = cariBarangByKode(products, v);
-                  if (!barang) return;
-                  scanAt.current = Date.now();
-                  setSearchQuery("");
-                  playPop();
-                  // Barang curah membuka dialog jumlah (handleAddToCart) —
-                  // memindai botol parfum tidak berarti "1 ml". Toastnya
-                  // ditahan supaya tidak mengaku menambah barang yang
-                  // jumlahnya belum ditentukan.
-                  handleAddToCart(barang);
-                  if (!isCurah(barang.uomPrecision)) {
-                    toast.success(`${barang.name} ditambahkan`);
-                  }
-                }}
+                onChange={(e) => tanganiMasukan(e.target.value)}
                 className="pos-touch-target w-full rounded-pill border-2 border-card-border bg-card py-2 pl-4 pr-11 font-sans text-base font-bold text-main placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sweet-strawberry"
               />
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
             </div>
+            {bisaPindaiKamera() && (
+              <button
+                type="button"
+                onClick={() => setPindaiTerbuka(true)}
+                aria-label="Pindai barcode dengan kamera"
+                className="mochi-button flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border-2 border-card-border bg-base shadow-hard-sm"
+              >
+                <ScanLine className="h-5 w-5 text-main" aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setMemberPanelOpen(true)}
@@ -909,6 +942,18 @@ export default function KasirPage() {
               .catch((err) => {
                 toast.error(err instanceof Error ? err.message : "PIN ditolak");
               });
+          }}
+        />
+      )}
+
+      {pindaiTerbuka && (
+        <PindaiKamera
+          onTutup={() => setPindaiTerbuka(false)}
+          onHasil={(kode) => {
+            setPindaiTerbuka(false);
+            // Lewat jalur yang sama dengan ketikan: kode member menempel ke
+            // transaksi, barcode barang langsung masuk keranjang.
+            tanganiMasukan(kode);
           }}
         />
       )}
