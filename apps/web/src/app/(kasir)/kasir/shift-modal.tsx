@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth/context";
 import { profilTerakhir } from "@/lib/auth/profile";
 import { db } from "@/lib/db";
 import { type OutletRow, cacheOutlets } from "@/lib/outlet/api";
+import { adopsiShiftTerbuka } from "@/lib/sync/engine";
 import { enqueueOfflineAction } from "@/lib/sync/queue";
 import { Clock, Coffee, Lock, Store } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -121,6 +122,25 @@ export function ShiftModal({ onClose }: { onClose: () => void }) {
         return;
       }
       const outletId = selectedOutletId;
+
+      // Kasir yang sama mungkin MASIH punya shift terbuka di server —
+      // perangkat ini cuma kehilangan catatannya (dipasang ulang, cache
+      // dibersihkan, ganti HP). Membuka shift baru di atasnya ditolak indeks
+      // `idx_shifts_one_open`, dan setiap penjualan yang menunjuk shift baru
+      // itu ikut ditolak dengan pelanggaran foreign key — persis yang
+      // memblokir toko selama tiga hari pada 19-22 Sep 2026.
+      //
+      // Jadi tanya server dulu, dan pakai yang sudah ada bila memang ada.
+      if (accessToken && tenantId) {
+        const diadopsi = await adopsiShiftTerbuka(accessToken, tenantId, outletId).catch(
+          () => false,
+        );
+        if (diadopsi) {
+          toast.success("Shift yang masih terbuka di server dipakai lagi");
+          onClose();
+          return;
+        }
+      }
 
       const cash = Number.parseFloat(openingCash) || 0;
 

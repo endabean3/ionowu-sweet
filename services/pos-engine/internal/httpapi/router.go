@@ -121,6 +121,7 @@ func NewRouter(pool *pgxpool.Pool, jwtPublicKey ed25519.PublicKey, jwtPrivateKey
 			checkout.PostRefund(w, req, chi.URLParam(req, "id"))
 		})
 
+		r.Get("/shifts/open", shift.GetShiftOpen)
 		r.Post("/shifts/open", shift.PostShiftOpen)
 		r.Post("/shifts/{shiftId}/close", func(w http.ResponseWriter, req *http.Request) {
 			shift.PostShiftClose(w, req, chi.URLParam(req, "shiftId"))
