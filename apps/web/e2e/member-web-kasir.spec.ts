@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   provisionTenant,
   tambahProduk,
 } from "./helpers";
@@ -35,7 +36,7 @@ test.describe("Member daftar sendiri di web, lalu belanja di kasir", () => {
     // Transaksi pertama TANPA member — inilah nota yang QR-nya dipindai.
     await page.getByText("Sabun Batang").first().click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/).first()).toBeVisible();
@@ -111,7 +112,7 @@ test.describe("Member daftar sendiri di web, lalu belanja di kasir", () => {
 
     await page.getByText("Sabun Batang").first().click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/).first()).toBeVisible();

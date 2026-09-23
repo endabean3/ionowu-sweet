@@ -5,6 +5,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   pinUji,
   provisionTenant,
   tambahProduk,
@@ -43,7 +44,7 @@ test.describe("Diskon transaksi", () => {
     await expect(teksTerlihat(page, "15.000")).toBeVisible();
 
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "20000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/).first()).toBeVisible();

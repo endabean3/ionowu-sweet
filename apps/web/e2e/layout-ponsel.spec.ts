@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { type TenantFixture, bukaShiftBilaPerlu, loginViaUI, provisionTenant } from "./helpers";
+import {
+  type TenantFixture,
+  bukaShiftBilaPerlu,
+  loginViaUI,
+  pilihTunai,
+  provisionTenant,
+} from "./helpers";
 
 /**
  * Tata letak portrait ponsel murah (Redmi 9C: 360×800 CSS px) — layar yang
@@ -39,7 +45,7 @@ test.describe("Layout ponsel 360 px", () => {
 
     await panel.getByRole("button", { name: /Bayar Sekarang/ }).click();
     await expect(panel).toBeHidden();
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "1000000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/)).toBeVisible();
