@@ -79,6 +79,49 @@ func (h *ShiftHandler) PostShiftOpen(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetShiftOpen menangani GET /shifts/open?outlet_id=...
+//
+// Kenapa ini ada: perangkat yang KEHILANGAN data lokalnya — dipasang ulang,
+// cache dibersihkan, ganti HP — tidak tahu bahwa kasir yang sama masih punya
+// shift terbuka di server. Ia membuka shift baru, ditolak indeks unik parsial
+// `idx_shifts_one_open`, dan SETIAP penjualan yang menunjuk shift baru itu
+// ikut ditolak dengan pelanggaran foreign key.
+//
+// Terjadi sungguhan: satu shift yang lupa ditutup 19 Sep 2026 memblokir semua
+// penjualan selama tiga hari, dan nota tidak pernah sampai ke server sehingga
+// QR garansi di nota pembeli menjawab 404.
+//
+// Dengan endpoint ini klien bisa MENGADOPSI shift yang sudah terbuka, bukan
+// memaksa membuka yang baru.
+//
+// 204 bila tidak ada shift terbuka — bukan 404. Ketiadaan shift adalah
+// keadaan normal (toko belum buka), bukan kekeliruan alamat.
+func (h *ShiftHandler) GetShiftOpen(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	outletID := r.URL.Query().Get("outlet_id")
+	if outletID == "" {
+		RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "outlet_id wajib diisi")
+		return
+	}
+
+	shift, err := h.q.GetOpenShift(ctx, store.GetOpenShiftParams{
+		TenantID: TenantID(ctx), OutletID: outletID, CashierID: UserID(ctx),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err != nil {
+		RespondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal membaca shift")
+		return
+	}
+
+	RespondJSON(w, http.StatusOK, shiftResponse{
+		ID: shift.ID, OutletID: shift.OutletID, CashierID: shift.CashierID,
+		OpenedAt: shift.OpenedAt.Time, OpeningCash: shift.OpeningCash,
+	})
+}
+
 type shiftCloseInput struct {
 	ClosingCash decimal.Decimal `json:"closing_cash"`
 	OccurredAt  time.Time       `json:"occurred_at"`

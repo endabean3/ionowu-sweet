@@ -220,3 +220,61 @@ export async function pushQueue(accessToken: string, deviceId: string) {
     return false;
   }
 }
+
+interface ShiftTerbukaResponse {
+  id: string;
+  outlet_id: string;
+  cashier_id: string;
+  opened_at: string;
+  opening_cash: string;
+}
+
+/**
+ * Mengadopsi shift yang MASIH TERBUKA di server ke penyimpanan lokal.
+ *
+ * Perangkat yang kehilangan data lokalnya — dipasang ulang, cache dibersihkan,
+ * ganti HP — tidak tahu bahwa kasir yang sama masih punya shift terbuka di
+ * server. Tanpa ini ia membuka shift baru, ditolak indeks unik
+ * `idx_shifts_one_open`, dan SETIAP penjualan yang menunjuk shift itu ikut
+ * ditolak dengan pelanggaran foreign key.
+ *
+ * Terjadi sungguhan: satu shift yang lupa ditutup 19 Sep 2026 memblokir semua
+ * penjualan selama tiga hari, dan nota tidak pernah sampai ke server sehingga
+ * QR garansi di nota pembeli menjawab 404.
+ *
+ * Hanya mengisi kekosongan: bila perangkat SUDAH punya shift terbuka lokal,
+ * fungsi ini tidak menyentuh apa pun. Menimpanya akan memutus penjualan yang
+ * masih mengantre dengan shift_id lama.
+ */
+export async function adopsiShiftTerbuka(
+  accessToken: string,
+  tenantId: string,
+  outletId: string,
+): Promise<boolean> {
+  const lokal = await db.shifts.where("status").equals("open").first();
+  if (lokal) return false;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/shifts/open?outlet_id=${encodeURIComponent(outletId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    // Offline: kasir tetap bisa membuka shift baru seperti biasa.
+    return false;
+  }
+  // 204 = tidak ada shift terbuka. Itu keadaan normal, bukan galat.
+  if (res.status === 204 || !res.ok) return false;
+
+  const s: ShiftTerbukaResponse = await res.json();
+  await db.shifts.put({
+    id: s.id,
+    tenant_id: tenantId,
+    outlet_id: s.outlet_id,
+    cashier_id: s.cashier_id,
+    opened_at: s.opened_at,
+    opening_cash: s.opening_cash,
+    status: "open",
+  });
+  return true;
+}
