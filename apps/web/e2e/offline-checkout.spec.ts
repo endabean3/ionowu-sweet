@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   provisionTenant,
 } from "./helpers";
 
@@ -45,7 +46,7 @@ test.describe("Offline Checkout & Sync", () => {
     // Ada dua pemicu: CTA keranjang (desktop) dan bar ringkas (mobile).
     await klikBayar(page);
     await expect(page.getByRole("heading", { name: "Pembayaran" })).toBeVisible();
-    await page.click("text=Tunai");
+    await pilihTunai(page);
 
     // Tunai wajib menyebut uang diterima — tombolnya tetap mati sampai
     // nominalnya menutupi total.

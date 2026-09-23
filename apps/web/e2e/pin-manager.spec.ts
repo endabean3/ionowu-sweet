@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   pinUji,
   provisionTenant,
 } from "./helpers";
@@ -60,7 +61,7 @@ test.describe("PIN persetujuan manager", () => {
     await bukaShiftBilaPerlu(page);
     await page.getByText(fx.productName).first().click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/).first()).toBeVisible();
@@ -112,7 +113,7 @@ test.describe("PIN persetujuan manager", () => {
     await bukaShiftBilaPerlu(page);
     await page.getByText(fx.productName).first().click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/).first()).toBeVisible();

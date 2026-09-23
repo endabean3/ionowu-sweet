@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   provisionTenant,
   tambahProduk,
 } from "./helpers";
@@ -30,7 +31,7 @@ test.describe("Tutup buku", () => {
   const jual = async (page: import("@playwright/test").Page) => {
     await page.getByText(NAMA).first().click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
     await expect(page.getByText(/^Lunas/).first()).toBeVisible();
