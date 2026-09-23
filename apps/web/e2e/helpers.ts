@@ -200,6 +200,21 @@ export function teksTerlihat(page: Page, teks: string | RegExp) {
  * dilakukan kasir sungguhan: ia membayar dari panel yang sedang ia buka,
  * bukan menutupnya dulu.
  */
+/**
+ * Memilih metode "Tunai" DI DALAM dialog pembayaran.
+ *
+ * Bukan `page.click("text=Tunai")`. Setelah penjualan pertama, nota di layar
+ * juga memuat kata "Tunai" (lib/receipt/format.ts memetakan cash -> "Tunai"),
+ * sehingga locator itu cocok dengan DUA elemen. Selama dialog kebetulan lebih
+ * dulu di DOM ia tetap lolos — dan berhenti lolos begitu urutannya berubah,
+ * misalnya saat Modal dipindah ke portal `document.body`.
+ *
+ * Melingkupi ke dialog membuat uji ini tidak lagi bergantung pada urutan DOM.
+ */
+export async function pilihTunai(page: Page) {
+  await page.getByRole("dialog").getByRole("button", { name: "Tunai" }).click();
+}
+
 export async function klikBayar(page: Page) {
   const diPanel = page
     .getByRole("dialog")

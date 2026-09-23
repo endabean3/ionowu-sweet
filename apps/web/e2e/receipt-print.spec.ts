@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   provisionTenant,
 } from "./helpers";
 
@@ -34,7 +35,7 @@ test.describe("Cetak Struk", () => {
 
     await kartuProduk.click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
 

@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   provisionTenant,
 } from "./helpers";
 
@@ -78,7 +79,7 @@ const cetakan = (page: Page) => page.evaluate(() => window.__printer.printed);
 async function jualSatu(page: Page, fx: TenantFixture) {
   await page.getByText(fx.productName).first().click();
   await klikBayar(page);
-  await page.click("text=Tunai");
+  await pilihTunai(page);
   await page.fill("#given_amount", "50000");
   await page.locator('button:has-text("Selesaikan Pembayaran")').click();
   await expect(page.getByText(/^Lunas/)).toBeVisible();
@@ -174,7 +175,7 @@ test.describe("Printer Bluetooth (APK)", () => {
 
     await page.getByText(fx.productName).first().click();
     await klikBayar(page);
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
 

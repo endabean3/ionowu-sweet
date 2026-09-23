@@ -4,6 +4,7 @@ import { latarModal, panelModal } from "@/lib/motion/tokens";
 import { type PanInfo, m, useDragControls } from "framer-motion";
 import { X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const FOKUSABEL =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -86,6 +87,9 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const pemicuRef = useRef<Element | null>(null);
   const judulId = useId();
+  // Portal butuh document; di render server ia belum ada.
+  const [pasang, setPasang] = useState(false);
+  useEffect(() => setPasang(true), []);
 
   const tutup = useCallback(() => {
     if (dismissible) onClose();
@@ -138,7 +142,18 @@ export function Modal({
     };
   }, [tutup]);
 
-  return (
+  // Dirender ke <body>, BUKAN di tempat pemanggilnya berada.
+  //
+  // `position: fixed` mengacu ke leluhur terdekat yang punya transform/filter,
+  // bukan ke layar. Modal yang dipanggil dari dalam header — yang beranimasi
+  // dengan framer-motion, jadi ber-transform — menjadi kotak kecil seukuran
+  // header itu, bukan lapisan penuh. Terjadi sungguhan pada dialog antrean
+  // gagal: 331x60 piksel di pojok atas, isinya terpotong.
+  //
+  // Ditunda sampai `pasang` supaya render server tidak menyentuh document.
+  if (!pasang) return null;
+
+  return createPortal(
     <m.div
       className="fixed inset-0 z-50 flex items-end justify-center bg-main/40 backdrop-blur-sm sm:items-center sm:p-4"
       variants={latarModal}
@@ -227,6 +242,7 @@ export function Modal({
           </div>
         )}
       </m.div>
-    </m.div>
+    </m.div>,
+    document.body,
   );
 }

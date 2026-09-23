@@ -4,6 +4,7 @@ import {
   bukaShiftBilaPerlu,
   klikBayar,
   loginViaUI,
+  pilihTunai,
   provisionTenant,
 } from "./helpers";
 
@@ -39,7 +40,7 @@ test.describe("Sync Recovery", () => {
     await kartuProduk.click();
     await klikBayar(page);
     await expect(page.getByRole("heading", { name: "Pembayaran" })).toBeVisible();
-    await page.click("text=Tunai");
+    await pilihTunai(page);
     await page.fill("#given_amount", "50000");
     await page.locator('button:has-text("Selesaikan Pembayaran")').click();
 
